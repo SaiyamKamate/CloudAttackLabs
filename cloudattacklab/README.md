@@ -2,7 +2,31 @@
 
 A local-first security experimentation platform: start an isolated Docker lab, run a controlled attack scenario against ShopCloud, collect real logs, detect, investigate and verify a response.
 
-**Status:** Week 1 groundwork. This repo currently holds the contracts and a fake ShopCloud. No platform features are implemented yet.
+**Status:** Backend and lab control are implemented (step 3 in `docs/api-contract.md`). Not started: Scenario Engine, log ingestion, detection, dashboard, responses.
+
+What works now:
+
+- FastAPI backend in `backend/app` with PostgreSQL; tables are created by Alembic (`backend/alembic`).
+- `GET /api/v1/health` and every "Labs" endpoint: create, list, details (with container status and ShopCloud health), start, stop, reset.
+- Lab Manager (`backend/app/lab_manager`). Its Docker adapter is the only code that talks to Docker, and it only runs `docker compose -f lab/docker-compose.lab.yml`. Reset recreates the container and then calls ShopCloud's `POST /lab/reset`.
+- Every lab start, stop and reset writes an `audit_log` row. There is no login yet, so the actor is `anonymous`.
+- One lab can be running at a time, because the lab compose file uses fixed ports.
+
+Run it:
+
+```bash
+cp .env.example .env                 # then change the values
+docker compose up -d --build         # PostgreSQL + backend (runs the migrations), API on 127.0.0.1:8000
+
+curl -X POST http://127.0.0.1:8000/api/v1/labs -H 'Content-Type: application/json' -d '{"name": "demo", "target": "shopcloud"}'
+curl -X POST http://127.0.0.1:8000/api/v1/labs/<id>/start
+curl http://127.0.0.1:8000/api/v1/labs/<id>
+
+pytest                               # unit tests, no Docker needed
+pytest -m integration                # really starts, resets and stops the lab
+```
+
+The backend container uses host networking and mounts the Docker socket, so it needs a Linux Docker Engine (native, or inside WSL 2). On Docker Desktop, enable host networking or run the backend outside Docker: `cd backend && alembic upgrade head && uvicorn app.main:app`.
 
 ## What is here
 
