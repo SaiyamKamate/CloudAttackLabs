@@ -39,6 +39,9 @@ services:
       LAB_CONTROL_TOKEN: ${LAB_CONTROL_TOKEN:-lab-dev-token}
       LAB_COMPOSE_FILE: /workspace/lab/docker-compose.lab.yml
       SHOPCLOUD_URL: ${SHOPCLOUD_URL:-http://127.0.0.1:8081}
+      # The Scenario Engine loads these and runs the scenario scripts in-process.
+      SCENARIOS_DIR: /workspace/scenarios
+      SCENARIO_SCRIPTS_DIR: /workspace/scenarios/scripts
       BACKEND_HOST: 127.0.0.1
       BACKEND_PORT: ${BACKEND_PORT:-8000}
     volumes:
@@ -47,6 +50,8 @@ services:
       # The lab definition and its build context, read-only.
       - ./lab:/workspace/lab:ro
       - ./mock_shopcloud:/workspace/mock_shopcloud:ro
+      # Scenario definitions and their scripts, read-only.
+      - ./scenarios:/workspace/scenarios:ro
     mem_limit: 512m
     healthcheck:
       test: ["CMD", "python", "-c", "import os, urllib.request; urllib.request.urlopen('http://127.0.0.1:' + os.environ['BACKEND_PORT'] + '/api/v1/health', timeout=2)"]
