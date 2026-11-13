@@ -1,5 +1,6 @@
-# Platform services. The backend and frontend get added here in later steps.
-#   docker compose up -d
+# Platform services. The frontend gets added here in a later step.
+#   docker compose up -d --build
+# Settings come from .env (copy .env.example); the defaults below are for local use only.
 name: cloudattacklab
 
 services:
@@ -16,6 +17,39 @@ services:
     mem_limit: 512m
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build: ./backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # Host networking: the lab publishes ShopCloud on the host's 127.0.0.1 only,
+    # and this is how the backend reaches it without joining the lab network.
+    # The API listens on 127.0.0.1:8000 (this machine only).
+    network_mode: host
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-cloudattacklab}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-locally}
+      POSTGRES_DB: ${POSTGRES_DB:-cloudattacklab}
+      POSTGRES_HOST: 127.0.0.1
+      POSTGRES_PORT: 5432
+      LAB_CONTROL_TOKEN: ${LAB_CONTROL_TOKEN:-lab-dev-token}
+      LAB_COMPOSE_FILE: /workspace/lab/docker-compose.lab.yml
+      SHOPCLOUD_URL: ${SHOPCLOUD_URL:-http://127.0.0.1:8081}
+      BACKEND_HOST: 127.0.0.1
+      BACKEND_PORT: ${BACKEND_PORT:-8000}
+    volumes:
+      # The Lab Manager's Docker adapter drives the host's Docker through this socket.
+      - /var/run/docker.sock:/var/run/docker.sock
+      # The lab definition and its build context, read-only.
+      - ./lab:/workspace/lab:ro
+      - ./mock_shopcloud:/workspace/mock_shopcloud:ro
+    mem_limit: 512m
+    healthcheck:
+      test: ["CMD", "python", "-c", "import os, urllib.request; urllib.request.urlopen('http://127.0.0.1:' + os.environ['BACKEND_PORT'] + '/api/v1/health', timeout=2)"]
       interval: 5s
       timeout: 3s
       retries: 10
