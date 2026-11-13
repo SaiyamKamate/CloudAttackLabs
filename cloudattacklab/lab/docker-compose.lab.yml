@@ -1,0 +1,27 @@
+# The isolated lab. The Lab Manager will start, stop and reset this file.
+# By hand:  docker compose -f lab/docker-compose.lab.yml up --build -d
+#
+# To use the real ShopCloud, change `build:` to its folder. Nothing else changes
+# as long as it follows docs/shopcloud-interface.md.
+name: cloudattacklab-lab
+
+services:
+  shopcloud:
+    build: ../mock_shopcloud
+    environment:
+      LAB_CONTROL_TOKEN: ${LAB_CONTROL_TOKEN:-lab-dev-token}
+    ports:
+      - "127.0.0.1:8081:8000" # reachable from this machine only
+    networks:
+      - lab
+    mem_limit: 256m
+    cpus: 0.5
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+networks:
+  lab:
+    name: cloudattacklab-lab

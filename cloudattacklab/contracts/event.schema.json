@@ -1,0 +1,209 @@
+{
+  "$defs": {
+    "EventSource": {
+      "enum": [
+        "application",
+        "docker",
+        "falco",
+        "platform"
+      ],
+      "title": "EventSource",
+      "type": "string"
+    },
+    "EventType": {
+      "enum": [
+        "authentication_success",
+        "authentication_failure",
+        "rate_limit_triggered",
+        "authorization_denied",
+        "resource_access",
+        "container_started",
+        "container_stopped",
+        "suspicious_process",
+        "scenario_started",
+        "scenario_finished",
+        "response_executed",
+        "config_changed",
+        "other"
+      ],
+      "title": "EventType",
+      "type": "string"
+    },
+    "Severity": {
+      "enum": [
+        "info",
+        "low",
+        "medium",
+        "high",
+        "critical"
+      ],
+      "title": "Severity",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "One normalized event. Field names follow the guide's table exactly.",
+  "properties": {
+    "event_id": {
+      "description": "Unique ID of the normalized event.",
+      "format": "uuid",
+      "title": "Event Id",
+      "type": "string"
+    },
+    "timestamp": {
+      "description": "When the event happened. Always stored in UTC.",
+      "format": "date-time",
+      "title": "Timestamp",
+      "type": "string"
+    },
+    "scenario_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Scenario linked to the event, when known.",
+      "title": "Scenario Id"
+    },
+    "source": {
+      "$ref": "#/$defs/EventSource",
+      "description": "Where the event came from."
+    },
+    "event_type": {
+      "$ref": "#/$defs/EventType",
+      "description": "Normalized category."
+    },
+    "severity": {
+      "$ref": "#/$defs/Severity",
+      "default": "info",
+      "description": "Normalized severity."
+    },
+    "source_ip": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Source address, if present.",
+      "title": "Source Ip"
+    },
+    "resource": {
+      "description": "Affected app, container, service or resource.",
+      "minLength": 1,
+      "title": "Resource",
+      "type": "string"
+    },
+    "message": {
+      "description": "Human-readable description.",
+      "minLength": 1,
+      "title": "Message",
+      "type": "string"
+    },
+    "raw_event_reference": {
+      "description": "Pointer to the original log line/event so a detection can be explained (e.g. 'docker:shopcloud:<request_id>' or a Loki stream + timestamp).",
+      "minLength": 1,
+      "title": "Raw Event Reference",
+      "type": "string"
+    },
+    "schema_version": {
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "lab_id": {
+      "anyOf": [
+        {
+          "format": "uuid",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Lab Id"
+    },
+    "run_id": {
+      "anyOf": [
+        {
+          "format": "uuid",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Scenario run that produced the event.",
+      "title": "Run Id"
+    },
+    "username": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Username"
+    },
+    "container_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Container Id"
+    },
+    "rule_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Set for Falco events: the Falco rule name.",
+      "title": "Rule Id"
+    },
+    "correlation_key": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Events sharing this key belong together, e.g. 'run:<run_id>|ip:<source_ip>'.",
+      "title": "Correlation Key"
+    }
+  },
+  "required": [
+    "timestamp",
+    "source",
+    "event_type",
+    "resource",
+    "message",
+    "raw_event_reference"
+  ],
+  "title": "NormalizedEvent",
+  "type": "object"
+}

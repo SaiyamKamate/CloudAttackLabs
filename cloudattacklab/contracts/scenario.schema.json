@@ -1,0 +1,379 @@
+{
+  "$defs": {
+    "Capability": {
+      "description": "What a target must offer for a scenario to be compatible with it.",
+      "enum": [
+        "login_endpoint",
+        "protected_resource",
+        "rate_limit_control",
+        "container_target",
+        "falco"
+      ],
+      "title": "Capability",
+      "type": "string"
+    },
+    "Cleanup": {
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "default": true,
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "steps": {
+          "description": "Named cleanup steps, run in order.",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Steps",
+          "type": "array"
+        }
+      },
+      "required": [
+        "steps"
+      ],
+      "title": "Cleanup",
+      "type": "object"
+    },
+    "Detection": {
+      "additionalProperties": false,
+      "properties": {
+        "rule": {
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "title": "Rule",
+          "type": "string"
+        },
+        "threshold": {
+          "minimum": 1,
+          "title": "Threshold",
+          "type": "integer"
+        },
+        "window_seconds": {
+          "default": 60,
+          "maximum": 3600,
+          "minimum": 1,
+          "title": "Window Seconds",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "rule",
+        "threshold"
+      ],
+      "title": "Detection",
+      "type": "object"
+    },
+    "EventSource": {
+      "enum": [
+        "application",
+        "docker",
+        "falco",
+        "platform"
+      ],
+      "title": "EventSource",
+      "type": "string"
+    },
+    "EventType": {
+      "enum": [
+        "authentication_success",
+        "authentication_failure",
+        "rate_limit_triggered",
+        "authorization_denied",
+        "resource_access",
+        "container_started",
+        "container_stopped",
+        "suspicious_process",
+        "scenario_started",
+        "scenario_finished",
+        "response_executed",
+        "config_changed",
+        "other"
+      ],
+      "title": "EventType",
+      "type": "string"
+    },
+    "Execution": {
+      "additionalProperties": false,
+      "properties": {
+        "script": {
+          "description": "File name only, inside the scenarios scripts folder.",
+          "pattern": "^[a-z][a-z0-9_]*\\.py$",
+          "title": "Script",
+          "type": "string"
+        },
+        "timeout_seconds": {
+          "default": 60,
+          "maximum": 600,
+          "minimum": 1,
+          "title": "Timeout Seconds",
+          "type": "integer"
+        },
+        "parameters": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "title": "Parameters",
+          "type": "object"
+        }
+      },
+      "required": [
+        "script"
+      ],
+      "title": "Execution",
+      "type": "object"
+    },
+    "ExpectedEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "source": {
+          "$ref": "#/$defs/EventSource"
+        },
+        "event_type": {
+          "$ref": "#/$defs/EventType"
+        },
+        "min_count": {
+          "default": 1,
+          "minimum": 1,
+          "title": "Min Count",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "source",
+        "event_type"
+      ],
+      "title": "ExpectedEvent",
+      "type": "object"
+    },
+    "Prerequisite": {
+      "additionalProperties": false,
+      "properties": {
+        "check": {
+          "$ref": "#/$defs/PrerequisiteCheck"
+        },
+        "detail": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Account or container name, if the check needs one.",
+          "title": "Detail"
+        }
+      },
+      "required": [
+        "check"
+      ],
+      "title": "Prerequisite",
+      "type": "object"
+    },
+    "PrerequisiteCheck": {
+      "enum": [
+        "http_health",
+        "container_running",
+        "test_account"
+      ],
+      "title": "PrerequisiteCheck",
+      "type": "string"
+    },
+    "Response": {
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "$ref": "#/$defs/ResponseActionType"
+        },
+        "requires_approval": {
+          "default": true,
+          "title": "Requires Approval",
+          "type": "boolean"
+        },
+        "parameters": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "title": "Parameters",
+          "type": "object"
+        },
+        "verification": {
+          "$ref": "#/$defs/Verification"
+        }
+      },
+      "required": [
+        "action",
+        "verification"
+      ],
+      "title": "Response",
+      "type": "object"
+    },
+    "ResponseActionType": {
+      "enum": [
+        "temporary_rate_limit",
+        "stop_container",
+        "isolate_container"
+      ],
+      "title": "ResponseActionType",
+      "type": "string"
+    },
+    "ScenarioType": {
+      "enum": [
+        "application",
+        "container"
+      ],
+      "title": "ScenarioType",
+      "type": "string"
+    },
+    "Verification": {
+      "additionalProperties": false,
+      "properties": {
+        "check": {
+          "description": "Name of the follow-up check, e.g. login_returns_429.",
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "title": "Check",
+          "type": "string"
+        },
+        "description": {
+          "title": "Description",
+          "type": "string"
+        }
+      },
+      "required": [
+        "check",
+        "description"
+      ],
+      "title": "Verification",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "id": {
+      "pattern": "^[a-z][a-z0-9_]*$",
+      "title": "Id",
+      "type": "string"
+    },
+    "name": {
+      "minLength": 3,
+      "title": "Name",
+      "type": "string"
+    },
+    "category": {
+      "minLength": 3,
+      "title": "Category",
+      "type": "string"
+    },
+    "description": {
+      "minLength": 10,
+      "title": "Description",
+      "type": "string"
+    },
+    "version": {
+      "default": "1.0.0",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "title": "Version",
+      "type": "string"
+    },
+    "target": {
+      "description": "Must be one of the lab's configured targets.",
+      "pattern": "^[a-z][a-z0-9_]*$",
+      "title": "Target",
+      "type": "string"
+    },
+    "type": {
+      "$ref": "#/$defs/ScenarioType"
+    },
+    "requires": {
+      "items": {
+        "$ref": "#/$defs/Capability"
+      },
+      "title": "Requires",
+      "type": "array"
+    },
+    "prerequisites": {
+      "items": {
+        "$ref": "#/$defs/Prerequisite"
+      },
+      "minItems": 1,
+      "title": "Prerequisites",
+      "type": "array"
+    },
+    "execution": {
+      "$ref": "#/$defs/Execution"
+    },
+    "expected_telemetry": {
+      "items": {
+        "$ref": "#/$defs/ExpectedEvent"
+      },
+      "minItems": 1,
+      "title": "Expected Telemetry",
+      "type": "array"
+    },
+    "detection": {
+      "$ref": "#/$defs/Detection"
+    },
+    "response": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Response"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "cleanup": {
+      "$ref": "#/$defs/Cleanup"
+    }
+  },
+  "required": [
+    "id",
+    "name",
+    "category",
+    "description",
+    "target",
+    "type",
+    "prerequisites",
+    "execution",
+    "expected_telemetry",
+    "detection",
+    "cleanup"
+  ],
+  "title": "ScenarioDefinition",
+  "type": "object"
+}

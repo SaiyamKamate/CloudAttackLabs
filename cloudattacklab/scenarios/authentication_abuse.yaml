@@ -1,0 +1,53 @@
+schema_version: "1.0"
+id: authentication_abuse
+name: Repeated Failed Login Attempts
+category: authentication
+description: >
+  Sends a bounded number of invalid login attempts to the ShopCloud test login
+  endpoint and checks that the repeated failures are detected.
+version: 1.0.0
+target: shopcloud
+type: application
+
+requires:
+  - login_endpoint
+  - rate_limit_control
+
+prerequisites:
+  - check: http_health
+  - check: test_account
+    detail: lab_user
+
+execution:
+  script: authentication_abuse.py
+  timeout_seconds: 60
+  parameters:
+    username: lab_user
+    attempts: 20
+    interval_seconds: 1
+
+expected_telemetry:
+  - source: application
+    event_type: authentication_failure
+    min_count: 10
+
+detection:
+  rule: repeated_failed_logins
+  threshold: 10
+  window_seconds: 60
+
+response:
+  action: temporary_rate_limit
+  requires_approval: true
+  parameters:
+    max_attempts: 5
+    window_seconds: 60
+  verification:
+    check: login_returns_429
+    description: Send follow-up login attempts and confirm ShopCloud answers 429.
+
+cleanup:
+  enabled: true
+  steps:
+    - disable_rate_limit
+    - reset_target_state
