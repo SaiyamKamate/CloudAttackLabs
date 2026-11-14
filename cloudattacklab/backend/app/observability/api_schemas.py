@@ -48,6 +48,7 @@ class AlertOut(BaseModel):
     description: str
     lab_id: Optional[UUID]
     run_id: Optional[UUID]
+    incident_id: Optional[UUID]
     event_count: int
     first_event_at: Optional[datetime]
     last_event_at: Optional[datetime]
