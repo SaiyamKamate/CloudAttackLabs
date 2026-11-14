@@ -8,7 +8,9 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+from datetime import datetime, timezone
 from pathlib import Path
+from typing import Optional
 
 from .adapter import ContainerStatus, LabAdapter, LabAdapterError
 
@@ -53,6 +55,14 @@ class DockerComposeAdapter(LabAdapter):
             )
             for row in _parse_ps(output)
         ]
+
+    def logs(self, service: str, since: Optional[datetime] = None) -> str:
+        args = ["logs", "--no-color", "--no-log-prefix"]
+        if since is not None:
+            # RFC3339 UTC, which `docker compose logs --since` accepts.
+            args += ["--since", since.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")]
+        args.append(service)
+        return self._compose(*args, timeout=60)
 
     # --- internals --------------------------------------------------------
     def _compose(self, *args: str, timeout: int | None = None) -> str:

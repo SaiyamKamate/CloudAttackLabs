@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Optional
 
 
@@ -39,3 +40,10 @@ class LabAdapter(ABC):
     @abstractmethod
     def status(self) -> list[ContainerStatus]:
         """Current workloads, including stopped ones. Empty if nothing exists."""
+
+    @abstractmethod
+    def logs(self, service: str, since: Optional[datetime] = None) -> str:
+        """Raw stdout logs of one service, oldest first, optionally only since a time.
+
+        One line per record. The caller parses them; the adapter never interprets them.
+        """
