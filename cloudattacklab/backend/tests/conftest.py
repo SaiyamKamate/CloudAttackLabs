@@ -15,7 +15,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 from app.db import get_session  # noqa: E402
 from app.lab_manager.adapter import ContainerStatus, LabAdapter, LabAdapterError  # noqa: E402
 from app.lab_manager.router import get_adapter, get_target_clients  # noqa: E402
-from app.lab_manager.target import TargetError, TargetHealth  # noqa: E402
+from app.lab_manager.target import LoginResult, TargetError, TargetHealth  # noqa: E402
 from app.main import create_app  # noqa: E402
 from app.models import Base  # noqa: E402
 
@@ -71,6 +71,11 @@ class FakeTarget:
         self.adapter = adapter
         self.reset_calls = 0
         self.fail_reset = False
+        # test_account pre-flight: which accounts may log in, and a switch to fail them.
+        self.valid_accounts = {"lab_user": "lab-user-pass", "lab_restricted": "lab-restricted-pass"}
+        self.fail_login = False
+        self.logins: list[tuple[str, str]] = []
+        self.rate_limit_calls: list[dict] = []
 
     def health(self) -> TargetHealth:
         if not self.adapter.running:
@@ -87,6 +92,18 @@ class FakeTarget:
         self.reset_calls += 1
         if self.fail_reset:
             raise TargetError("POST /lab/reset returned HTTP 403")
+
+    def login(self, username: str, password: str) -> LoginResult:
+        self.logins.append((username, password))
+        if self.fail_login:
+            return LoginResult(ok=False, status_code=401)
+        ok = self.valid_accounts.get(username) == password
+        return LoginResult(ok=ok, status_code=200 if ok else 401)
+
+    def set_rate_limit(self, enabled: bool, max_attempts=None, window_seconds=None) -> None:
+        self.rate_limit_calls.append(
+            {"enabled": enabled, "max_attempts": max_attempts, "window_seconds": window_seconds}
+        )
 
 
 @pytest.fixture

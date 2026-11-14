@@ -92,6 +92,7 @@ class ScenarioRun(Base):
     started_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     error: Mapped[Optional[str]] = mapped_column(Text)
+    summary: Mapped[Optional[dict[str, Any]]] = mapped_column(JSON)  # the script's JSON result
 
     lab: Mapped[Lab] = relationship(back_populates="runs")
 

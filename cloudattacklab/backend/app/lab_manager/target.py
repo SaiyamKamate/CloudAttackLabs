@@ -24,10 +24,21 @@ class TargetHealth:
     error: Optional[str] = None
 
 
+@dataclass(frozen=True)
+class LoginResult:
+    ok: bool                                # the login returned 200
+    status_code: Optional[int] = None
+    error: Optional[str] = None             # set when the request itself failed
+
+
 class TargetClient(Protocol):
     def health(self) -> TargetHealth: ...
     def wait_healthy(self, timeout_seconds: float = 30) -> TargetHealth: ...
     def reset(self) -> None: ...
+    def login(self, username: str, password: str) -> LoginResult: ...
+    def set_rate_limit(
+        self, enabled: bool, max_attempts: Optional[int] = None, window_seconds: Optional[int] = None
+    ) -> None: ...
 
 
 class HttpTargetClient:
@@ -71,3 +82,36 @@ class HttpTargetClient:
             raise TargetError(f"POST /lab/reset failed: {type(exc).__name__}: {exc}") from exc
         if response.status_code != 200:
             raise TargetError(f"POST /lab/reset returned HTTP {response.status_code}")
+
+    def login(self, username: str, password: str) -> LoginResult:
+        """POST /api/login. Used by the test_account pre-flight check."""
+        try:
+            response = httpx.post(
+                f"{self.base_url}/api/login",
+                json={"username": username, "password": password},
+                timeout=self._timeout,
+            )
+        except httpx.HTTPError as exc:
+            return LoginResult(ok=False, error=f"{type(exc).__name__}: {exc}")
+        return LoginResult(ok=response.status_code == 200, status_code=response.status_code)
+
+    def set_rate_limit(
+        self, enabled: bool, max_attempts: Optional[int] = None, window_seconds: Optional[int] = None
+    ) -> None:
+        """POST /lab/rate-limit. Used by the disable_rate_limit cleanup step."""
+        body: dict[str, Any] = {"enabled": enabled}
+        if max_attempts is not None:
+            body["max_attempts"] = max_attempts
+        if window_seconds is not None:
+            body["window_seconds"] = window_seconds
+        try:
+            response = httpx.post(
+                f"{self.base_url}/lab/rate-limit",
+                json=body,
+                headers={"X-Lab-Token": self._token},
+                timeout=self._timeout,
+            )
+        except httpx.HTTPError as exc:
+            raise TargetError(f"POST /lab/rate-limit failed: {type(exc).__name__}: {exc}") from exc
+        if response.status_code != 200:
+            raise TargetError(f"POST /lab/rate-limit returned HTTP {response.status_code}")
