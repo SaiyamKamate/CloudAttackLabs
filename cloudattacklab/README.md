@@ -2,7 +2,7 @@
 
 A local-first security experimentation platform: start an isolated Docker lab, run a controlled attack scenario against ShopCloud, collect real logs, detect, investigate and verify a response.
 
-**Status:** Backend, lab control, the Scenario Engine, telemetry ingestion with the first detection, and a basic dashboard are implemented (steps 3–6 in `docs/api-contract.md`). Not started: login/auth, response actions, incidents, reports.
+**Status:** Backend, lab control, the Scenario Engine, telemetry ingestion with the first detection, a basic dashboard, and one response action with approval and verification are implemented (steps 3–7 in `docs/api-contract.md`), plus a minimal version of incidents. Not started: login/auth, the `stop_container` and `isolate_container` actions, the incident timeline, risk score and correlation, reports.
 
 What works now:
 
@@ -19,8 +19,15 @@ What works now:
   - While a run is active (and once more when it finishes), ShopCloud's logs are collected through the Docker adapter, behind a small telemetry-source interface so Loki can replace it later. Lines that are not valid JSON are skipped and counted; nothing is invented.
   - Each log record is normalized into a `NormalizedEvent` using the mapping in `docs/shopcloud-interface.md` section 5. The original record is kept in `events.raw`; `raw_event_reference` is `docker:shopcloud:<request_id>`; the same request_id is never stored twice.
   - Detection rules are small validated YAML files in `/rules`. `repeated_failed_logins` fires when one source IP produces `threshold` failed logins within `window_seconds` (taken from the scenario's `detection`: 10 in 60s). One alert per run and source IP, with every contributing event linked through `alert_events`.
-- A basic React dashboard (`frontend/`) with three pages: Lab (status, ShopCloud health, Start/Stop/Reset), Scenarios (list, Run, live status, Cleanup) and Alerts (table, and each alert's linked events with their `raw_event_reference`). All API calls go through one module, `frontend/src/api.js`.
-- Every lab start/stop/reset and every run start/finish/failure/cleanup writes an `audit_log` row. There is no login yet, so the actor is `anonymous`.
+- Incidents, minimal version (`backend/app/incidents`): the first alert of a run creates one incident for that run, and every alert of the run is linked to it. `GET /incidents` and `GET /incidents/{id}` return it with its alerts and responses. No timeline, risk score or correlation across alerts yet.
+- Response Manager (`backend/app/response_manager`) and every "Response actions" endpoint, plus `GET /audit`.
+  - `POST /incidents/{id}/responses` creates a `response_actions` row with status `pending_approval`. The action and its parameters are read from the scenario's `response` section; the endpoints take no request body, so a caller cannot choose the action, its values or the target. One open response per incident.
+  - Nothing is executed until it is approved. Reject marks the row `rejected` and leaves ShopCloud untouched.
+  - Approve executes `temporary_rate_limit`: `POST /lab/rate-limit` with `enabled=true` and the scenario's `max_attempts` and `window_seconds`, sent to the lab's configured ShopCloud. It is refused with 409 if the lab is not running.
+  - Then it verifies with the scenario's check `login_returns_429`: `max_attempts + 2` logins with a deliberately wrong password, and the ones beyond the limit must all get 429. What was sent and the status of every answer is saved in `verification_result`. The status becomes `verified`, or `failed` if ShopCloud did not apply the limit or could not be reached.
+  - It is reversible: the cleanup step `disable_rate_limit` turns the limit off and the response becomes `reverted`. Lab reset clears it too.
+- A basic React dashboard (`frontend/`) with three pages: Lab (status, ShopCloud health, Start/Stop/Reset), Scenarios (list, Run, live status, Cleanup) and Alerts (table, and each alert's linked events with their `raw_event_reference`). The alert detail has a "Request response" button, Approve and Reject for a pending response, then its status, the verification result in plain words and its audit trail. All API calls go through one module, `frontend/src/api.js`.
+- Every lab start/stop/reset, every run start/finish/failure/cleanup, and every response step (requested, approved or rejected with who decided, executed, verified or failed, reverted) writes an `audit_log` row, readable through `GET /audit`. There is no login yet, so the actor is `anonymous`.
 - One lab can be running at a time, because the lab compose file uses fixed ports.
 
 Run the whole platform (PostgreSQL, backend, dashboard):
@@ -30,7 +37,7 @@ cp .env.example .env                 # then change the values
 docker compose up -d --build         # then open the dashboard at http://127.0.0.1:5173
 ```
 
-The backend API is on `127.0.0.1:8000`; the dashboard proxies `/api` to it. From the dashboard: create and Start the lab, Run `authentication_abuse`, watch it reach `completed`, then open Alerts to see the `repeated_failed_logins` alert and its 20 linked events.
+The backend API is on `127.0.0.1:8000`; the dashboard proxies `/api` to it. From the dashboard: create and Start the lab, Run `authentication_abuse`, watch it reach `completed`, then open Alerts to see the `repeated_failed_logins` alert and its 20 linked events. On that alert, click "Request response", then Approve: the status becomes `verified` with "2 of 7 follow-up logins were blocked with 429". Back on Scenarios, Cleanup turns the rate limit off and the response shows `reverted`.
 
 Both the backend and the dashboard containers use host networking and the backend mounts the Docker socket, so this needs a Linux Docker Engine (native, or inside WSL 2). On Docker Desktop, enable host networking.
 
