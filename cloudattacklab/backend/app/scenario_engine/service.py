@@ -20,6 +20,7 @@ from ..detection.engine import DetectionEngine
 from ..errors import ApiError
 from ..lab_manager.adapter import LabAdapter, LabAdapterError
 from ..models import Lab, LabStatus, RunStatus, ScenarioRun
+from ..response_manager.revert import mark_reverted
 from ..schemas.scenario import ScenarioDefinition
 from ..lab_manager.target import TargetClient, TargetError
 from ..telemetry.ingest import TelemetryIngestor
@@ -299,6 +300,10 @@ class ScenarioService:
             except TargetError as exc:
                 errors[step] = str(exc)
                 log.warning("cleanup step '%s' failed for run %s: %s", step, run.id, exc)
+        # Either step turns the target's rate limit off, so an applied response is now reverted.
+        reverted = []
+        if "disable_rate_limit" in done or "reset_target_state" in done:
+            reverted = mark_reverted(session, lab_id=run.lab_id, trigger=f"cleanup:{trigger}", actor=self.actor)
         audit.record(
             session,
             actor=self.actor,
@@ -310,6 +315,7 @@ class ScenarioService:
                 "trigger": trigger,
                 "steps_done": done,
                 "steps_failed": errors,
+                "responses_reverted": [str(row.id) for row in reverted],
                 "outcome": "success" if not errors else "partial",
             },
         )
