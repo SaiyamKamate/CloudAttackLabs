@@ -38,6 +38,11 @@ class Settings:
     scenarios_dir: Path
     scenario_scripts_dir: Path
     lab_test_accounts: dict[str, str]
+    # Telemetry and detection
+    rules_dir: Path
+    telemetry_service: str               # which lab service's logs to collect
+    telemetry_collect_interval_seconds: float
+    telemetry_since_grace_seconds: float  # widen the collection window slightly
 
 
 def _database_url() -> str:
@@ -70,6 +75,10 @@ def get_settings() -> Settings:
             os.environ.get("SCENARIO_SCRIPTS_DIR", str(REPO_ROOT / "scenarios" / "scripts"))
         ),
         lab_test_accounts=_test_accounts(),
+        rules_dir=Path(os.environ.get("RULES_DIR", str(REPO_ROOT / "rules"))),
+        telemetry_service=os.environ.get("TELEMETRY_SERVICE", "shopcloud"),
+        telemetry_collect_interval_seconds=float(os.environ.get("TELEMETRY_COLLECT_INTERVAL_SECONDS", "2")),
+        telemetry_since_grace_seconds=float(os.environ.get("TELEMETRY_SINCE_GRACE_SECONDS", "3")),
     )
 
 

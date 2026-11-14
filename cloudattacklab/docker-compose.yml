@@ -42,6 +42,8 @@ services:
       # The Scenario Engine loads these and runs the scenario scripts in-process.
       SCENARIOS_DIR: /workspace/scenarios
       SCENARIO_SCRIPTS_DIR: /workspace/scenarios/scripts
+      # Detection rules.
+      RULES_DIR: /workspace/rules
       BACKEND_HOST: 127.0.0.1
       BACKEND_PORT: ${BACKEND_PORT:-8000}
     volumes:
@@ -52,6 +54,8 @@ services:
       - ./mock_shopcloud:/workspace/mock_shopcloud:ro
       # Scenario definitions and their scripts, read-only.
       - ./scenarios:/workspace/scenarios:ro
+      # Detection rules, read-only.
+      - ./rules:/workspace/rules:ro
     mem_limit: 512m
     healthcheck:
       test: ["CMD", "python", "-c", "import os, urllib.request; urllib.request.urlopen('http://127.0.0.1:' + os.environ['BACKEND_PORT'] + '/api/v1/health', timeout=2)"]

@@ -9,7 +9,9 @@ from sqlalchemy.orm import Session
 
 from ..config import Settings, get_settings
 from ..db import get_session
-from ..lab_manager.router import get_target_clients
+from ..detection.engine import DetectionEngine
+from ..lab_manager.adapter import LabAdapter
+from ..lab_manager.router import get_adapter, get_target_clients
 from ..lab_manager.target import TargetClient
 from ..schemas.scenario import ScenarioDefinition
 from .api_schemas import RunCreate, RunOut, ScenarioSummary
@@ -25,13 +27,20 @@ def get_scenario_engine() -> ScenarioEngine:
     return ScenarioEngine(settings.scenarios_dir, set(settings.lab_targets))
 
 
+@lru_cache
+def get_detection_engine() -> DetectionEngine:
+    return DetectionEngine(get_settings().rules_dir)
+
+
 def get_service(
     session: Session = Depends(get_session),
     engine: ScenarioEngine = Depends(get_scenario_engine),
     target_clients: dict[str, TargetClient] = Depends(get_target_clients),
     settings: Settings = Depends(get_settings),
+    adapter: LabAdapter = Depends(get_adapter),
+    detection: DetectionEngine = Depends(get_detection_engine),
 ) -> ScenarioService:
-    return ScenarioService(session, engine, target_clients, settings)
+    return ScenarioService(session, engine, target_clients, settings, adapter, detection)
 
 
 @router.get("/scenarios", response_model=list[ScenarioSummary])

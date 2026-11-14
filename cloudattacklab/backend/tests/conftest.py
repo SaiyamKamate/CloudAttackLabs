@@ -63,6 +63,10 @@ class FakeAdapter(LabAdapter):
             )
         ]
 
+    def logs(self, service, since=None) -> str:
+        # Canned log text for telemetry collection; empty by default.
+        return getattr(self, "log_text", "")
+
 
 class FakeTarget:
     """Pretends to be ShopCloud, answering only while the fake container runs."""

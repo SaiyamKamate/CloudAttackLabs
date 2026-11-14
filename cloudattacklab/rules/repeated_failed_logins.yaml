@@ -1,0 +1,13 @@
+id: repeated_failed_logins
+# Fires when one source IP produces many failed logins in a short window.
+# The threshold and window for a run come from the scenario's `detection`
+# section; the values below are only fallbacks.
+event_type: authentication_failure
+group_by: source_ip
+severity: medium
+title: Repeated failed logins from one source
+description: >
+  One source IP produced enough failed logins within the window to look like a
+  password-guessing attempt.
+default_threshold: 10
+default_window_seconds: 60
