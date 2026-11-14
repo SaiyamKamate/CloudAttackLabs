@@ -1,5 +1,5 @@
-# Platform services. The frontend gets added here in a later step.
-#   docker compose up -d --build
+# Platform services: PostgreSQL, the backend, and the dashboard.
+#   docker compose up -d --build        # then open http://127.0.0.1:5173
 # Settings come from .env (copy .env.example); the defaults below are for local use only.
 name: cloudattacklab
 
@@ -59,6 +59,21 @@ services:
     mem_limit: 512m
     healthcheck:
       test: ["CMD", "python", "-c", "import os, urllib.request; urllib.request.urlopen('http://127.0.0.1:' + os.environ['BACKEND_PORT'] + '/api/v1/health', timeout=2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  frontend:
+    build: ./frontend
+    depends_on:
+      backend:
+        condition: service_healthy
+    # Host networking so nginx reaches the backend on 127.0.0.1:8000 and serves
+    # the dashboard on 127.0.0.1:5173 (this machine only).
+    network_mode: host
+    mem_limit: 256m
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:5173/"]
       interval: 5s
       timeout: 3s
       retries: 10
