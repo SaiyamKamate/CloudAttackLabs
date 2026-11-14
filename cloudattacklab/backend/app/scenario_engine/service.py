@@ -16,10 +16,15 @@ from sqlalchemy.orm import Session
 
 from .. import audit
 from ..config import Settings
+from ..detection.engine import DetectionEngine
 from ..errors import ApiError
+from ..lab_manager.adapter import LabAdapter, LabAdapterError
 from ..models import Lab, LabStatus, RunStatus, ScenarioRun
 from ..schemas.scenario import ScenarioDefinition
 from ..lab_manager.target import TargetClient, TargetError
+from ..telemetry.ingest import TelemetryIngestor
+from ..telemetry.normalize import RunContext
+from ..telemetry.source import DockerLogSource
 from . import runner
 from .engine import ScenarioEngine
 from .preflight import run_preflight
@@ -41,6 +46,8 @@ class ScenarioService:
         engine: ScenarioEngine,
         target_clients: dict[str, TargetClient],
         settings: Settings,
+        adapter: LabAdapter,
+        detection: DetectionEngine,
         *,
         actor: str = audit.ANONYMOUS_ACTOR,
     ) -> None:
@@ -48,6 +55,8 @@ class ScenarioService:
         self.engine = engine
         self.target_clients = target_clients
         self.settings = settings
+        self.adapter = adapter
+        self.detection = detection
         self.actor = actor
         # Background threads open their own session on the same database.
         self._bind: Engine = session.get_bind()
@@ -149,18 +158,46 @@ class ScenarioService:
         script_path: str,
         target_name: str,
     ) -> None:
+        from pathlib import Path
+
         try:
             with Session(self._bind, expire_on_commit=False) as session:
                 run = session.get(ScenarioRun, run_id)
                 run.status = RunStatus.running.value
                 run.started_at = _utcnow()
                 session.commit()
+                started_at = run.started_at
 
-                from pathlib import Path
+            # Collect ShopCloud's telemetry while the run is active (and once more at the end).
+            ctx = RunContext(
+                run_id=run_id,
+                lab_id=lab_id,
+                scenario_id=scenario.id,
+                started_at=started_at,
+                container_id=self._container_id(),
+            )
+            stop = threading.Event()
+            collector = threading.Thread(
+                target=self._collect_loop, args=(ctx, stop), name=f"collect-{run_id}", daemon=True
+            )
+            collector.start()
 
-                result = runner.execute_script(
-                    Path(script_path), base_url, dict(run.parameters), scenario.execution.timeout_seconds
-                )
+            result = runner.execute_script(
+                Path(script_path), base_url, dict(run.parameters), scenario.execution.timeout_seconds
+            )
+
+            stop.set()
+            collector.join(timeout=30)  # the loop does a final ingest after stop is set
+
+            # Detection runs over the events collected for this run.
+            with Session(self._bind, expire_on_commit=False) as session:
+                run = session.get(ScenarioRun, run_id)
+                try:
+                    alerts = self.detection.run_for_run(session, run, scenario)
+                    if alerts:
+                        log.info("run %s raised %d alert(s)", run_id, len(alerts))
+                except Exception:
+                    log.exception("detection failed for run %s", run_id)
 
                 run.finished_at = _utcnow()
                 if result.outcome == "completed":
@@ -198,6 +235,36 @@ class ScenarioService:
             self._record_crash(run_id, scenario)
         finally:
             self._release(lab_id)
+
+    # --- telemetry collection --------------------------------------------
+    def _collect_loop(self, ctx: RunContext, stop: threading.Event) -> None:
+        """Ingest telemetry periodically while the run is active, then once more at the end.
+
+        All ingestion is in this one thread, so stored events are never raced.
+        """
+        try:
+            while not stop.is_set():
+                self._ingest_once(ctx)
+                stop.wait(self.settings.telemetry_collect_interval_seconds)
+            self._ingest_once(ctx)  # final pass after the run stops
+        except Exception:
+            log.exception("telemetry collection failed for run %s", ctx.run_id)
+
+    def _ingest_once(self, ctx: RunContext) -> None:
+        source = DockerLogSource(self.adapter, self.settings.telemetry_service)
+        with Session(self._bind, expire_on_commit=False) as session:
+            TelemetryIngestor(
+                session, source, ctx, grace_seconds=self.settings.telemetry_since_grace_seconds
+            ).ingest()
+
+    def _container_id(self) -> Optional[str]:
+        try:
+            for container in self.adapter.status():
+                if container.service == self.settings.telemetry_service:
+                    return container.container_id or None
+        except LabAdapterError:
+            return None
+        return None
 
     def _record_crash(self, run_id: uuid.UUID, scenario: ScenarioDefinition) -> None:
         try:
