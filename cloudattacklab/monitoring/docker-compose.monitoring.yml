@@ -1,0 +1,28 @@
+name: cloudattacklab-monitoring
+
+services:
+  loki:
+    image: grafana/loki:3.7.8
+    command: -config.file=/etc/loki/local-config.yaml
+    ports:
+      - "127.0.0.1:3100:3100"
+    mem_limit: 512m
+  
+  grafana:
+    image: grafana/grafana:13.2.2
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "127.0.0.1:3000:3000"
+    mem_limit: 512m
+
+  alloy:
+    image: grafana/alloy:v1.20.0
+    command: run --server.http.listen-addr=0.0.0.0:12345 /etc/alloy/config.alloy
+    volumes:
+      - ./config.alloy:/etc/alloy/config.alloy:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    ports:
+      - "127.0.0.1:12345:12345"
+    mem_limit: 256m
