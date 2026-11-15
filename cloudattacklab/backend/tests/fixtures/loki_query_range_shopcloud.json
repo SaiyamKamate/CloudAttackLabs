@@ -1,0 +1,227 @@
+{
+ "status": "success",
+ "data": {
+  "resultType": "streams",
+  "result": [
+   {
+    "stream": {
+     "detected_level": "info",
+     "service": "shopcloud",
+     "service_name": "shopcloud"
+    },
+    "values": [
+     [
+      "1794758790167113226",
+      "{\"timestamp\": \"2026-11-15T16:06:30.166Z\", \"service\": \"shopcloud\", \"level\": \"info\", \"event\": \"login_success\", \"request_id\": \"07e3b60a-06c2-4cec-82a9-7a4f66bdde33\", \"source_ip\": \"172.21.0.1\", \"method\": \"POST\", \"path\": \"/api/login\", \"status\": 200, \"username\": \"lab_user\", \"message\": \"Login succeeded\"}"
+     ]
+    ]
+   },
+   {
+    "stream": {
+     "detected_level": "warn",
+     "service": "shopcloud",
+     "service_name": "shopcloud"
+    },
+    "values": [
+     [
+      "1794758789917895667",
+      "{\"timestamp\": \"2026-11-15T16:06:29.917Z\", \"service\": \"shopcloud\", \"level\": \"warning\", \"event\": \"login_failed\", \"request_id\": \"dff39dd8-3cbe-4460-a014-76e7c3d9abbb\", \"source_ip\": \"172.21.0.1\", \"method\": \"POST\", \"path\": \"/api/login\", \"status\": 401, \"username\": \"lab_user\", \"message\": \"Invalid username or password\"}"
+     ],
+     [
+      "1794758790386920725",
+      "{\"timestamp\": \"2026-11-15T16:06:30.386Z\", \"service\": \"shopcloud\", \"level\": \"warning\", \"event\": \"login_failed\", \"request_id\": \"186ae150-c04f-490a-a328-7f84cb0e456f\", \"source_ip\": \"172.21.0.1\", \"method\": \"POST\", \"path\": \"/api/login\", \"status\": 401, \"username\": \"lab_user\", \"message\": \"Invalid username or password\"}"
+     ]
+    ]
+   }
+  ],
+  "stats": {
+   "summary": {
+    "bytesProcessedPerSecond": 82456,
+    "linesProcessedPerSecond": 260,
+    "totalBytesProcessed": 948,
+    "totalLinesProcessed": 3,
+    "execTime": 0.011497,
+    "queueTime": 0.000808,
+    "subqueries": 0,
+    "totalEntriesReturned": 3,
+    "splits": 0,
+    "shards": 1,
+    "totalPostFilterLines": 3,
+    "totalStructuredMetadataBytesProcessed": 24
+   },
+   "querier": {
+    "store": {
+     "totalChunksRef": 0,
+     "totalChunksDownloaded": 0,
+     "chunksDownloadTime": 0,
+     "queryReferencedStructuredMetadata": false,
+     "queryUsedV2Engine": false,
+     "chunk": {
+      "headChunkBytes": 0,
+      "headChunkLines": 0,
+      "decompressedBytes": 0,
+      "decompressedLines": 0,
+      "compressedBytes": 0,
+      "totalDuplicates": 0,
+      "postFilterLines": 0,
+      "headChunkStructuredMetadataBytes": 0,
+      "decompressedStructuredMetadataBytes": 0
+     },
+     "chunkRefsFetchTime": 0,
+     "congestionControlLatency": 0,
+     "pipelineWrapperFilteredLines": 0,
+     "dataobj": {
+      "prePredicateDecompressedRows": 0,
+      "prePredicateDecompressedBytes": 0,
+      "prePredicateDecompressedStructuredMetadataBytes": 0,
+      "postPredicateRows": 0,
+      "postPredicateDecompressedBytes": 0,
+      "postPredicateStructuredMetadataBytes": 0,
+      "postFilterRows": 0,
+      "pagesScanned": 0,
+      "pagesDownloaded": 0,
+      "pagesDownloadedBytes": 0,
+      "pageBatches": 0,
+      "totalRowsAvailable": 0,
+      "totalPageDownloadTime": 0
+     }
+    },
+    "querierExecTime": 0.008403
+   },
+   "ingester": {
+    "totalReached": 1,
+    "totalChunksMatched": 1,
+    "totalBatches": 2,
+    "totalLinesSent": 3,
+    "store": {
+     "totalChunksRef": 0,
+     "totalChunksDownloaded": 0,
+     "chunksDownloadTime": 0,
+     "queryReferencedStructuredMetadata": false,
+     "queryUsedV2Engine": false,
+     "chunk": {
+      "headChunkBytes": 948,
+      "headChunkLines": 3,
+      "decompressedBytes": 0,
+      "decompressedLines": 0,
+      "compressedBytes": 0,
+      "totalDuplicates": 0,
+      "postFilterLines": 3,
+      "headChunkStructuredMetadataBytes": 24,
+      "decompressedStructuredMetadataBytes": 0
+     },
+     "chunkRefsFetchTime": 274677,
+     "congestionControlLatency": 0,
+     "pipelineWrapperFilteredLines": 0,
+     "dataobj": {
+      "prePredicateDecompressedRows": 0,
+      "prePredicateDecompressedBytes": 0,
+      "prePredicateDecompressedStructuredMetadataBytes": 0,
+      "postPredicateRows": 0,
+      "postPredicateDecompressedBytes": 0,
+      "postPredicateStructuredMetadataBytes": 0,
+      "postFilterRows": 0,
+      "pagesScanned": 0,
+      "pagesDownloaded": 0,
+      "pagesDownloadedBytes": 0,
+      "pageBatches": 0,
+      "totalRowsAvailable": 0,
+      "totalPageDownloadTime": 0
+     }
+    },
+    "recvWaitTime": 0.001711
+   },
+   "cache": {
+    "chunk": {
+     "entriesFound": 0,
+     "entriesRequested": 0,
+     "entriesStored": 0,
+     "bytesReceived": 0,
+     "bytesSent": 0,
+     "requests": 0,
+     "downloadTime": 0,
+     "queryLengthServed": 0
+    },
+    "index": {
+     "entriesFound": 0,
+     "entriesRequested": 0,
+     "entriesStored": 0,
+     "bytesReceived": 0,
+     "bytesSent": 0,
+     "requests": 0,
+     "downloadTime": 0,
+     "queryLengthServed": 0
+    },
+    "result": {
+     "entriesFound": 0,
+     "entriesRequested": 0,
+     "entriesStored": 0,
+     "bytesReceived": 0,
+     "bytesSent": 0,
+     "requests": 0,
+     "downloadTime": 0,
+     "queryLengthServed": 0
+    },
+    "statsResult": {
+     "entriesFound": 0,
+     "entriesRequested": 0,
+     "entriesStored": 0,
+     "bytesReceived": 0,
+     "bytesSent": 0,
+     "requests": 0,
+     "downloadTime": 0,
+     "queryLengthServed": 0
+    },
+    "volumeResult": {
+     "entriesFound": 0,
+     "entriesRequested": 0,
+     "entriesStored": 0,
+     "bytesReceived": 0,
+     "bytesSent": 0,
+     "requests": 0,
+     "downloadTime": 0,
+     "queryLengthServed": 0
+    },
+    "seriesResult": {
+     "entriesFound": 0,
+     "entriesRequested": 0,
+     "entriesStored": 0,
+     "bytesReceived": 0,
+     "bytesSent": 0,
+     "requests": 0,
+     "downloadTime": 0,
+     "queryLengthServed": 0
+    },
+    "labelResult": {
+     "entriesFound": 0,
+     "entriesRequested": 0,
+     "entriesStored": 0,
+     "bytesReceived": 0,
+     "bytesSent": 0,
+     "requests": 0,
+     "downloadTime": 0,
+     "queryLengthServed": 0
+    },
+    "instantMetricResult": {
+     "entriesFound": 0,
+     "entriesRequested": 0,
+     "entriesStored": 0,
+     "bytesReceived": 0,
+     "bytesSent": 0,
+     "requests": 0,
+     "downloadTime": 0,
+     "queryLengthServed": 0
+    }
+   },
+   "index": {
+    "totalChunks": 0,
+    "postFilterChunks": 0,
+    "shardsDuration": 0,
+    "usedBloomFilters": false,
+    "totalStreams": 0,
+    "chunkRefsLookupTime": 0,
+    "bloomFilterTime": 0
+   }
+  }
+ }
+}

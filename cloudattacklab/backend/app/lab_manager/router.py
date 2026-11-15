@@ -7,7 +7,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from ..config import get_settings
+from ..config import Settings, get_settings
 from ..db import get_session
 from .adapter import LabAdapter
 from ..telemetry.loki import LokiSource
@@ -57,9 +57,8 @@ def list_labs(manager: LabManager = Depends(get_manager)):
     return manager.list()
 
 
-def get_telemetry_status() -> TelemetryStatusOut:
+def get_telemetry_status(settings: Settings = Depends(get_settings)) -> TelemetryStatusOut:
     """The active telemetry source; for Loki, a quick check that it answers."""
-    settings = get_settings()
     if settings.telemetry_source != "loki":
         return TelemetryStatusOut(source=settings.telemetry_source, loki_url=None, reachable=None, error=None)
     try:
