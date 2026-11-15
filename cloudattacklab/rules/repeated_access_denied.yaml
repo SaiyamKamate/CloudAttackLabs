@@ -1,0 +1,22 @@
+id: repeated_access_denied
+# Fires when one logged-in user is refused the same resource many times in a
+# short window. The threshold and window for a run come from the scenario's
+# `detection` section; the values below are only fallbacks.
+event_type: authorization_denied
+# One group per user and requested path. `raw.` fields are read from the
+# original ShopCloud log record kept with each event.
+group_by:
+  - username
+  - raw.path
+# Count only 403: a known user who is not allowed. A 401 (no token or a bad
+# one) is "not logged in", which is a different thing and has no username.
+match:
+  raw.status: 403
+severity: medium
+title: Repeated access denied for one user
+description: >
+  One logged-in user was refused the same protected resource enough times
+  within the window to look like deliberate probing of something they are not
+  allowed to read.
+default_threshold: 5
+default_window_seconds: 60

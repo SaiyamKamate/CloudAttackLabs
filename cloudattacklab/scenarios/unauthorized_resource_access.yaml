@@ -1,0 +1,46 @@
+schema_version: "1.0"
+id: unauthorized_resource_access
+name: Unauthorized Resource Access
+category: authorization
+description: >
+  Logs in as the restricted test account and repeatedly requests a protected
+  ShopCloud resource it is not allowed to read. Checks that every request is
+  refused and that the repeated denials are detected.
+version: 1.0.0
+target: shopcloud
+type: application
+
+requires:
+  - protected_resource
+
+prerequisites:
+  - check: http_health
+  - check: test_account
+    detail: lab_restricted
+
+execution:
+  script: unauthorized_resource_access.py
+  timeout_seconds: 60
+  parameters:
+    username: lab_restricted
+    attempts: 8
+    interval_seconds: 1
+    # After the run the engine repeats the access check once and records
+    # whether access is still denied. There is no response action here, so the
+    # check is named in the parameters instead of under `response`.
+    verification_check: access_remains_denied
+
+expected_telemetry:
+  - source: application
+    event_type: authorization_denied
+    min_count: 5
+
+detection:
+  rule: repeated_access_denied
+  threshold: 5
+  window_seconds: 60
+
+cleanup:
+  enabled: true
+  steps:
+    - reset_target_state
