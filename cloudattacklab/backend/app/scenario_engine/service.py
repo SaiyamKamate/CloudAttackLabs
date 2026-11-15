@@ -29,6 +29,7 @@ from ..telemetry.source import DockerLogSource
 from . import runner
 from .engine import ScenarioEngine
 from .preflight import run_preflight
+from .verification import run_verification
 
 log = logging.getLogger("cloudattacklab.scenarios")
 
@@ -200,30 +201,45 @@ class ScenarioService:
                 except Exception:
                     log.exception("detection failed for run %s", run_id)
 
+                # Repeat the scenario's check once more, if it names one, and
+                # keep the result with the run. Done after collection stops, so
+                # this request is not counted as part of the run's evidence.
+                summary = result.summary
+                verification = run_verification(
+                    scenario, self.target_clients.get(target_name), self.settings.lab_test_accounts
+                )
+                if verification is not None:
+                    summary = {**(summary or {}), "verification": verification}
+
                 run.finished_at = _utcnow()
                 if result.outcome == "completed":
                     run.status = RunStatus.completed.value
-                    run.summary = result.summary
+                    run.summary = summary
                     audit.record(
                         session,
                         actor=self.actor,
                         action="run.finish",
                         object_type="scenario_run",
                         object_id=str(run.id),
-                        detail={"scenario_id": scenario.id, "outcome": "completed", "summary": result.summary},
+                        detail={"scenario_id": scenario.id, "outcome": "completed", "summary": summary},
                     )
                     session.commit()
                 else:
                     run.status = RunStatus.failed.value
                     run.error = result.error
-                    run.summary = result.summary
+                    run.summary = summary
                     audit.record(
                         session,
                         actor=self.actor,
                         action="run.failure",
                         object_type="scenario_run",
                         object_id=str(run.id),
-                        detail={"scenario_id": scenario.id, "outcome": "failed", "error": result.error},
+                        detail={
+                            "scenario_id": scenario.id,
+                            "outcome": "failed",
+                            "error": result.error,
+                            "summary": summary,
+                        },
                     )
                     session.commit()
                     # Cleanup also runs if a run fails or times out.

@@ -1,6 +1,7 @@
 """Run a scenario's detection rule over a run's events and raise alerts.
 
-One alert per run and group value (e.g. source_ip), not one per event. Every
+One alert per run and group (one source_ip, or one username on one path),
+not one per event. Every
 contributing event is linked to the alert so it can be explained from evidence.
 """
 from __future__ import annotations
@@ -16,7 +17,7 @@ from sqlalchemy.orm import Session
 from ..incidents.service import attach_alerts
 from ..models import Alert, Event, ScenarioRun
 from ..schemas.scenario import ScenarioDefinition
-from .rules import RuleDefinition, load_rules
+from .rules import RuleDefinition, field_value, load_rules
 
 log = logging.getLogger("cloudattacklab.detection")
 
@@ -46,13 +47,15 @@ class DetectionEngine:
                 .order_by(Event.timestamp)
             )
         )
-        groups: dict[str, list[Event]] = defaultdict(list)
+        groups: dict[tuple[str, ...], list[Event]] = defaultdict(list)
         for event in events:
-            key = getattr(event, rule.group_by)
+            if not _matches(event, rule):
+                continue
+            key = _group_key(event, rule)
             if key is not None:
-                groups[str(key)].append(event)
+                groups[key].append(event)
 
-        already = _groups_already_alerted(session, run, rule.id, rule.group_by)
+        already = _groups_already_alerted(session, run, rule)
         new_alerts: list[Alert] = []
         for key, group in groups.items():
             if key in already:
@@ -88,16 +91,31 @@ def _first_window_reaching(events: list[Event], threshold: int, window: timedelt
     return None
 
 
-def _build_alert(run, rule, detection, group_value, contributing) -> Alert:
+def _matches(event: Event, rule: RuleDefinition) -> bool:
+    """True if the event has every value the rule's `match` asks for."""
+    return all(field_value(event, name) == wanted for name, wanted in rule.match.items())
+
+
+def _group_key(event: Event, rule: RuleDefinition) -> tuple[str, ...] | None:
+    """The event's group: one value per `group_by` field. None if any is missing."""
+    values = [field_value(event, name) for name in rule.group_fields]
+    if any(value is None for value in values):
+        return None
+    return tuple(str(value) for value in values)
+
+
+def _build_alert(run, rule, detection, key, contributing) -> Alert:
+    # e.g. "source_ip=172.20.0.5" or "username=lab_restricted, raw.path=/api/orders"
+    group = ", ".join(f"{name}={value}" for name, value in zip(rule.group_fields, key))
     first = contributing[0].timestamp
     last = contributing[-1].timestamp
     span = int((last - first).total_seconds())
     return Alert(
         rule_id=rule.id,
         severity=rule.severity,
-        title=f"{rule.title} ({rule.group_by}={group_value})",
+        title=f"{rule.title} ({group})",
         description=(
-            f"{len(contributing)} {rule.event_type} events from {rule.group_by}={group_value} "
+            f"{len(contributing)} {rule.event_type} events from {group} "
             f"within {span}s (threshold {detection.threshold} in {detection.window_seconds}s)."
         ),
         lab_id=run.lab_id,
@@ -109,13 +127,13 @@ def _build_alert(run, rule, detection, group_value, contributing) -> Alert:
     )
 
 
-def _groups_already_alerted(session: Session, run: ScenarioRun, rule_id: str, group_by: str) -> set[str]:
-    """Group values that already have an alert for this run+rule (so we don't duplicate)."""
-    alerts = session.scalars(select(Alert).where(Alert.run_id == run.id, Alert.rule_id == rule_id))
-    seen: set[str] = set()
+def _groups_already_alerted(session: Session, run: ScenarioRun, rule: RuleDefinition) -> set[tuple[str, ...]]:
+    """Groups that already have an alert for this run+rule (so we don't duplicate)."""
+    alerts = session.scalars(select(Alert).where(Alert.run_id == run.id, Alert.rule_id == rule.id))
+    seen: set[tuple[str, ...]] = set()
     for alert in alerts:
         for event in alert.events:
-            value = getattr(event, group_by)
-            if value is not None:
-                seen.add(str(value))
+            key = _group_key(event, rule)
+            if key is not None:
+                seen.add(key)
     return seen

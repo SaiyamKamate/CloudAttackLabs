@@ -2,7 +2,8 @@
 
 Only a script named in a valid scenario file is ever run, and the target URL is
 passed in from the lab configuration, so a script cannot be pointed outside the
-lab. The script prints a single JSON object (its summary) on stdout.
+lab. The script prints a single JSON object (its summary) on stdout. A non-zero
+exit code means the run failed; the summary is kept if the script printed one.
 """
 from __future__ import annotations
 
@@ -19,7 +20,7 @@ from ..errors import ApiError
 @dataclass(frozen=True)
 class RunResult:
     outcome: str                        # "completed" or "failed"
-    summary: Optional[dict[str, Any]]   # the script's parsed JSON, when it completed
+    summary: Optional[dict[str, Any]]   # the script's parsed JSON, if it printed one
     error: Optional[str]                # why it failed
     exit_code: Optional[int] = None
     stdout: str = ""
@@ -66,7 +67,9 @@ def execute_script(
         tail = (completed.stderr or completed.stdout).strip().splitlines()[-5:]
         return RunResult(
             outcome="failed",
-            summary=None,
+            # A script that fails on purpose (e.g. the target granted access it
+            # should have refused) still reports what it saw.
+            summary=_parse_summary(completed.stdout),
             error=f"script exited with code {completed.returncode}: {' | '.join(tail)}",
             exit_code=completed.returncode,
             stdout=completed.stdout,

@@ -3,17 +3,21 @@ invalid file is skipped and logged, and can never fire."""
 from __future__ import annotations
 
 import logging
+import re
 from pathlib import Path
-from typing import Union
+from typing import Optional, Union
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 from ..schemas.event import EventType, Severity
 
 log = logging.getLogger("cloudattacklab.detection")
 
 ID_PATTERN = r"^[a-z][a-z0-9_]*$"
+# A field a rule may read: a normalized event column, or `raw.<name>` for a
+# field of the original log record kept with the event.
+FIELD_PATTERN = r"^(source_ip|username|resource|raw\.[a-z][a-z0-9_]*)$"
 
 
 class RuleError(Exception):
@@ -26,18 +30,57 @@ class RuleDefinition(BaseModel):
     It fires when one value of `group_by` produces `threshold` events of
     `event_type` within `window_seconds`. threshold/window usually come from the
     scenario; the values here are fallback defaults.
+
+    `group_by` is one field or a list of fields (events are grouped by the
+    combination). `match`, if given, keeps only events whose fields equal the
+    listed values, e.g. `raw.status: 403`.
     """
 
     model_config = ConfigDict(extra="forbid", use_enum_values=True)
 
     id: str = Field(pattern=ID_PATTERN)
     event_type: EventType
-    group_by: str = Field(default="source_ip", pattern=r"^(source_ip|username)$")
+    group_by: Union[str, list[str]] = "source_ip"
+    match: dict[str, Union[bool, int, str]] = Field(default_factory=dict)
     severity: Severity = Severity.medium
     title: str = Field(min_length=3)
     description: str = Field(min_length=3)
     default_threshold: int = Field(default=10, ge=1)
     default_window_seconds: int = Field(default=60, ge=1, le=3600)
+
+    @field_validator("group_by")
+    @classmethod
+    def _known_group_fields(cls, value):
+        fields = [value] if isinstance(value, str) else value
+        if not fields:
+            raise ValueError("group_by needs at least one field")
+        for name in fields:
+            _check_field(name)
+        return value
+
+    @field_validator("match")
+    @classmethod
+    def _known_match_fields(cls, value: dict) -> dict:
+        for name in value:
+            _check_field(name)
+        return value
+
+    @property
+    def group_fields(self) -> list[str]:
+        return [self.group_by] if isinstance(self.group_by, str) else list(self.group_by)
+
+
+def _check_field(name: str) -> None:
+    if not isinstance(name, str) or not re.match(FIELD_PATTERN, name):
+        raise ValueError(f"'{name}' is not a field a rule can use (source_ip, username, resource or raw.<name>)")
+
+
+def field_value(event, name: str) -> Optional[object]:
+    """The value of a rule field on a stored event; None if it is not there."""
+    if name.startswith("raw."):
+        raw = event.raw if isinstance(event.raw, dict) else {}
+        return raw.get(name[4:])
+    return getattr(event, name)
 
 
 def load_rule(path: Union[str, Path]) -> RuleDefinition:
