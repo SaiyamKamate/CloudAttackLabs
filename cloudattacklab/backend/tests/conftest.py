@@ -15,7 +15,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 from app.db import get_session  # noqa: E402
 from app.lab_manager.adapter import ContainerStatus, LabAdapter, LabAdapterError  # noqa: E402
 from app.lab_manager.router import get_adapter, get_target_clients  # noqa: E402
-from app.lab_manager.target import LoginResult, TargetError, TargetHealth  # noqa: E402
+from app.lab_manager.target import AccessResult, LoginResult, TargetError, TargetHealth  # noqa: E402
 from app.main import create_app  # noqa: E402
 from app.models import Base  # noqa: E402
 
@@ -86,6 +86,12 @@ class FakeTarget:
         self.applies_limit = True
         self.fail_rate_limit = False
         self._attempts = 0
+        # The protected resource: only role `user` may read orders. `restriction_broken`
+        # is a broken target that lets the restricted account in.
+        self.roles = {"lab_user": "user", "lab_restricted": "restricted"}
+        self.restriction_broken = False
+        self.fail_orders = False
+        self.order_reads: list[str] = []
 
     def health(self) -> TargetHealth:
         if not self.adapter.running:
@@ -115,6 +121,15 @@ class FakeTarget:
             return LoginResult(ok=False, status_code=401)
         ok = self.valid_accounts.get(username) == password
         return LoginResult(ok=ok, status_code=200 if ok else 401)
+
+    def read_orders(self, username: str, password: str) -> AccessResult:
+        self.order_reads.append(username)
+        if self.fail_orders:
+            return AccessResult(error="ConnectError: connection refused")
+        if self.valid_accounts.get(username) != password:
+            return AccessResult(login_status=401, error="login did not return 200")
+        allowed = self.roles.get(username) == "user" or self.restriction_broken
+        return AccessResult(login_status=200, status_code=200 if allowed else 403)
 
     def set_rate_limit(self, enabled: bool, max_attempts=None, window_seconds=None):
         self.rate_limit_calls.append(

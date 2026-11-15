@@ -1,6 +1,7 @@
 """HTTP client for the lab target (ShopCloud), per docs/shopcloud-interface.md.
 
-The calls the platform needs: health, login, the rate limit and reset.
+The calls the platform needs: health, login, reading the protected resource,
+the rate limit and reset.
 """
 from __future__ import annotations
 
@@ -31,11 +32,21 @@ class LoginResult:
     error: Optional[str] = None             # set when the request itself failed
 
 
+@dataclass(frozen=True)
+class AccessResult:
+    """What happened when an account logged in and asked for the protected resource."""
+
+    login_status: Optional[int] = None      # HTTP status of POST /api/login
+    status_code: Optional[int] = None       # HTTP status of GET /api/orders; None if not sent
+    error: Optional[str] = None             # set when a request itself failed
+
+
 class TargetClient(Protocol):
     def health(self) -> TargetHealth: ...
     def wait_healthy(self, timeout_seconds: float = 30) -> TargetHealth: ...
     def reset(self) -> None: ...
     def login(self, username: str, password: str) -> LoginResult: ...
+    def read_orders(self, username: str, password: str) -> AccessResult: ...
     def set_rate_limit(
         self, enabled: bool, max_attempts: Optional[int] = None, window_seconds: Optional[int] = None
     ) -> Optional[dict[str, Any]]: ...
@@ -94,6 +105,31 @@ class HttpTargetClient:
         except httpx.HTTPError as exc:
             return LoginResult(ok=False, error=f"{type(exc).__name__}: {exc}")
         return LoginResult(ok=response.status_code == 200, status_code=response.status_code)
+
+    def read_orders(self, username: str, password: str) -> AccessResult:
+        """Log in, then GET /api/orders with that token. The token is not kept.
+
+        Used by the access_remains_denied verification.
+        """
+        try:
+            login = httpx.post(
+                f"{self.base_url}/api/login",
+                json={"username": username, "password": password},
+                timeout=self._timeout,
+            )
+            if login.status_code != 200:
+                return AccessResult(login_status=login.status_code, error="login did not return 200")
+            token = login.json().get("token")
+            if not isinstance(token, str) or not token:
+                return AccessResult(login_status=200, error="login returned no token")
+            response = httpx.get(
+                f"{self.base_url}/api/orders",
+                headers={"Authorization": f"Bearer {token}"},
+                timeout=self._timeout,
+            )
+        except (httpx.HTTPError, ValueError, AttributeError) as exc:
+            return AccessResult(error=f"{type(exc).__name__}: {exc}")
+        return AccessResult(login_status=200, status_code=response.status_code)
 
     def set_rate_limit(
         self, enabled: bool, max_attempts: Optional[int] = None, window_seconds: Optional[int] = None
