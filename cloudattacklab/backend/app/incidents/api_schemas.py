@@ -20,10 +20,31 @@ class IncidentOut(BaseModel):
     title: str
     status: str
     created_at: datetime
+    correlation_key: Optional[str]
+    # 0-100 heuristic and how it was reached; null for an incident that was never scored.
+    risk_score: Optional[int]
+    risk_explanation: Optional[str]
+
+
+class Evidence(BaseModel):
+    """Where the proof for a timeline entry is: an API path, and for an event its raw reference."""
+
+    kind: str  # run, event, alert, response or audit
+    id: str
+    href: str
+    raw_event_reference: Optional[str] = None
+
+
+class TimelineEntry(BaseModel):
+    time: datetime
+    type: str
+    description: str
+    evidence: Evidence
 
 
 class IncidentDetail(IncidentOut):
-    """An incident with its alerts and any response actions requested for it."""
+    """An incident with its alerts, its response actions and its timeline."""
 
     alerts: list[AlertOut]
     responses: list[ResponseOut]
+    timeline: list[TimelineEntry]
