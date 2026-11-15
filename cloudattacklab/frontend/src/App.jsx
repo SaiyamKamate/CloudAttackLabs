@@ -2,11 +2,14 @@ import { useState } from 'react'
 import LabPage from './pages/LabPage.jsx'
 import ScenariosPage from './pages/ScenariosPage.jsx'
 import AlertsPage from './pages/AlertsPage.jsx'
+import IncidentsPage from './pages/IncidentsPage.jsx'
+import ReportPage from './pages/ReportPage.jsx'
 
 const PAGES = {
   lab: { label: 'Lab', Component: LabPage },
   scenarios: { label: 'Scenarios', Component: ScenariosPage },
   alerts: { label: 'Alerts', Component: AlertsPage },
+  incidents: { label: 'Incidents', Component: IncidentsPage },
 }
 
 export default function App() {
@@ -14,6 +17,8 @@ export default function App() {
   // The run started on the Scenarios page. Kept here so it (and its Cleanup
   // button) is still there after a visit to another page.
   const [run, setRun] = useState(null)
+  // The run whose report is open. While set, the report replaces the page.
+  const [reportRunId, setReportRunId] = useState(null)
   const Current = PAGES[page].Component
 
   return (
@@ -23,15 +28,17 @@ export default function App() {
         {Object.entries(PAGES).map(([key, { label }]) => (
           <button
             key={key}
-            onClick={() => setPage(key)}
-            disabled={key === page}
+            onClick={() => { setPage(key); setReportRunId(null) }}
+            disabled={key === page && !reportRunId}
             style={{ marginRight: '0.5rem', fontWeight: key === page ? 'bold' : 'normal' }}
           >
             {label}
           </button>
         ))}
       </nav>
-      <Current run={run} setRun={setRun} />
+      {reportRunId
+        ? <ReportPage runId={reportRunId} onClose={() => setReportRunId(null)} />
+        : <Current run={run} setRun={setRun} openReport={setReportRunId} />}
     </div>
   )
 }

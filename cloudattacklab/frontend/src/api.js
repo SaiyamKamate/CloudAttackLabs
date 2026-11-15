@@ -61,6 +61,7 @@ export const api = {
   startRun: (labId, scenarioId) => request(`/labs/${labId}/runs`, { method: 'POST', body: { scenario_id: scenarioId } }),
   getRun: (runId) => request(`/runs/${runId}`),
   cleanupRun: (runId) => request(`/runs/${runId}/cleanup`, { method: 'POST' }),
+  getRunReport: (runId) => request(`/runs/${runId}/report`),
 
   // Events and alerts
   listAlerts: (params = {}) => request('/alerts' + query(params)),
@@ -68,6 +69,7 @@ export const api = {
 
   // Incidents and response actions. The request and decision calls send no body:
   // the action and its parameters come from the scenario, on the backend.
+  listIncidents: (params = {}) => request('/incidents' + query(params)),
   getIncident: (incidentId) => request(`/incidents/${incidentId}`),
   requestResponse: (incidentId) => request(`/incidents/${incidentId}/responses`, { method: 'POST' }),
   approveResponse: (responseId) => request(`/responses/${responseId}/approve`, { method: 'POST' }),

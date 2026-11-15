@@ -4,7 +4,7 @@ import { api } from '../api.js'
 const TERMINAL = ['completed', 'failed', 'cleaned_up']
 
 // List scenarios and run one against the running lab, then follow the run.
-export default function ScenariosPage({ run, setRun }) {
+export default function ScenariosPage({ run, setRun, openReport }) {
   const [scenarios, setScenarios] = useState([])
   const [lab, setLab] = useState(null)   // a running lab, if there is one
   const [error, setError] = useState(null)
@@ -106,7 +106,8 @@ export default function ScenariosPage({ run, setRun }) {
           {run.error && <p style={{ color: 'crimson' }}>Run error: {run.error}</p>}
           {run.summary?.verification && <p>{verificationText(run.summary.verification)}</p>}
           {run.summary && <pre>{JSON.stringify(run.summary, null, 2)}</pre>}
-          <button onClick={cleanup} disabled={busy || running}>Cleanup</button>
+          <button onClick={cleanup} disabled={busy || running}>Cleanup</button>{' '}
+          {!running && <button onClick={() => openReport(run.id)}>View report</button>}
         </div>
       )}
     </section>
