@@ -96,7 +96,7 @@ def get_settings() -> Settings:
         telemetry_source=_telemetry_source(),
         loki_url=os.environ.get("LOKI_URL", "http://127.0.0.1:3100").rstrip("/"),
         loki_settle_interval_seconds=float(os.environ.get("LOKI_SETTLE_INTERVAL_SECONDS", "2")),
-        loki_settle_timeout_seconds=float(os.environ.get("LOKI_SETTLE_TIMEOUT_SECONDS", "15")),
+        loki_settle_timeout_seconds=float(os.environ.get("LOKI_SETTLE_TIMEOUT_SECONDS", "20")),
     )
 
 

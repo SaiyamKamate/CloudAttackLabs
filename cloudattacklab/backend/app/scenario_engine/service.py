@@ -292,11 +292,17 @@ class ScenarioService:
                 stop.wait(self.settings.telemetry_collect_interval_seconds)
             if getattr(source, "late_arriving", False):
                 # Records reach Loki a little late: poll until the count stops growing.
-                ingest_until_settled(
+                settled = ingest_until_settled(
                     lambda: self._ingest_once(source, ctx),
                     interval_seconds=self.settings.loki_settle_interval_seconds,
                     timeout_seconds=self.settings.loki_settle_timeout_seconds,
                 )
+                if settled.collected == 0:
+                    raise TelemetrySourceError(
+                        f"{source.name} returned no {self.settings.telemetry_service} log lines for this run "
+                        f"after waiting {self.settings.loki_settle_timeout_seconds:g} s. Check that the monitoring "
+                        "stack's Alloy is running and shipping the lab container's logs."
+                    )
             else:
                 self._ingest_once(source, ctx)  # final pass after the run stops
         except TelemetrySourceError as exc:

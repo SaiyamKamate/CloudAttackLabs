@@ -140,7 +140,8 @@ def ingest_until_settled(
     in a row, or the timeout passes. Returns the combined result.
 
     Used after a run for sources whose records arrive late, so the last requests
-    of a run are not missed.
+    of a run are not missed. An empty answer never counts as settled: a run
+    always makes requests, so no records means they have not arrived yet.
     """
     total = IngestResult()
     deadline = clock() + timeout_seconds
@@ -148,7 +149,7 @@ def ingest_until_settled(
     while True:
         result = ingest_once()
         total.add(result)
-        if previous is not None and result.collected == previous:
+        if previous is not None and result.collected == previous and result.collected > 0:
             break
         if clock() + interval_seconds > deadline:
             log.info("telemetry did not settle within %ss; stopping with %d records", timeout_seconds, result.collected)
