@@ -1,4 +1,4 @@
-"""GET /incidents and /incidents/{incident_id} (api-contract.md), minimal version."""
+"""GET /incidents and /incidents/{incident_id} (api-contract.md)."""
 from __future__ import annotations
 
 from typing import Optional
@@ -12,6 +12,7 @@ from ..db import get_session
 from ..errors import ApiError
 from ..models import Incident
 from .api_schemas import IncidentDetail, IncidentOut
+from .timeline import build_timeline
 
 router = APIRouter(tags=["incidents"])
 
@@ -33,4 +34,5 @@ def get_incident(incident_id: UUID, session: Session = Depends(get_session)):
         **IncidentOut.model_validate(incident).model_dump(),
         alerts=sorted(incident.alerts, key=lambda alert: alert.created_at),
         responses=sorted(incident.responses, key=lambda response: response.requested_at),
+        timeline=build_timeline(session, incident),
     )

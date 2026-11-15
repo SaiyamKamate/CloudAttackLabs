@@ -22,6 +22,7 @@ from sqlalchemy.orm import Session
 
 from .. import audit
 from ..errors import ApiError
+from ..incidents.risk import refresh_risk
 from ..lab_manager.target import TargetClient, TargetError
 from ..models import Incident, Lab, LabStatus, ResponseAction, ResponseStatus, ScenarioRun
 from ..scenario_engine.engine import ScenarioEngine
@@ -163,6 +164,8 @@ class ResponseManager:
                 row.status = ResponseStatus.verified.value
                 row.verification_result = result
                 self._audit(row, "response.verified", result)
+                # A verified response lowers the incident's risk score.
+                refresh_risk(self.session, incident, scenario.detection.threshold)
                 self.session.commit()
             else:
                 self._fail(row, {"stage": "verify", **result})

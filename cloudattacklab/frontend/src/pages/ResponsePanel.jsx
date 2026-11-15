@@ -5,8 +5,9 @@ import { api } from '../api.js'
 const CLOSED = ['rejected', 'failed', 'reverted']
 
 // The response action for one incident: request it, approve or reject it, then
-// read its status, the verification result and its audit trail.
-export default function ResponsePanel({ incidentId }) {
+// read its status, the verification result and its audit trail. `onChange`,
+// if given, is called after each step so the page around it can refresh.
+export default function ResponsePanel({ incidentId, onChange }) {
   const [response, setResponse] = useState(null) // the incident's latest response, if any
   const [audit, setAudit] = useState([])
   const [error, setError] = useState(null)
@@ -41,6 +42,7 @@ export default function ResponsePanel({ incidentId }) {
     } finally {
       await load()
       setBusy(false)
+      if (onChange) onChange()
     }
   }
 
