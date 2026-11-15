@@ -65,6 +65,16 @@ export const api = {
   // Events and alerts
   listAlerts: (params = {}) => request('/alerts' + query(params)),
   getAlert: (alertId) => request(`/alerts/${alertId}`),
+
+  // Incidents and response actions. The request and decision calls send no body:
+  // the action and its parameters come from the scenario, on the backend.
+  getIncident: (incidentId) => request(`/incidents/${incidentId}`),
+  requestResponse: (incidentId) => request(`/incidents/${incidentId}/responses`, { method: 'POST' }),
+  approveResponse: (responseId) => request(`/responses/${responseId}/approve`, { method: 'POST' }),
+  rejectResponse: (responseId) => request(`/responses/${responseId}/reject`, { method: 'POST' }),
+
+  // Audit
+  listAudit: (params = {}) => request('/audit' + query(params)),
 }
 
 function query(params) {

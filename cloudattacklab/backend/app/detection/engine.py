@@ -13,6 +13,7 @@ from pathlib import Path
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from ..incidents.service import attach_alerts
 from ..models import Alert, Event, ScenarioRun
 from ..schemas.scenario import ScenarioDefinition
 from .rules import RuleDefinition, load_rules
@@ -63,6 +64,7 @@ class DetectionEngine:
 
         session.add_all(new_alerts)
         if new_alerts:
+            attach_alerts(session, run, scenario, new_alerts)  # one incident per run
             session.commit()
         return new_alerts
 

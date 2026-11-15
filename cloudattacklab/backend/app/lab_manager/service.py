@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 from .. import audit
 from ..errors import ApiError
 from ..models import Lab, LabStatus
+from ..response_manager.revert import mark_reverted
 from .adapter import ContainerStatus, LabAdapter, LabAdapterError
 from .target import TargetClient, TargetError, TargetHealth
 
@@ -135,6 +136,8 @@ class LabManager:
             except (LabAdapterError, TargetError) as exc:
                 self._finish(lab, "lab.reset", LabStatus.error, previous, error=str(exc))
                 raise ApiError(502, "lab_reset_failed", str(exc)) from exc
+            # The baseline has the rate limit off, so an applied response is now reverted.
+            mark_reverted(self.session, lab_id=lab.id, trigger="lab.reset", actor=self.actor)
             self._finish(lab, "lab.reset", LabStatus.running, previous)
         return lab
 

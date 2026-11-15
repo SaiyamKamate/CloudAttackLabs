@@ -80,6 +80,12 @@ class FakeTarget:
         self.fail_login = False
         self.logins: list[tuple[str, str]] = []
         self.rate_limit_calls: list[dict] = []
+        # The rate limit, as ShopCloud keeps it. `applies_limit = False` is a broken
+        # target that accepts the setting but never answers 429.
+        self.rate_limit = {"enabled": False, "max_attempts": 5, "window_seconds": 60}
+        self.applies_limit = True
+        self.fail_rate_limit = False
+        self._attempts = 0
 
     def health(self) -> TargetHealth:
         if not self.adapter.running:
@@ -96,18 +102,33 @@ class FakeTarget:
         self.reset_calls += 1
         if self.fail_reset:
             raise TargetError("POST /lab/reset returned HTTP 403")
+        self.rate_limit = {"enabled": False, "max_attempts": 5, "window_seconds": 60}  # baseline
+        self._attempts = 0
 
     def login(self, username: str, password: str) -> LoginResult:
         self.logins.append((username, password))
+        if self.rate_limit["enabled"] and self.applies_limit:
+            if self._attempts >= self.rate_limit["max_attempts"]:
+                return LoginResult(ok=False, status_code=429)
+            self._attempts += 1
         if self.fail_login:
             return LoginResult(ok=False, status_code=401)
         ok = self.valid_accounts.get(username) == password
         return LoginResult(ok=ok, status_code=200 if ok else 401)
 
-    def set_rate_limit(self, enabled: bool, max_attempts=None, window_seconds=None) -> None:
+    def set_rate_limit(self, enabled: bool, max_attempts=None, window_seconds=None):
         self.rate_limit_calls.append(
             {"enabled": enabled, "max_attempts": max_attempts, "window_seconds": window_seconds}
         )
+        if self.fail_rate_limit:
+            raise TargetError("POST /lab/rate-limit returned HTTP 403")
+        self.rate_limit = {
+            "enabled": enabled,
+            "max_attempts": max_attempts if max_attempts is not None else self.rate_limit["max_attempts"],
+            "window_seconds": window_seconds if window_seconds is not None else self.rate_limit["window_seconds"],
+        }
+        self._attempts = 0
+        return dict(self.rate_limit)
 
 
 @pytest.fixture

@@ -1,6 +1,6 @@
 """HTTP client for the lab target (ShopCloud), per docs/shopcloud-interface.md.
 
-Only the two calls the Lab Manager needs: GET /health and POST /lab/reset.
+The calls the platform needs: health, login, the rate limit and reset.
 """
 from __future__ import annotations
 
@@ -38,7 +38,7 @@ class TargetClient(Protocol):
     def login(self, username: str, password: str) -> LoginResult: ...
     def set_rate_limit(
         self, enabled: bool, max_attempts: Optional[int] = None, window_seconds: Optional[int] = None
-    ) -> None: ...
+    ) -> Optional[dict[str, Any]]: ...
 
 
 class HttpTargetClient:
@@ -97,8 +97,11 @@ class HttpTargetClient:
 
     def set_rate_limit(
         self, enabled: bool, max_attempts: Optional[int] = None, window_seconds: Optional[int] = None
-    ) -> None:
-        """POST /lab/rate-limit. Used by the disable_rate_limit cleanup step."""
+    ) -> Optional[dict[str, Any]]:
+        """POST /lab/rate-limit. Returns the settings the target says it saved.
+
+        Used by the temporary_rate_limit response and the disable_rate_limit cleanup step.
+        """
         body: dict[str, Any] = {"enabled": enabled}
         if max_attempts is not None:
             body["max_attempts"] = max_attempts
@@ -115,3 +118,8 @@ class HttpTargetClient:
             raise TargetError(f"POST /lab/rate-limit failed: {type(exc).__name__}: {exc}") from exc
         if response.status_code != 200:
             raise TargetError(f"POST /lab/rate-limit returned HTTP {response.status_code}")
+        try:
+            saved = response.json()
+        except ValueError:
+            saved = None
+        return saved if isinstance(saved, dict) else None

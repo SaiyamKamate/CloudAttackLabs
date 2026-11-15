@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api.js'
+import ResponsePanel from './ResponsePanel.jsx'
 
 // A table of alerts; clicking one shows the events that caused it.
 export default function AlertsPage() {
@@ -64,6 +65,7 @@ export default function AlertsPage() {
         <div style={{ marginTop: '1rem' }}>
           <h3>{selected.title}</h3>
           <p>{selected.description}</p>
+          {selected.incident_id && <ResponsePanel key={selected.incident_id} incidentId={selected.incident_id} />}
           <p>{selected.events.length} linked event(s):</p>
           <table border="1" cellPadding="6" style={{ borderCollapse: 'collapse' }}>
             <thead>

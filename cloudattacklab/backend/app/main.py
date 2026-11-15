@@ -11,8 +11,10 @@ from sqlalchemy.orm import Session
 
 from .db import get_session
 from .errors import ApiError, register_error_handlers
+from .incidents.router import router as incidents_router
 from .lab_manager.router import router as labs_router
 from .observability.router import router as observability_router
+from .response_manager.router import router as responses_router
 from .scenario_engine.router import router as scenarios_router
 
 API_PREFIX = "/api/v1"
@@ -36,6 +38,8 @@ def create_app() -> FastAPI:
     app.include_router(labs_router, prefix=API_PREFIX)
     app.include_router(scenarios_router, prefix=API_PREFIX)
     app.include_router(observability_router, prefix=API_PREFIX)
+    app.include_router(incidents_router, prefix=API_PREFIX)
+    app.include_router(responses_router, prefix=API_PREFIX)
     return app
 
 
