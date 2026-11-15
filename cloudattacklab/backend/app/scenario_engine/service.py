@@ -23,9 +23,10 @@ from ..models import Lab, LabStatus, RunStatus, ScenarioRun
 from ..response_manager.revert import mark_reverted
 from ..schemas.scenario import ScenarioDefinition
 from ..lab_manager.target import TargetClient, TargetError
-from ..telemetry.ingest import TelemetryIngestor
+from ..telemetry.factory import make_source
+from ..telemetry.ingest import IngestResult, TelemetryIngestor, ingest_until_settled
 from ..telemetry.normalize import RunContext
-from ..telemetry.source import DockerLogSource
+from ..telemetry.source import TelemetrySource, TelemetrySourceError
 from . import runner
 from .engine import ScenarioEngine
 from .preflight import run_preflight
@@ -171,6 +172,14 @@ class ScenarioService:
                 started_at = run.started_at
 
             # Collect ShopCloud's telemetry while the run is active (and once more at the end).
+            source = make_source(self.settings, self.adapter)
+            try:
+                source.check()
+            except TelemetrySourceError as exc:
+                # The telemetry source cannot be read: do not run the attack at
+                # all, and never fall back to another source.
+                self._fail_before_script(run_id, scenario, f"Telemetry source '{source.name}' is not available: {exc}")
+                return
             ctx = RunContext(
                 run_id=run_id,
                 lab_id=lab_id,
@@ -179,8 +188,12 @@ class ScenarioService:
                 container_id=self._container_id(),
             )
             stop = threading.Event()
+            telemetry_errors: list[str] = []
             collector = threading.Thread(
-                target=self._collect_loop, args=(ctx, stop), name=f"collect-{run_id}", daemon=True
+                target=self._collect_loop,
+                args=(source, ctx, stop, telemetry_errors),
+                name=f"collect-{run_id}",
+                daemon=True,
             )
             collector.start()
 
@@ -189,15 +202,26 @@ class ScenarioService:
             )
 
             stop.set()
-            collector.join(timeout=30)  # the loop does a final ingest after stop is set
+            # The loop does a final ingest after stop is set (and, for a late
+            # source such as Loki, polls until the count stops growing).
+            collector.join(timeout=30 + self.settings.loki_settle_timeout_seconds)
+            if telemetry_errors:
+                # The run's evidence is incomplete: record it as failed and do
+                # not raise alerts from part of the telemetry.
+                result = runner.RunResult(
+                    outcome="failed",
+                    summary=result.summary,
+                    error=f"Telemetry source '{source.name}' failed during the run: {telemetry_errors[0]}",
+                )
 
             # Detection runs over the events collected for this run.
             with Session(self._bind, expire_on_commit=False) as session:
                 run = session.get(ScenarioRun, run_id)
                 try:
-                    alerts = self.detection.run_for_run(session, run, scenario)
-                    if alerts:
-                        log.info("run %s raised %d alert(s)", run_id, len(alerts))
+                    if not telemetry_errors:
+                        alerts = self.detection.run_for_run(session, run, scenario)
+                        if alerts:
+                            log.info("run %s raised %d alert(s)", run_id, len(alerts))
                 except Exception:
                     log.exception("detection failed for run %s", run_id)
 
@@ -254,25 +278,56 @@ class ScenarioService:
             self._release(lab_id)
 
     # --- telemetry collection --------------------------------------------
-    def _collect_loop(self, ctx: RunContext, stop: threading.Event) -> None:
+    def _collect_loop(
+        self, source: TelemetrySource, ctx: RunContext, stop: threading.Event, errors: list[str]
+    ) -> None:
         """Ingest telemetry periodically while the run is active, then once more at the end.
 
-        All ingestion is in this one thread, so stored events are never raced.
+        All ingestion is in this one thread, so stored events are never raced. If
+        the source cannot be read, the error is put in `errors` and collection stops.
         """
         try:
             while not stop.is_set():
-                self._ingest_once(ctx)
+                self._ingest_once(source, ctx)
                 stop.wait(self.settings.telemetry_collect_interval_seconds)
-            self._ingest_once(ctx)  # final pass after the run stops
-        except Exception:
+            if getattr(source, "late_arriving", False):
+                # Records reach Loki a little late: poll until the count stops growing.
+                ingest_until_settled(
+                    lambda: self._ingest_once(source, ctx),
+                    interval_seconds=self.settings.loki_settle_interval_seconds,
+                    timeout_seconds=self.settings.loki_settle_timeout_seconds,
+                )
+            else:
+                self._ingest_once(source, ctx)  # final pass after the run stops
+        except TelemetrySourceError as exc:
+            log.warning("telemetry source %s failed for run %s: %s", source.name, ctx.run_id, exc)
+            errors.append(str(exc))
+        except Exception as exc:
             log.exception("telemetry collection failed for run %s", ctx.run_id)
+            errors.append(f"{type(exc).__name__}: {exc}")
 
-    def _ingest_once(self, ctx: RunContext) -> None:
-        source = DockerLogSource(self.adapter, self.settings.telemetry_service)
+    def _ingest_once(self, source: TelemetrySource, ctx: RunContext) -> IngestResult:
         with Session(self._bind, expire_on_commit=False) as session:
-            TelemetryIngestor(
+            return TelemetryIngestor(
                 session, source, ctx, grace_seconds=self.settings.telemetry_since_grace_seconds
             ).ingest()
+
+    def _fail_before_script(self, run_id: uuid.UUID, scenario: ScenarioDefinition, error: str) -> None:
+        """Mark a run failed before its script ran (nothing was sent to the target)."""
+        with Session(self._bind, expire_on_commit=False) as session:
+            run = session.get(ScenarioRun, run_id)
+            run.status = RunStatus.failed.value
+            run.error = error
+            run.finished_at = _utcnow()
+            audit.record(
+                session,
+                actor=self.actor,
+                action="run.failure",
+                object_type="scenario_run",
+                object_id=str(run_id),
+                detail={"scenario_id": scenario.id, "outcome": "failed", "error": error, "script_ran": False},
+            )
+            session.commit()
 
     def _container_id(self) -> Optional[str]:
         try:

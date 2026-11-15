@@ -47,6 +47,17 @@ class TargetHealthOut(BaseModel):
     error: Optional[str]
 
 
+class TelemetryStatusOut(BaseModel):
+    """Which telemetry source the backend uses (TELEMETRY_SOURCE) and, for Loki,
+    whether it can be read right now."""
+
+    source: str                  # "docker" or "loki"
+    loki_url: Optional[str]      # only for "loki"
+    reachable: Optional[bool]    # only checked for "loki"
+    error: Optional[str]
+
+
 class LabDetail(LabOut):
     containers: list[ContainerOut]
     target_health: TargetHealthOut
+    telemetry: TelemetryStatusOut

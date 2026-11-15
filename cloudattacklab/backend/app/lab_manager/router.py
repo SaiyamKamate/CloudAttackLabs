@@ -10,7 +10,9 @@ from sqlalchemy.orm import Session
 from ..config import get_settings
 from ..db import get_session
 from .adapter import LabAdapter
-from .api_schemas import LabCreate, LabDetail, LabOut
+from ..telemetry.loki import LokiSource
+from ..telemetry.source import TelemetrySourceError
+from .api_schemas import LabCreate, LabDetail, LabOut, TelemetryStatusOut
 from .docker_adapter import DockerComposeAdapter
 from .service import LabManager
 from .target import HttpTargetClient, TargetClient
@@ -55,11 +57,30 @@ def list_labs(manager: LabManager = Depends(get_manager)):
     return manager.list()
 
 
+def get_telemetry_status() -> TelemetryStatusOut:
+    """The active telemetry source; for Loki, a quick check that it answers."""
+    settings = get_settings()
+    if settings.telemetry_source != "loki":
+        return TelemetryStatusOut(source=settings.telemetry_source, loki_url=None, reachable=None, error=None)
+    try:
+        LokiSource(settings.loki_url, settings.telemetry_service, timeout_seconds=2).check()
+    except TelemetrySourceError as exc:
+        return TelemetryStatusOut(source="loki", loki_url=settings.loki_url, reachable=False, error=str(exc))
+    return TelemetryStatusOut(source="loki", loki_url=settings.loki_url, reachable=True, error=None)
+
+
 @router.get("/{lab_id}", response_model=LabDetail)
-def get_lab(lab_id: UUID, manager: LabManager = Depends(get_manager)):
+def get_lab(
+    lab_id: UUID,
+    manager: LabManager = Depends(get_manager),
+    telemetry: TelemetryStatusOut = Depends(get_telemetry_status),
+):
     lab, containers, target_health = manager.details(lab_id)
     return LabDetail(
-        **LabOut.model_validate(lab).model_dump(), containers=containers, target_health=target_health
+        **LabOut.model_validate(lab).model_dump(),
+        containers=containers,
+        target_health=target_health,
+        telemetry=telemetry,
     )
 
 
