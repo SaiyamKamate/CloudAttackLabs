@@ -67,7 +67,7 @@ class DetectionEngine:
 
         session.add_all(new_alerts)
         if new_alerts:
-            attach_alerts(session, run, scenario, new_alerts)  # one incident per run
+            attach_alerts(session, run, scenario, new_alerts)  # correlate into incidents
             session.commit()
         return new_alerts
 
