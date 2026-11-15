@@ -4,10 +4,9 @@ import { api } from '../api.js'
 const TERMINAL = ['completed', 'failed', 'cleaned_up']
 
 // List scenarios and run one against the running lab, then follow the run.
-export default function ScenariosPage() {
+export default function ScenariosPage({ run, setRun }) {
   const [scenarios, setScenarios] = useState([])
   const [lab, setLab] = useState(null)   // a running lab, if there is one
-  const [run, setRun] = useState(null)   // the run we started
   const [error, setError] = useState(null)
   const [busy, setBusy] = useState(false)
   const pollRef = useRef(null)
@@ -27,7 +26,10 @@ export default function ScenariosPage() {
     // Fetch on mount. State is set after the await, not synchronously.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     load()
+    // Coming back to this page: pick the run up again where it is now.
+    if (run) follow(run.id)
     return () => clearInterval(pollRef.current)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Poll the run until it reaches a terminal status.

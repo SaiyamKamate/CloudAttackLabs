@@ -11,6 +11,9 @@ const PAGES = {
 
 export default function App() {
   const [page, setPage] = useState('lab')
+  // The run started on the Scenarios page. Kept here so it (and its Cleanup
+  // button) is still there after a visit to another page.
+  const [run, setRun] = useState(null)
   const Current = PAGES[page].Component
 
   return (
@@ -28,7 +31,7 @@ export default function App() {
           </button>
         ))}
       </nav>
-      <Current />
+      <Current run={run} setRun={setRun} />
     </div>
   )
 }
