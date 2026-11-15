@@ -104,10 +104,26 @@ export default function ScenariosPage({ run, setRun }) {
           <h3>Run {run.scenario_id}</h3>
           <p>Status: <b>{run.status}</b> {running && '(updating…)'}</p>
           {run.error && <p style={{ color: 'crimson' }}>Run error: {run.error}</p>}
+          {run.summary?.verification && <p>{verificationText(run.summary.verification)}</p>}
           {run.summary && <pre>{JSON.stringify(run.summary, null, 2)}</pre>}
           <button onClick={cleanup} disabled={busy || running}>Cleanup</button>
         </div>
       )}
     </section>
   )
+}
+
+// The check the engine repeated after the run, in plain words. Works for any
+// check; the "still denied" wording is used when the result carries that field.
+function verificationText(v) {
+  const request = v.sent ? `${v.sent.request} as ${v.sent.username}` : v.check
+  const status = v.received?.status
+  if (v.still_denied === true) {
+    return `Verification passed: access is still denied (${request} returned ${status}).`
+  }
+  if (v.still_denied === false && status) {
+    return `Verification FAILED: access is no longer denied (${request} returned ${status}).`
+  }
+  if (v.passed) return `Verification passed: ${v.check}.`
+  return `Verification FAILED: ${v.check} could not be confirmed${v.error ? ` (${v.error})` : ''}.`
 }
