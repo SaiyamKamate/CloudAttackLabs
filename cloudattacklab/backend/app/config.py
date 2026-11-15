@@ -46,6 +46,17 @@ class Settings:
     telemetry_service: str               # which lab service's logs to collect
     telemetry_collect_interval_seconds: float
     telemetry_since_grace_seconds: float  # widen the collection window slightly
+    # Where telemetry comes from: "docker" (the lab's container logs, the
+    # default) or "loki" (the monitoring stack). No fallback between them.
+    telemetry_source: str
+    loki_url: str
+    # Logs reach Loki a little late: after a run, poll until the count of
+    # records stops growing or this timeout passes.
+    loki_settle_interval_seconds: float
+    loki_settle_timeout_seconds: float
+
+
+TELEMETRY_SOURCES = ("docker", "loki")
 
 
 def _database_url() -> str:
@@ -82,7 +93,18 @@ def get_settings() -> Settings:
         telemetry_service=os.environ.get("TELEMETRY_SERVICE", "shopcloud"),
         telemetry_collect_interval_seconds=float(os.environ.get("TELEMETRY_COLLECT_INTERVAL_SECONDS", "2")),
         telemetry_since_grace_seconds=float(os.environ.get("TELEMETRY_SINCE_GRACE_SECONDS", "3")),
+        telemetry_source=_telemetry_source(),
+        loki_url=os.environ.get("LOKI_URL", "http://127.0.0.1:3100").rstrip("/"),
+        loki_settle_interval_seconds=float(os.environ.get("LOKI_SETTLE_INTERVAL_SECONDS", "2")),
+        loki_settle_timeout_seconds=float(os.environ.get("LOKI_SETTLE_TIMEOUT_SECONDS", "15")),
     )
+
+
+def _telemetry_source() -> str:
+    value = os.environ.get("TELEMETRY_SOURCE", "docker").strip().lower()
+    if value not in TELEMETRY_SOURCES:
+        raise ValueError(f"TELEMETRY_SOURCE must be 'docker' or 'loki', not '{value}'.")
+    return value
 
 
 def _test_accounts() -> dict[str, str]:
