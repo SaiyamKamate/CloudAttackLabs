@@ -68,7 +68,7 @@ def audit_actions(db, response_id):
 
 
 # --- incidents ------------------------------------------------------------
-def test_detection_creates_one_incident_per_run_and_links_the_alerts(db):
+def test_detection_links_every_alert_of_a_run_to_an_incident(db):
     scenario = ScenarioEngine(ROOT / "scenarios", {"shopcloud"}).get("authentication_abuse")
     lab = Lab(name="det-lab")
     db.add(lab)
@@ -84,11 +84,12 @@ def test_detection_creates_one_incident_per_run_and_links_the_alerts(db):
     second = detection.run_for_run(db, run, scenario)
 
     assert len(first) == 1 and len(second) == 1
+    # Since step 9 the two source IPs are unrelated (no shared IP or username),
+    # so each alert gets its own incident. See test_incidents_and_reports.py.
     incidents = list(db.scalars(select(Incident)))
-    assert len(incidents) == 1
-    assert incidents[0].run_id == run.id and incidents[0].lab_id == lab.id
-    assert incidents[0].status == "open"
-    assert {first[0].incident_id, second[0].incident_id} == {incidents[0].id}
+    assert len(incidents) == 2
+    assert all(i.run_id == run.id and i.lab_id == lab.id and i.status == "open" for i in incidents)
+    assert {first[0].incident_id, second[0].incident_id} == {i.id for i in incidents}
 
 
 def test_no_alert_means_no_incident(db):
@@ -115,8 +116,10 @@ def test_list_and_get_incident(client, seeded):
     detail = client.get(f"{API}/incidents/{seeded['incident_id']}").json()
     assert [a["id"] for a in detail["alerts"]] == [seeded["alert_id"]]
     assert [r["id"] for r in detail["responses"]] == [response_id]
-    # Not built yet: no timeline and no risk score.
-    assert "risk_score" not in detail and "timeline" not in detail
+    # This incident was inserted directly, so it was never scored; the timeline
+    # holds its alert and the one response step so far.
+    assert detail["risk_score"] is None
+    assert [entry["type"] for entry in detail["timeline"]] == ["alert_fired", "response_requested"]
 
 
 def test_alert_carries_its_incident_id(client, seeded):
