@@ -2,7 +2,7 @@
 
 A local-first security experimentation platform: start an isolated Docker lab, run a controlled attack scenario against ShopCloud, collect real logs, detect, investigate and verify a response.
 
-**Status:** Backend, lab control, the Scenario Engine, telemetry ingestion with the first detection, a basic dashboard, and one response action with approval and verification are implemented (steps 3–7 in `docs/api-contract.md`), plus, in step 8, the second application scenario, `unauthorized_resource_access`, and in step 9 incident correlation, the incident timeline, a risk score and a run report. Not started: login/auth, the container scenario with Falco, Loki ingestion, the `stop_container` and `isolate_container` actions, PDF export and sharing of reports.
+**Status:** Backend, lab control, the Scenario Engine, telemetry ingestion with the first detection, a basic dashboard, and one response action with approval and verification are implemented (steps 3–7 in `docs/api-contract.md`), plus, in step 8, the second application scenario, `unauthorized_resource_access`, in step 9 incident correlation, the incident timeline, a risk score and a run report, and in step 10 reading ShopCloud's logs from Loki (`TELEMETRY_SOURCE=loki`). Not started: login/auth, the container scenario with Falco, the `stop_container` and `isolate_container` actions, PDF export and sharing of reports.
 
 What works now:
 
@@ -19,8 +19,8 @@ What works now:
 - The first scenario, `authentication_abuse`: sends 20 wrong-password logins for `lab_user` and reports how many got 401/429. Its script uses a deliberately wrong password and never a real one.
 - The second scenario, `unauthorized_resource_access` (guide section 5.3): logs in as `lab_restricted`, then requests `GET /api/orders` 8 times with that token. Every request must be refused with 403. The summary reports attempts sent, how many got 403 and how many got anything else. If any request returns 200 the summary says `"access_control_failed": true` and the run ends as `failed`. Its verification, `access_remains_denied`, makes one more request as `lab_restricted` after the run and records whether it was still denied. It has no response action; cleanup is `reset_target_state`.
 - Telemetry ingestion and detection (`backend/app/telemetry`, `backend/app/detection`) and every "Events and alerts" read endpoint: `GET /events`, `GET /events/{id}`, `GET /alerts`, `GET /alerts/{id}`.
-  - While a run is active (and once more when it finishes), ShopCloud's logs are collected through the Docker adapter, behind a small telemetry-source interface so Loki can replace it later. Lines that are not valid JSON are skipped and counted; nothing is invented.
-  - Each log record is normalized into a `NormalizedEvent` using the mapping in `docs/shopcloud-interface.md` section 5. The original record is kept in `events.raw`; `raw_event_reference` is `docker:shopcloud:<request_id>`; the same request_id is never stored twice.
+  - While a run is active (and once more when it finishes), ShopCloud's logs are collected from the telemetry source chosen by `TELEMETRY_SOURCE` (see "Telemetry source: Docker or Loki" below). Lines that are not valid JSON are skipped and counted; nothing is invented.
+  - Each log record is normalized into a `NormalizedEvent` using the mapping in `docs/shopcloud-interface.md` section 5. The original record is kept in `events.raw`; `raw_event_reference` is `docker:shopcloud:<request_id>` or `loki:shopcloud:<request_id>`, depending on the source; the same request_id is never stored twice, whichever source read it.
   - Detection rules are small validated YAML files in `/rules`. `repeated_failed_logins` fires when one source IP produces `threshold` failed logins within `window_seconds` (taken from the scenario's `detection`: 10 in 60s). One alert per run and source IP, with every contributing event linked through `alert_events`.
   - A rule's `group_by` is one field or a list of fields, and an optional `match` keeps only events with the listed values. Fields are `source_ip`, `username`, `resource`, or `raw.<name>` for a field of the original log record.
   - `repeated_access_denied` fires when one username gets `threshold` `authorization_denied` events on the same path within `window_seconds` (5 in 60s for the scenario). It counts only 403 denials for a logged-in user (`match: raw.status: 403`); a 401 with no token does not count. One alert per run, username and path.
@@ -50,6 +50,24 @@ docker compose up -d --build         # then open the dashboard at http://127.0.0
 The backend API is on `127.0.0.1:8000`; the dashboard proxies `/api` to it. From the dashboard: create and Start the lab, Run `authentication_abuse`, watch it reach `completed`, then open Alerts to see the `repeated_failed_logins` alert and its 20 linked events. On that alert, click "Request response", then Approve: the status becomes `verified` with "2 of 7 follow-up logins were blocked with 429". Back on Scenarios, Cleanup turns the rate limit off and the response shows `reverted`. Then Run `unauthorized_resource_access`: it reaches `completed` with 8 of 8 requests refused and "Verification passed: access is still denied", and Alerts shows a second alert, `repeated_access_denied`, with its 8 linked events. Incidents now shows two incidents, one per run: the first with risk score 40 (60 before its response was verified) and the second with 46. Open one for its timeline, and use "View report" for the run report.
 
 Both the backend and the dashboard containers use host networking and the backend mounts the Docker socket, so this needs a Linux Docker Engine (native, or inside WSL 2). On Docker Desktop, enable host networking.
+
+### Telemetry source: Docker or Loki
+
+The backend reads ShopCloud's logs from one of two sources, chosen with one setting in `.env`:
+
+- `TELEMETRY_SOURCE=docker` (the default): the lab container's logs through the Docker adapter. Works without the monitoring stack.
+- `TELEMETRY_SOURCE=loki`: Loki's HTTP API (`/loki/api/v1/query_range`) for `{service="shopcloud"}`, from the run's start to now, at `LOKI_URL` (default `http://127.0.0.1:3100`). Start the monitoring stack first: `docker compose -f monitoring/docker-compose.monitoring.yml up -d`.
+
+```bash
+TELEMETRY_SOURCE=loki docker compose up -d backend    # or set it in .env
+```
+
+Both sources return the same ShopCloud log lines, so normalization and detection are the same; only `raw_event_reference` changes (`loki:shopcloud:<request_id>`). The Lab page shows the active source and, for Loki, whether it can be reached.
+
+- Late logs. Logs reach Loki a second or two after ShopCloud writes them. After a run, the backend polls Loki every `LOKI_SETTLE_INTERVAL_SECONDS` (2) until the number of records stops growing, for at most `LOKI_SETTLE_TIMEOUT_SECONDS` (20). An empty answer does not count as settled. Alloy (`monitoring/config.alloy`) looks for new containers every 5 seconds instead of its default minute, because a lab start or reset creates a new ShopCloud container whose logs only reach Loki once Alloy has found it.
+- No fallback. If `TELEMETRY_SOURCE=loki` and Loki cannot be reached, the run fails before its script starts (nothing is sent to ShopCloud) with an error such as "Telemetry source 'loki' is not available: Loki at http://127.0.0.1:3100 could not be reached ...", shown on the run in the dashboard. A Loki failure during a run, or no ShopCloud logs at all after the timeout, also fails the run, and no alert is raised from partial telemetry. The backend never falls back to Docker and never invents events.
+
+Networking. The backend and Loki are in different Compose projects. The backend already uses host networking (that is how it reaches ShopCloud on `127.0.0.1:8081`), and the monitoring stack publishes Loki on the host's `127.0.0.1:3100`, so the backend reaches Loki at `http://127.0.0.1:3100` with no extra wiring. I chose this over joining the two projects with a shared external Docker network because it is the pattern the backend already uses for the lab, it needs no change to either compose project's networks, neither project has to start first to create a network, and Loki stays reachable from this machine only. If the backend ever leaves host networking, the alternative is an external network that both projects join, with `LOKI_URL=http://loki:3100`.
 
 ### Frontend development
 
@@ -84,6 +102,9 @@ Two notes for this repo's setup, both already configured in `frontend/vite.confi
 | `backend/app/incidents/risk.py` | The risk score heuristic and its explanation |
 | `backend/app/incidents/timeline.py` | Builds the incident timeline |
 | `backend/app/reports/service.py` | Builds the run report |
+| `backend/app/telemetry/source.py` | The telemetry source interface and the Docker source |
+| `backend/app/telemetry/loki.py` | The Loki telemetry source |
+| `monitoring/` | Loki, Alloy and Grafana (`docker compose -f monitoring/docker-compose.monitoring.yml up -d`) |
 | `mock_shopcloud/` | Fake ShopCloud that follows the interface |
 | `lab/docker-compose.lab.yml` | The isolated lab (ShopCloud) |
 | `docker-compose.yml` | Platform services (PostgreSQL for now) |
