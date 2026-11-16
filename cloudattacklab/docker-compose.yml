@@ -44,6 +44,11 @@ services:
       SCENARIO_SCRIPTS_DIR: /workspace/scenarios/scripts
       # Detection rules.
       RULES_DIR: /workspace/rules
+      # Telemetry: docker (default) or loki. Loki is in another Compose project
+      # (monitoring/) and publishes 127.0.0.1:3100 on the host; with host
+      # networking the backend reaches it there, like ShopCloud on 8081.
+      TELEMETRY_SOURCE: ${TELEMETRY_SOURCE:-docker}
+      LOKI_URL: ${LOKI_URL:-http://127.0.0.1:3100}
       BACKEND_HOST: 127.0.0.1
       BACKEND_PORT: ${BACKEND_PORT:-8000}
     volumes:

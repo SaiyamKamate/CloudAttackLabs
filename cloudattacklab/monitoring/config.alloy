@@ -1,5 +1,8 @@
 discovery.docker "containers" {
   host = "unix:///var/run/docker.sock"
+  // The default is 1m. A lab start or reset creates a new ShopCloud container,
+  // and its logs only reach Loki once Alloy has discovered it.
+  refresh_interval = "5s"
 }
 
 discovery.relabel "containers" {

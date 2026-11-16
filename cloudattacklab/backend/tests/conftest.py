@@ -1,6 +1,11 @@
 """Shared fixtures. Unit tests use an in-memory SQLite database and fakes, so they need no Docker."""
+import os
 import sys
 from pathlib import Path
+
+# The tests run with the default telemetry source whatever the shell says; the
+# Loki tests choose Loki explicitly.
+os.environ["TELEMETRY_SOURCE"] = "docker"
 
 import pytest
 from sqlalchemy import create_engine

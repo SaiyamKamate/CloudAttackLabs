@@ -62,8 +62,12 @@ def _clean_ip(value: Any) -> Optional[str]:
         return None
 
 
-def normalize(record: dict[str, Any], ctx: RunContext) -> Optional[NormalizedEvent]:
-    """Return a NormalizedEvent, or None if the record cannot be used (never invents one)."""
+def normalize(record: dict[str, Any], ctx: RunContext, origin: str = "docker") -> Optional[NormalizedEvent]:
+    """Return a NormalizedEvent, or None if the record cannot be used (never invents one).
+
+    `origin` is the telemetry source's name ("docker" or "loki"); it only sets the
+    first part of raw_event_reference. The mapping itself is the same for both.
+    """
     if not isinstance(record, dict):
         return None
     request_id = record.get("request_id")
@@ -85,7 +89,7 @@ def normalize(record: dict[str, Any], ctx: RunContext) -> Optional[NormalizedEve
         source_ip=source_ip,
         resource="shopcloud",
         message=message if isinstance(message, str) and message else event_name,
-        raw_event_reference=f"docker:shopcloud:{request_id}",
+        raw_event_reference=f"{origin}:shopcloud:{request_id}",
         scenario_id=ctx.scenario_id,
         lab_id=ctx.lab_id,
         run_id=ctx.run_id,

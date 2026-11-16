@@ -88,6 +88,10 @@ export default function LabPage() {
             <th align="left">ShopCloud health</th>
             <td>{health ? (health.healthy ? 'healthy' : health.reachable ? `unhealthy (HTTP ${health.status_code})` : `unreachable: ${health.error}`) : '—'}</td>
           </tr>
+          <tr>
+            <th align="left">Telemetry source</th>
+            <td>{telemetryText(detail?.telemetry)}</td>
+          </tr>
         </tbody>
       </table>
 
@@ -100,4 +104,12 @@ export default function LabPage() {
       {busy && <p>Working… (start, stop and reset can take a little while)</p>}
     </section>
   )
+}
+
+// TELEMETRY_SOURCE as the backend reports it, with Loki's reachability.
+function telemetryText(telemetry) {
+  if (!telemetry) return '—'
+  if (telemetry.source !== 'loki') return `${telemetry.source} (the lab container's logs)`
+  if (telemetry.reachable) return `loki at ${telemetry.loki_url} (reachable)`
+  return <span style={{ color: 'crimson' }}>loki at {telemetry.loki_url}: NOT reachable. {telemetry.error}</span>
 }
