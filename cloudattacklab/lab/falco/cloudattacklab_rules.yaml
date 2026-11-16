@@ -1,0 +1,25 @@
+# CloudAttackLab's one custom Falco rule.
+#
+# Fires when the suspicious_container_activity scenario's marker process starts
+# inside a container labelled cloudattacklab.role=test-target. The marker string
+# is part of the fixed command in backend/app/lab_manager/container.py; nothing
+# else in the lab runs a process with it.
+#
+# Falco's default rules are loaded too. The backend keeps any Falco alert about
+# the test container as extra evidence and ignores alerts about other containers.
+
+- rule: CloudAttackLab marker process in test container
+  desc: >
+    The scenario's harmless marker command (a shell that runs `id`) started in
+    the lab's designated test container.
+  condition: >
+    evt.type in (execve, execveat)
+    and container.id != host
+    and container.label[cloudattacklab.role] = "test-target"
+    and proc.cmdline contains "cloudattacklab-scenario-marker"
+  output: >
+    Marker process started in test container (proc=%proc.name cmdline=%proc.cmdline
+    user=%user.name container_id=%container.id container_name=%container.name
+    role=%container.label[cloudattacklab.role])
+  priority: WARNING
+  tags: [cloudattacklab, container, process]

@@ -49,6 +49,8 @@ services:
       # networking the backend reaches it there, like ShopCloud on 8081.
       TELEMETRY_SOURCE: ${TELEMETRY_SOURCE:-docker}
       LOKI_URL: ${LOKI_URL:-http://127.0.0.1:3100}
+      # Run Falco in the lab (privileged; see README). Off by default.
+      FALCO_ENABLED: ${FALCO_ENABLED:-false}
       BACKEND_HOST: 127.0.0.1
       BACKEND_PORT: ${BACKEND_PORT:-8000}
     volumes:

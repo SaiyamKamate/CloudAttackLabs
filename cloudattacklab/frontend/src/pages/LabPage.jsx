@@ -69,7 +69,7 @@ export default function LabPage() {
   }
 
   const health = detail?.target_health
-  const container = detail?.containers?.[0]
+  const containers = detail?.containers ?? []
 
   return (
     <section>
@@ -81,12 +81,20 @@ export default function LabPage() {
           <tr><th align="left">Name</th><td>{lab.name}</td></tr>
           <tr><th align="left">Status</th><td><b>{lab.status}</b></td></tr>
           <tr>
-            <th align="left">Container</th>
-            <td>{container ? `${container.service}: ${container.state} (${container.health ?? 'no health check'})` : '—'}</td>
+            <th align="left">Containers</th>
+            <td>
+              {containers.length === 0 ? '—' : containers.map((c) => (
+                <div key={c.service}>{`${c.service}: ${c.state} (${c.health ?? 'no health check'})`}</div>
+              ))}
+            </td>
           </tr>
           <tr>
             <th align="left">ShopCloud health</th>
             <td>{health ? (health.healthy ? 'healthy' : health.reachable ? `unhealthy (HTTP ${health.status_code})` : `unreachable: ${health.error}`) : '—'}</td>
+          </tr>
+          <tr>
+            <th align="left">Falco</th>
+            <td>{falcoText(detail?.falco)}</td>
           </tr>
           <tr>
             <th align="left">Telemetry source</th>
@@ -104,6 +112,15 @@ export default function LabPage() {
       {busy && <p>Working… (start, stop and reset can take a little while)</p>}
     </section>
   )
+}
+
+// FALCO_ENABLED and the Falco container's state.
+function falcoText(falco) {
+  if (!falco) return '—'
+  if (!falco.enabled) return 'off (FALCO_ENABLED=false): container scenarios use Docker events only'
+  if (falco.healthy) return 'on and healthy'
+  const state = falco.state ? `${falco.state}${falco.health ? `, ${falco.health}` : ''}` : 'no Falco container; start or reset the lab'
+  return <span style={{ color: 'crimson' }}>on but NOT healthy ({state})</span>
 }
 
 // TELEMETRY_SOURCE as the backend reports it, with Loki's reachability.

@@ -70,7 +70,8 @@ export default function AlertsPage() {
           <table border="1" cellPadding="6" style={{ borderCollapse: 'collapse' }}>
             <thead>
               <tr>
-                <th align="left">Time</th><th align="left">Type</th><th align="left">Source IP</th>
+                <th align="left">Time</th><th align="left">Source</th><th align="left">Type</th>
+                <th align="left">Source IP / container</th><th align="left">Falco rule</th>
                 <th align="left">Evidence (raw_event_reference)</th>
               </tr>
             </thead>
@@ -78,8 +79,10 @@ export default function AlertsPage() {
               {selected.events.map((e) => (
                 <tr key={e.event_id}>
                   <td>{fmt(e.timestamp)}</td>
+                  <td>{e.source}</td>
                   <td>{e.event_type}</td>
-                  <td>{e.source_ip ?? '—'}</td>
+                  <td>{e.source_ip ?? (e.container_id ? `container ${e.container_id}` : '—')}</td>
+                  <td>{e.rule_id ?? '—'}</td>
                   <td><code>{e.raw_event_reference}</code></td>
                 </tr>
               ))}

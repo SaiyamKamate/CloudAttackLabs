@@ -5,9 +5,14 @@ Safety rules, all enforced here:
   Nothing from the request body is used.
 - Nothing touches the target until a response is approved.
 - The target is the lab's configured target client, never an address from a request.
+- stop_container stops only the container named in the incident's own evidence
+  (the container_id on its events), and only if that container carries the
+  test-target label and belongs to the lab's Compose project. This is checked
+  when the response is requested and again by the adapter right before
+  `docker stop`; ShopCloud, Falco and platform containers are refused.
 
-Only `temporary_rate_limit` is implemented. Reverting happens in cleanup and
-lab reset (see revert.py).
+Implemented: `temporary_rate_limit` and `stop_container`. Reverting happens in
+cleanup and lab reset (see revert.py).
 """
 from __future__ import annotations
 
@@ -23,15 +28,17 @@ from sqlalchemy.orm import Session
 from .. import audit
 from ..errors import ApiError
 from ..incidents.risk import refresh_risk
+from ..lab_manager.adapter import LabAdapter, LabAdapterError
+from ..lab_manager.container import TargetRefused, check_test_container
 from ..lab_manager.target import TargetClient, TargetError
 from ..models import Incident, Lab, LabStatus, ResponseAction, ResponseStatus, ScenarioRun
 from ..scenario_engine.engine import ScenarioEngine
 from ..schemas.scenario import MAX_ATTEMPTS, ScenarioDefinition
-from .verification import CHECKS, EXTRA_ATTEMPTS
+from .verification import CHECKS, EXTRA_ATTEMPTS, container_not_running
 
 log = logging.getLogger("cloudattacklab.responses")
 
-SUPPORTED_ACTIONS = ("temporary_rate_limit",)
+SUPPORTED_ACTIONS = ("temporary_rate_limit", "stop_container")
 # A response that is still waiting or is applied; an incident may have only one of these.
 OPEN = (
     ResponseStatus.pending_approval.value,
@@ -55,11 +62,15 @@ class ResponseManager:
         engine: ScenarioEngine,
         target_clients: dict[str, TargetClient],
         *,
+        adapter: Optional[LabAdapter] = None,
+        container_targets: Optional[dict[str, str]] = None,
         actor: str = audit.ANONYMOUS_ACTOR,
     ) -> None:
         self.session = session
         self.engine = engine
         self.target_clients = target_clients  # the configured lab targets
+        self.adapter = adapter  # for stop_container
+        self.container_targets = container_targets or {}
         self.actor = actor
 
     # --- read -------------------------------------------------------------
@@ -75,7 +86,9 @@ class ResponseManager:
         if incident is None:
             raise ApiError(404, "incident_not_found", f"No incident with id {incident_id}.")
         scenario = self._scenario_for(incident)
-        action, parameters = self._planned_action(scenario)
+        action, parameters = self._planned_action(scenario, incident)
+        if action == "stop_container":
+            self._check_stoppable(parameters["container_id"])  # 409 for anything but the test container
 
         with _decision_lock:
             existing = self.session.scalars(
@@ -114,13 +127,16 @@ class ResponseManager:
             incident = self.session.get(Incident, row.incident_id)
             scenario = self._scenario_for(incident)
             # Re-read the action from the scenario: the stored row must still match it.
-            action, parameters = self._planned_action(scenario)
+            action, parameters = self._planned_action(scenario, incident)
             if (action, parameters) != (row.action, dict(row.parameters)):
                 raise ApiError(
                     409,
                     "response_out_of_date",
                     "The scenario's response section changed after this response was requested; request it again.",
                 )
+            if action == "stop_container":
+                self._lab_for(incident)  # the lab must exist and be running
+                return self._approve_stop_container(row, incident, scenario, parameters)
             target = self._target_for(incident, scenario)
 
             row.status = ResponseStatus.approved.value
@@ -171,6 +187,92 @@ class ResponseManager:
                 self._fail(row, {"stage": "verify", **result})
         return row
 
+    # --- stop_container ---------------------------------------------------
+    def _approve_stop_container(
+        self, row: ResponseAction, incident: Incident, scenario: ScenarioDefinition, parameters: dict[str, Any]
+    ) -> ResponseAction:
+        """Approved, then `docker stop` (the adapter refuses any non-test container), then verify."""
+        container_id = parameters["container_id"]
+        row.status = ResponseStatus.approved.value
+        row.decided_at = _utcnow()
+        row.decided_by = self.actor
+        self._audit(row, "response.approved", {"decided_by": self.actor})
+        self.session.commit()
+
+        try:
+            stopped = self.adapter.stop_test_container(container_id)
+        except TargetRefused as exc:
+            self._fail(row, {"stage": "execute", "passed": False, "refused": True, "error": str(exc)})
+            return row
+        except Exception as exc:  # LabAdapterError, or anything unexpected: never leave it "approved"
+            self._fail(row, {"stage": "execute", "passed": False, "error": str(exc)})
+            return row
+        row.status = ResponseStatus.executed.value
+        row.executed_at = _utcnow()
+        self._audit(
+            row,
+            "response.executed",
+            {"request": "docker stop", "container": stopped.name, "container_id": stopped.short_id},
+        )
+        self.session.commit()
+
+        check = scenario.response.verification.check
+        try:
+            if check != "container_not_running":
+                raise TargetError(f"verification check '{check}' is not implemented for stop_container")
+            result = container_not_running(self.adapter, container_id)
+        except Exception as exc:
+            self._fail(row, {"stage": "verify", "check": check, "passed": False, "error": str(exc)})
+            return row
+
+        row.verified_at = _utcnow()
+        if result["passed"]:
+            row.status = ResponseStatus.verified.value
+            row.verification_result = result
+            self._audit(row, "response.verified", result)
+            refresh_risk(self.session, incident, scenario.detection.threshold)
+            self.session.commit()
+        else:
+            self._fail(row, {"stage": "verify", **result})
+        return row
+
+    def _incident_container(self, incident: Incident) -> str:
+        """The one container the incident's events are about (from evidence, never a request)."""
+        ids = sorted({event.container_id for alert in incident.alerts for event in alert.events if event.container_id})
+        if not ids:
+            raise ApiError(409, "no_container", f"Incident {incident.id} has no container in its evidence.")
+        if len(ids) > 1:
+            raise ApiError(
+                409, "several_containers", f"Incident {incident.id} names several containers ({', '.join(ids)})."
+            )
+        return ids[0]
+
+    def _check_stoppable(self, container_id: str) -> None:
+        if self.adapter is None:
+            raise ApiError(409, "no_lab_adapter", "stop_container needs the lab adapter.")
+        try:
+            info = self.adapter.inspect(container_id)
+            check_test_container(info, self.adapter.project)
+        except TargetRefused as exc:
+            raise ApiError(409, "target_refused", f"stop_container refused: {exc}.") from exc
+        except LabAdapterError as exc:
+            raise ApiError(
+                409,
+                "container_not_found",
+                f"Container {container_id} from this incident cannot be inspected ({exc}); "
+                "it may have been recreated by cleanup or a lab reset.",
+            ) from exc
+        if not info.running:
+            raise ApiError(409, "container_not_running", f"Container {info.name} is already stopped.")
+
+    def _lab_for(self, incident: Incident) -> Lab:
+        lab: Optional[Lab] = self.session.get(Lab, incident.lab_id) if incident.lab_id else None
+        if lab is None:
+            raise ApiError(409, "no_lab", f"Incident {incident.id} is not linked to a lab.")
+        if lab.status != LabStatus.running.value:
+            raise ApiError(409, "lab_not_running", f"Lab '{lab.name}' is {lab.status}; start it before approving.")
+        return lab
+
     # --- internals --------------------------------------------------------
     def _pending(self, response_id: uuid.UUID) -> ResponseAction:
         row = self.get(response_id)
@@ -189,13 +291,19 @@ class ResponseManager:
             raise ApiError(409, "no_scenario_run", f"Incident {incident.id} is not linked to a scenario run.")
         return self.engine.get(run.scenario_id)  # 404 if it is no longer a valid scenario
 
-    def _planned_action(self, scenario: ScenarioDefinition) -> tuple[str, dict[str, Any]]:
+    def _planned_action(self, scenario: ScenarioDefinition, incident: Incident) -> tuple[str, dict[str, Any]]:
         """The action and parameters from the scenario's `response` section, checked."""
         response = scenario.response
         if response is None:
             raise ApiError(409, "no_response_defined", f"Scenario '{scenario.id}' defines no response action.")
         if response.action not in SUPPORTED_ACTIONS:
             raise ApiError(409, "action_not_supported", f"Response action '{response.action}' is not implemented.")
+        if response.action == "stop_container":
+            if scenario.target not in self.container_targets:
+                raise ApiError(409, "unknown_target", f"'{scenario.target}' is not a container target.")
+            # The container comes from the incident's evidence; the scenario's
+            # parameters cannot name one.
+            return response.action, {"target": scenario.target, "container_id": self._incident_container(incident)}
         max_attempts = response.parameters.get("max_attempts")
         window_seconds = response.parameters.get("window_seconds")
         # Bounded like scenario attempts: verification sends max_attempts + 2 logins.

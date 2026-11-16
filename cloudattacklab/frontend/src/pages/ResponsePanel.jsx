@@ -111,17 +111,24 @@ export default function ResponsePanel({ incidentId, onChange }) {
 }
 
 function describeParameters(response) {
+  if (response.action === 'stop_container') {
+    return `stop the test container ${response.parameters.container_id} (${response.parameters.target})`
+  }
   const { max_attempts: max, window_seconds: seconds } = response.parameters
   return `at most ${max} login attempts per ${seconds} seconds`
 }
 
 function blockedSentence(result) {
+  if (result.check === 'container_not_running') {
+    return `the test container ${result.sent.container} is ${result.received.running ? 'STILL running' : 'no longer running'}`
+  }
   return `${result.received.blocked_429} of ${result.sent.attempts} follow-up logins were blocked with 429`
 }
 
 // The status and verification result as one plain sentence.
 function inPlainWords(response) {
   const result = response.verification_result
+  if (response.action === 'stop_container') return stopContainerWords(response, result)
   switch (response.status) {
     case 'pending_approval':
       return 'Waiting for approval. Nothing has been changed on ShopCloud.'
@@ -148,6 +155,32 @@ function inPlainWords(response) {
   }
 }
 
+function stopContainerWords(response, result) {
+  switch (response.status) {
+    case 'pending_approval':
+      return 'Waiting for approval. Nothing has been changed on the test container.'
+    case 'rejected':
+      return `Rejected by ${response.decided_by}. The test container was not touched.`
+    case 'approved':
+      return `Approved by ${response.decided_by}; the test container is being stopped.`
+    case 'executed':
+      return 'The test container was stopped; it has not been verified yet.'
+    case 'verified':
+      return `Verified: ${blockedSentence(result)}.`
+    case 'failed':
+      if (result?.refused) return `Refused, nothing was stopped: ${result.error}`
+      if (result?.received) return `Failed: ${blockedSentence(result)}.`
+      return `Failed while trying to ${result?.stage === 'execute' ? 'stop the container' : 'verify it'}: ${result?.error ?? 'unknown error'}`
+    case 'reverted':
+      return (
+        'Reverted: cleanup recreated the test container.' +
+        (result?.received ? ` Before that it was verified: ${blockedSentence(result)}.` : '')
+      )
+    default:
+      return ''
+  }
+}
+
 function auditDetail(row) {
   const detail = row.detail || {}
   switch (row.action) {
@@ -157,7 +190,7 @@ function auditDetail(row) {
     case 'response.rejected':
       return `decided by ${detail.decided_by}`
     case 'response.executed':
-      return `${detail.request} ${JSON.stringify(detail.sent)}`
+      return detail.container ? `${detail.request} ${detail.container} (${detail.container_id})` : `${detail.request} ${JSON.stringify(detail.sent)}`
     case 'response.verified':
     case 'response.failed':
       return detail.received ? blockedSentence(detail) : detail.error ?? ''

@@ -7,12 +7,12 @@ from uuid import UUID
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from ..config import Settings, get_settings
+from ..config import FALCO_SERVICE, Settings, get_settings
 from ..db import get_session
 from .adapter import LabAdapter
 from ..telemetry.loki import LokiSource
 from ..telemetry.source import TelemetrySourceError
-from .api_schemas import LabCreate, LabDetail, LabOut, TelemetryStatusOut
+from .api_schemas import FalcoStatusOut, LabCreate, LabDetail, LabOut, TelemetryStatusOut
 from .docker_adapter import DockerComposeAdapter
 from .service import LabManager
 from .target import HttpTargetClient, TargetClient
@@ -28,6 +28,7 @@ def get_adapter() -> LabAdapter:
         docker_bin=settings.docker_bin,
         lab_control_token=settings.lab_control_token,
         start_timeout_seconds=settings.lab_start_timeout_seconds,
+        falco_enabled=settings.falco_enabled,
     )
 
 
@@ -73,6 +74,7 @@ def get_lab(
     lab_id: UUID,
     manager: LabManager = Depends(get_manager),
     telemetry: TelemetryStatusOut = Depends(get_telemetry_status),
+    settings: Settings = Depends(get_settings),
 ):
     lab, containers, target_health = manager.details(lab_id)
     return LabDetail(
@@ -80,6 +82,19 @@ def get_lab(
         containers=containers,
         target_health=target_health,
         telemetry=telemetry,
+        falco=falco_status(settings.falco_enabled, containers),
+    )
+
+
+def falco_status(enabled: bool, containers) -> FalcoStatusOut:
+    falco = next((c for c in containers if c.service == FALCO_SERVICE), None)
+    state = falco.state if falco else None
+    health = falco.health if falco else None
+    return FalcoStatusOut(
+        enabled=enabled,
+        state=state,
+        health=health,
+        healthy=bool(enabled and state == "running" and health == "healthy"),
     )
 
 

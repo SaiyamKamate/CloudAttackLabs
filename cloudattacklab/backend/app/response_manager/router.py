@@ -9,7 +9,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..db import get_session
-from ..lab_manager.router import get_target_clients
+from ..config import Settings, get_settings
+from ..lab_manager.adapter import LabAdapter
+from ..lab_manager.router import get_adapter, get_target_clients
 from ..lab_manager.target import TargetClient
 from ..models import AuditLog
 from ..scenario_engine.engine import ScenarioEngine
@@ -24,8 +26,12 @@ def get_response_manager(
     session: Session = Depends(get_session),
     engine: ScenarioEngine = Depends(get_scenario_engine),
     target_clients: dict[str, TargetClient] = Depends(get_target_clients),
+    adapter: LabAdapter = Depends(get_adapter),
+    settings: Settings = Depends(get_settings),
 ) -> ResponseManager:
-    return ResponseManager(session, engine, target_clients)
+    return ResponseManager(
+        session, engine, target_clients, adapter=adapter, container_targets=settings.container_targets
+    )
 
 
 # These endpoints declare no request body on purpose: the action, its parameters

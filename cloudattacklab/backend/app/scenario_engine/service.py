@@ -8,7 +8,8 @@ from __future__ import annotations
 import logging
 import threading
 import uuid
-from typing import Any, Optional
+from dataclasses import dataclass
+from typing import Any, Callable, Optional
 
 from sqlalchemy import select
 from sqlalchemy.engine import Engine
@@ -23,7 +24,10 @@ from ..models import Lab, LabStatus, RunStatus, ScenarioRun
 from ..response_manager.revert import mark_reverted
 from ..schemas.scenario import ScenarioDefinition
 from ..lab_manager.target import TargetClient, TargetError
-from ..telemetry.factory import make_source
+from ..config import FALCO_SERVICE
+from ..lab_manager.container import TargetRefused
+from ..telemetry.container import DockerEventSource, make_docker_event_normalizer, make_falco_normalizer
+from ..telemetry.factory import make_service_source, make_source
 from ..telemetry.ingest import IngestResult, TelemetryIngestor, ingest_until_settled
 from ..telemetry.normalize import RunContext
 from ..telemetry.source import TelemetrySource, TelemetrySourceError
@@ -40,6 +44,20 @@ ACTIVE_RUN = (RunStatus.pending.value, RunStatus.running.value)
 # One active run per lab, across the single backend process.
 _active_labs: set[uuid.UUID] = set()
 _active_lock = threading.Lock()
+
+
+@dataclass
+class Feed:
+    """One telemetry source collected during a run, and how its records are normalized."""
+
+    source: TelemetrySource
+    what: str                                   # for messages, e.g. "shopcloud log lines"
+    normalizer: Optional[Callable[..., Any]] = None  # None: ShopCloud's mapping
+    required: bool = True     # a settling source that returns nothing at all fails the run
+    settle: bool = False      # after the run, poll until the record count stops growing
+    hint: str = (             # added to the error when a required source returned nothing
+        "Check that the monitoring stack's Alloy is running and shipping the lab container's logs."
+    )
 
 
 class ScenarioService:
@@ -84,26 +102,40 @@ class ScenarioService:
             raise ApiError(404, "lab_not_found", f"No lab with id {lab_id}.")
         scenario = self.engine.get(scenario_id)  # 404 if not a valid scenario
 
-        # Refuse (409) if the lab is not running or the target is not the lab's target.
-        if scenario.target != lab.target:
-            raise ApiError(
-                409,
-                "target_mismatch",
-                f"scenario targets '{scenario.target}' but lab '{lab.name}' targets '{lab.target}'.",
-            )
-        if lab.target not in self.target_clients:
-            raise ApiError(409, "unknown_target", f"'{lab.target}' is not a configured lab target.")
+        # Refuse (409) if the lab is not running or the target is not one of the lab's targets.
+        is_container = scenario.type == "container"
+        if is_container:
+            # Every Docker lab has the configured container targets (the test container).
+            if scenario.target not in self.settings.container_targets:
+                raise ApiError(409, "unknown_target", f"'{scenario.target}' is not a configured container target.")
+        else:
+            if scenario.target != lab.target:
+                raise ApiError(
+                    409,
+                    "target_mismatch",
+                    f"scenario targets '{scenario.target}' but lab '{lab.name}' targets '{lab.target}'.",
+                )
+            if lab.target not in self.target_clients:
+                raise ApiError(409, "unknown_target", f"'{lab.target}' is not a configured lab target.")
         if lab.status != LabStatus.running.value:
             raise ApiError(409, "lab_not_running", f"Lab '{lab.name}' is {lab.status}; start it before a run.")
 
-        target = self.target_clients[lab.target]
-        base_url = self.settings.lab_targets[lab.target]
+        target = None if is_container else self.target_clients[lab.target]
+        base_url = None if is_container else self.settings.lab_targets[lab.target]
         # Confirm the script exists before accepting the run.
         script_path = runner.resolve_script(self.settings.scenario_scripts_dir, scenario.execution.script)
 
         self._acquire(lab_id)  # one active run per lab (409 if busy)
         try:
-            run_preflight(scenario, target, self.settings.lab_test_accounts)  # 409 on failure
+            run_preflight(  # 409 on failure
+                scenario,
+                target,
+                self.settings.lab_test_accounts,
+                adapter=self.adapter,
+                container_targets=self.settings.container_targets,
+            )
+            if is_container and self.settings.falco_enabled:
+                self._check_falco_running()
 
             run = ScenarioRun(
                 lab_id=lab.id,
@@ -144,7 +176,7 @@ class ScenarioService:
             raise ApiError(409, "run_in_progress", f"Run {run_id} is {run.status}; wait for it to finish.")
         scenario = self.engine.get(run.scenario_id)
         target = self.target_clients.get(scenario.target)
-        if target is None:
+        if target is None and scenario.target not in self.settings.container_targets:
             raise ApiError(409, "unknown_target", f"'{scenario.target}' is not a configured lab target.")
         self._run_cleanup(self.session, scenario, target, run, trigger="manual")
         run.status = RunStatus.cleaned_up.value
@@ -157,7 +189,7 @@ class ScenarioService:
         run_id: uuid.UUID,
         lab_id: uuid.UUID,
         scenario: ScenarioDefinition,
-        base_url: str,
+        base_url: Optional[str],
         script_path: str,
         target_name: str,
     ) -> None:
@@ -171,35 +203,45 @@ class ScenarioService:
                 session.commit()
                 started_at = run.started_at
 
-            # Collect ShopCloud's telemetry while the run is active (and once more at the end).
-            source = make_source(self.settings, self.adapter)
-            try:
-                source.check()
-            except TelemetrySourceError as exc:
-                # The telemetry source cannot be read: do not run the attack at
-                # all, and never fall back to another source.
-                self._fail_before_script(run_id, scenario, f"Telemetry source '{source.name}' is not available: {exc}")
-                return
+            # Collect the run's telemetry while it is active (and once more at the end).
+            feeds = self._telemetry_feeds(scenario)
+            for feed in feeds:
+                try:
+                    feed.source.check()
+                except TelemetrySourceError as exc:
+                    # A telemetry source cannot be read: do not run the scenario at
+                    # all, and never fall back to another source.
+                    self._fail_before_script(
+                        run_id, scenario, f"Telemetry source '{feed.source.name}' is not available: {exc}"
+                    )
+                    return
+            is_container = scenario.type == "container"
+            service = self.settings.container_targets.get(target_name) if is_container else self.settings.telemetry_service
             ctx = RunContext(
                 run_id=run_id,
                 lab_id=lab_id,
                 scenario_id=scenario.id,
                 started_at=started_at,
-                container_id=self._container_id(),
+                container_id=self._container_id(service),
             )
             stop = threading.Event()
-            telemetry_errors: list[str] = []
+            telemetry_errors: list[tuple[str, str]] = []
             collector = threading.Thread(
                 target=self._collect_loop,
-                args=(source, ctx, stop, telemetry_errors),
+                args=(feeds, ctx, stop, telemetry_errors),
                 name=f"collect-{run_id}",
                 daemon=True,
             )
             collector.start()
 
-            result = runner.execute_script(
-                Path(script_path), base_url, dict(run.parameters), scenario.execution.timeout_seconds
-            )
+            if is_container:
+                # In-process, with a handle that can only run the fixed marker command.
+                handle = runner.ContainerHandle(self.adapter, target_name, service)
+                result = runner.execute_container_script(Path(script_path), handle, scenario.execution.timeout_seconds)
+            else:
+                result = runner.execute_script(
+                    Path(script_path), base_url, dict(run.parameters), scenario.execution.timeout_seconds
+                )
 
             stop.set()
             # The loop does a final ingest after stop is set (and, for a late
@@ -208,10 +250,11 @@ class ScenarioService:
             if telemetry_errors:
                 # The run's evidence is incomplete: record it as failed and do
                 # not raise alerts from part of the telemetry.
+                failed_source, message = telemetry_errors[0]
                 result = runner.RunResult(
                     outcome="failed",
                     summary=result.summary,
-                    error=f"Telemetry source '{source.name}' failed during the run: {telemetry_errors[0]}",
+                    error=f"Telemetry source '{failed_source}' failed during the run: {message}",
                 )
 
             # Detection runs over the events collected for this run.
@@ -268,7 +311,7 @@ class ScenarioService:
                     session.commit()
                     # Cleanup also runs if a run fails or times out.
                     target = self.target_clients.get(target_name)
-                    if target is not None:
+                    if target is not None or target_name in self.settings.container_targets:
                         self._run_cleanup(session, scenario, target, run, trigger="auto")
                         session.commit()
         except Exception:  # never let a background thread die silently
@@ -278,45 +321,110 @@ class ScenarioService:
             self._release(lab_id)
 
     # --- telemetry collection --------------------------------------------
+    def _telemetry_feeds(self, scenario: ScenarioDefinition) -> list[Feed]:
+        """What to collect for this scenario.
+
+        Application scenarios: the target's logs from TELEMETRY_SOURCE.
+        Container scenarios: the test container's Docker events (base telemetry)
+        and, with FALCO_ENABLED, Falco's alerts read from TELEMETRY_SOURCE (extra
+        evidence: Falco having nothing to report is not an error).
+        """
+        if scenario.type != "container":
+            source = make_source(self.settings, self.adapter)
+            return [
+                Feed(
+                    source,
+                    what=f"{self.settings.telemetry_service} log lines",
+                    settle=bool(getattr(source, "late_arriving", False)),
+                )
+            ]
+        feeds = [
+            Feed(
+                DockerEventSource(self.adapter),
+                what="docker events",
+                normalizer=make_docker_event_normalizer(scenario.target),
+                # An event can reach the daemon's log a moment after `docker exec`
+                # returns, so poll until the count stops growing.
+                settle=True,
+                hint="Check that the backend can reach the Docker daemon.",
+            )
+        ]
+        if self.settings.falco_enabled:
+            feeds.append(
+                Feed(
+                    make_service_source(self.settings, self.adapter, FALCO_SERVICE),
+                    what="falco alerts",
+                    normalizer=make_falco_normalizer(scenario.target),
+                    required=False,
+                    settle=True,  # Falco reports a moment after the process started
+                )
+            )
+        return feeds
+
     def _collect_loop(
-        self, source: TelemetrySource, ctx: RunContext, stop: threading.Event, errors: list[str]
+        self, feeds: list[Feed], ctx: RunContext, stop: threading.Event, errors: list[tuple[str, str]]
     ) -> None:
         """Ingest telemetry periodically while the run is active, then once more at the end.
 
         All ingestion is in this one thread, so stored events are never raced. If
-        the source cannot be read, the error is put in `errors` and collection stops.
+        a source cannot be read, (source name, error) is put in `errors` and
+        collection stops.
         """
+        feed = feeds[0]
         try:
             while not stop.is_set():
-                self._ingest_once(source, ctx)
+                for feed in feeds:
+                    self._ingest_once(feed, ctx)
                 stop.wait(self.settings.telemetry_collect_interval_seconds)
-            if getattr(source, "late_arriving", False):
-                # Records reach Loki a little late: poll until the count stops growing.
+            for feed in feeds:
+                if not feed.settle:
+                    self._ingest_once(feed, ctx)  # final pass after the run stops
+                    continue
+                # Records reach Loki (or Falco's output) a little late: poll until
+                # the count stops growing.
                 settled = ingest_until_settled(
-                    lambda: self._ingest_once(source, ctx),
+                    lambda: self._ingest_once(feed, ctx),
                     interval_seconds=self.settings.loki_settle_interval_seconds,
                     timeout_seconds=self.settings.loki_settle_timeout_seconds,
+                    empty_is_settled=not feed.required,
                 )
-                if settled.collected == 0:
+                if feed.required and settled.collected == 0:
                     raise TelemetrySourceError(
-                        f"{source.name} returned no {self.settings.telemetry_service} log lines for this run "
-                        f"after waiting {self.settings.loki_settle_timeout_seconds:g} s. Check that the monitoring "
-                        "stack's Alloy is running and shipping the lab container's logs."
+                        f"{feed.source.name} returned no {feed.what} for this run "
+                        f"after waiting {self.settings.loki_settle_timeout_seconds:g} s. {feed.hint}"
                     )
-            else:
-                self._ingest_once(source, ctx)  # final pass after the run stops
         except TelemetrySourceError as exc:
-            log.warning("telemetry source %s failed for run %s: %s", source.name, ctx.run_id, exc)
-            errors.append(str(exc))
+            log.warning("telemetry source %s failed for run %s: %s", feed.source.name, ctx.run_id, exc)
+            errors.append((feed.source.name, str(exc)))
         except Exception as exc:
             log.exception("telemetry collection failed for run %s", ctx.run_id)
-            errors.append(f"{type(exc).__name__}: {exc}")
+            errors.append((feed.source.name, f"{type(exc).__name__}: {exc}"))
 
-    def _ingest_once(self, source: TelemetrySource, ctx: RunContext) -> IngestResult:
+    def _ingest_once(self, feed: Feed, ctx: RunContext) -> IngestResult:
         with Session(self._bind, expire_on_commit=False) as session:
             return TelemetryIngestor(
-                session, source, ctx, grace_seconds=self.settings.telemetry_since_grace_seconds
+                session,
+                feed.source,
+                ctx,
+                grace_seconds=self.settings.telemetry_since_grace_seconds,
+                normalizer=feed.normalizer,
             ).ingest()
+
+    def _check_falco_running(self) -> None:
+        """With FALCO_ENABLED, a container run needs Falco up: refuse (409) otherwise."""
+        try:
+            containers = self.adapter.status()
+        except LabAdapterError as exc:
+            raise ApiError(409, "preflight_failed", f"pre-flight check 'falco' failed: {exc}") from exc
+        falco = next((c for c in containers if c.service == FALCO_SERVICE), None)
+        if falco is None or falco.state != "running":
+            state = "missing" if falco is None else falco.state
+            raise ApiError(
+                409,
+                "preflight_failed",
+                f"pre-flight check 'falco' failed: FALCO_ENABLED is true but the Falco container is {state}. "
+                "Start (or reset) the lab, or set FALCO_ENABLED=false.",
+            )
 
     def _fail_before_script(self, run_id: uuid.UUID, scenario: ScenarioDefinition, error: str) -> None:
         """Mark a run failed before its script ran (nothing was sent to the target)."""
@@ -335,10 +443,10 @@ class ScenarioService:
             )
             session.commit()
 
-    def _container_id(self) -> Optional[str]:
+    def _container_id(self, service: str) -> Optional[str]:
         try:
             for container in self.adapter.status():
-                if container.service == self.settings.telemetry_service:
+                if container.service == service:
                     return container.container_id or None
         except LabAdapterError:
             return None
@@ -366,21 +474,36 @@ class ScenarioService:
 
     # --- cleanup steps ----------------------------------------------------
     def _run_cleanup(
-        self, session: Session, scenario: ScenarioDefinition, target: TargetClient, run: ScenarioRun, *, trigger: str
+        self,
+        session: Session,
+        scenario: ScenarioDefinition,
+        target: Optional[TargetClient],
+        run: ScenarioRun,
+        *,
+        trigger: str,
     ) -> None:
         done: list[str] = []
         errors: dict[str, str] = {}
         for step in scenario.cleanup.steps:
             try:
-                self._cleanup_step(step, target)
+                self._cleanup_step(step, target, scenario)
                 done.append(step)
-            except TargetError as exc:
+            except (TargetError, LabAdapterError, TargetRefused) as exc:
                 errors[step] = str(exc)
                 log.warning("cleanup step '%s' failed for run %s: %s", step, run.id, exc)
-        # Either step turns the target's rate limit off, so an applied response is now reverted.
+        # Either step turns the target's rate limit off, so an applied rate limit is now reverted;
+        # a recreated test container undoes stop_container.
         reverted = []
         if "disable_rate_limit" in done or "reset_target_state" in done:
-            reverted = mark_reverted(session, lab_id=run.lab_id, trigger=f"cleanup:{trigger}", actor=self.actor)
+            reverted += mark_reverted(
+                session, lab_id=run.lab_id, trigger=f"cleanup:{trigger}", actor=self.actor,
+                actions=("temporary_rate_limit",),
+            )
+        if "recreate_test_container" in done:
+            reverted += mark_reverted(
+                session, lab_id=run.lab_id, trigger=f"cleanup:{trigger}", actor=self.actor,
+                actions=("stop_container",),
+            )
         audit.record(
             session,
             actor=self.actor,
@@ -397,11 +520,19 @@ class ScenarioService:
             },
         )
 
-    def _cleanup_step(self, step: str, target: TargetClient) -> None:
+    def _cleanup_step(self, step: str, target: Optional[TargetClient], scenario: ScenarioDefinition) -> None:
+        if step in ("disable_rate_limit", "reset_target_state") and target is None:
+            raise TargetError(f"'{scenario.target}' has no HTTP control endpoints for '{step}'")
         if step == "disable_rate_limit":
             target.set_rate_limit(enabled=False)
         elif step == "reset_target_state":
             target.reset()
+        elif step == "recreate_test_container":
+            service = self.settings.container_targets.get(scenario.target)
+            if service is None:
+                raise TargetError(f"'{scenario.target}' is not a container target")
+            # A fresh test container: back to the baseline (undoes a stop_container).
+            self.adapter.recreate_service(service)
         else:
             log.warning("unknown cleanup step '%s'; skipping", step)
 

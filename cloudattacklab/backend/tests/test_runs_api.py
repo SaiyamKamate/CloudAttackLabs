@@ -118,7 +118,11 @@ def patch_script(monkeypatch, result: RunResult, record=None):
 # --- scenarios ------------------------------------------------------------
 def test_list_scenarios(client):
     body = client.get(f"{API}/scenarios").json()
-    assert [s["id"] for s in body] == ["authentication_abuse", "unauthorized_resource_access"]
+    assert [s["id"] for s in body] == [
+        "authentication_abuse",
+        "suspicious_container_activity",
+        "unauthorized_resource_access",
+    ]
     assert body[0]["target"] == "shopcloud"
 
 

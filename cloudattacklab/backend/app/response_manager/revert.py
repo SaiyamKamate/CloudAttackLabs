@@ -8,6 +8,7 @@ target, and the caller commits.
 from __future__ import annotations
 
 import uuid
+from typing import Optional
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -19,19 +20,29 @@ from ..models import Incident, ResponseAction, ResponseStatus
 APPLIED = (ResponseStatus.executed.value, ResponseStatus.verified.value)
 
 
-def mark_reverted(session: Session, *, lab_id: uuid.UUID, trigger: str, actor: str) -> list[ResponseAction]:
+def mark_reverted(
+    session: Session,
+    *,
+    lab_id: uuid.UUID,
+    trigger: str,
+    actor: str,
+    actions: Optional[tuple[str, ...]] = None,
+) -> list[ResponseAction]:
     """Every applied response in this lab becomes `reverted`, with one audit row each.
 
     It is per lab, not per run, because the target's rate limit is one setting:
-    turning it off undoes every response that turned it on.
+    turning it off undoes every response that turned it on. `actions` limits it
+    to the responses a cleanup step actually undid (turning the rate limit off
+    does not restart a stopped container); None means all of them (lab reset).
     """
-    rows = list(
-        session.scalars(
-            select(ResponseAction)
-            .join(Incident, ResponseAction.incident_id == Incident.id)
-            .where(Incident.lab_id == lab_id, ResponseAction.status.in_(APPLIED))
-        )
+    query = (
+        select(ResponseAction)
+        .join(Incident, ResponseAction.incident_id == Incident.id)
+        .where(Incident.lab_id == lab_id, ResponseAction.status.in_(APPLIED))
     )
+    if actions is not None:
+        query = query.where(ResponseAction.action.in_(actions))
+    rows = list(session.scalars(query))
     for row in rows:
         before = row.status
         row.status = ResponseStatus.reverted.value

@@ -24,7 +24,11 @@ router = APIRouter(tags=["scenarios"])
 @lru_cache
 def get_scenario_engine() -> ScenarioEngine:
     settings = get_settings()
-    return ScenarioEngine(settings.scenarios_dir, set(settings.lab_targets))
+    return ScenarioEngine(
+        settings.scenarios_dir,
+        set(settings.lab_targets) | set(settings.container_targets),
+        set(settings.container_targets),
+    )
 
 
 @lru_cache

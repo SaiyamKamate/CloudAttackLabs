@@ -37,6 +37,11 @@ class Settings:
     # Configured lab targets: name -> base URL as seen from the backend.
     # A lab (and a scenario) may only name one of these.
     lab_targets: dict[str, str]
+    # Configured container targets: target name -> lab Compose service. Every
+    # Docker lab has them. A container scenario may only name one of these.
+    container_targets: dict[str, str]
+    # Run the optional Falco service in the lab (needs a privileged container).
+    falco_enabled: bool
     # Scenario Engine
     scenarios_dir: Path
     scenario_scripts_dir: Path
@@ -57,6 +62,20 @@ class Settings:
 
 
 TELEMETRY_SOURCES = ("docker", "loki")
+
+# The lab's container targets (lab/docker-compose.lab.yml): target -> service.
+CONTAINER_TARGETS = {"test_container": "test_container"}
+# The optional Falco service in the lab compose file.
+FALCO_SERVICE = "falco"
+
+
+def _flag(name: str) -> bool:
+    value = os.environ.get(name, "false").strip().lower()
+    if value in ("1", "true", "yes", "on"):
+        return True
+    if value in ("0", "false", "no", "off", ""):
+        return False
+    raise ValueError(f"{name} must be true or false, not '{value}'.")
 
 
 def _database_url() -> str:
@@ -84,6 +103,8 @@ def get_settings() -> Settings:
         lab_control_token=os.environ.get("LAB_CONTROL_TOKEN", "lab-dev-token"),
         lab_start_timeout_seconds=int(os.environ.get("LAB_START_TIMEOUT_SECONDS", "180")),
         lab_targets={"shopcloud": os.environ.get("SHOPCLOUD_URL", "http://127.0.0.1:8081").rstrip("/")},
+        container_targets=dict(CONTAINER_TARGETS),
+        falco_enabled=_flag("FALCO_ENABLED"),
         scenarios_dir=Path(os.environ.get("SCENARIOS_DIR", str(REPO_ROOT / "scenarios"))),
         scenario_scripts_dir=Path(
             os.environ.get("SCENARIO_SCRIPTS_DIR", str(REPO_ROOT / "scenarios" / "scripts"))

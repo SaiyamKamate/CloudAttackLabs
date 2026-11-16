@@ -2,7 +2,7 @@
 
 A local-first security experimentation platform: start an isolated Docker lab, run a controlled attack scenario against ShopCloud, collect real logs, detect, investigate and verify a response.
 
-**Status:** Backend, lab control, the Scenario Engine, telemetry ingestion with the first detection, a basic dashboard, and one response action with approval and verification are implemented (steps 3–7 in `docs/api-contract.md`), plus, in step 8, the second application scenario, `unauthorized_resource_access`, in step 9 incident correlation, the incident timeline, a risk score and a run report, and in step 10 reading ShopCloud's logs from Loki (`TELEMETRY_SOURCE=loki`). Not started: login/auth, the container scenario with Falco, the `stop_container` and `isolate_container` actions, PDF export and sharing of reports.
+**Status:** Backend, lab control, the Scenario Engine, telemetry ingestion with the first detection, a basic dashboard, and one response action with approval and verification are implemented (steps 3–7 in `docs/api-contract.md`), plus, in step 8, the second application scenario, `unauthorized_resource_access`, in step 9 incident correlation, the incident timeline, a risk score and a run report, in step 10 reading ShopCloud's logs from Loki (`TELEMETRY_SOURCE=loki`), and in step 11 the container scenario `suspicious_container_activity` with Docker events, optional Falco (`FALCO_ENABLED=true`) and the `stop_container` response. Not started: login/auth, the `isolate_container` action, Kubernetes and cloud adapters, Prometheus, PDF export and sharing of reports.
 
 What works now:
 
@@ -18,6 +18,7 @@ What works now:
   - A scenario with no response action can name a post-run check in `execution.parameters` (`verification_check`). After the run the engine repeats that check once against the lab's ShopCloud and stores the result under `verification` in the run's `summary`.
 - The first scenario, `authentication_abuse`: sends 20 wrong-password logins for `lab_user` and reports how many got 401/429. Its script uses a deliberately wrong password and never a real one.
 - The second scenario, `unauthorized_resource_access` (guide section 5.3): logs in as `lab_restricted`, then requests `GET /api/orders` 8 times with that token. Every request must be refused with 403. The summary reports attempts sent, how many got 403 and how many got anything else. If any request returns 200 the summary says `"access_control_failed": true` and the run ends as `failed`. Its verification, `access_remains_denied`, makes one more request as `lab_restricted` after the run and records whether it was still denied. It has no response action; cleanup is `reset_target_state`.
+- The container scenario, `suspicious_container_activity` (guide section 5.2): runs one harmless, fixed command (`sh -c "id; : cloudattacklab-scenario-marker"`) inside the lab's test container, the way an intruder would start a shell in a running container. See "Container scenario and Falco" below.
 - Telemetry ingestion and detection (`backend/app/telemetry`, `backend/app/detection`) and every "Events and alerts" read endpoint: `GET /events`, `GET /events/{id}`, `GET /alerts`, `GET /alerts/{id}`.
   - While a run is active (and once more when it finishes), ShopCloud's logs are collected from the telemetry source chosen by `TELEMETRY_SOURCE` (see "Telemetry source: Docker or Loki" below). Lines that are not valid JSON are skipped and counted; nothing is invented.
   - Each log record is normalized into a `NormalizedEvent` using the mapping in `docs/shopcloud-interface.md` section 5. The original record is kept in `events.raw`; `raw_event_reference` is `docker:shopcloud:<request_id>` or `loki:shopcloud:<request_id>`, depending on the source; the same request_id is never stored twice, whichever source read it.
@@ -69,6 +70,26 @@ Both sources return the same ShopCloud log lines, so normalization and detection
 
 Networking. The backend and Loki are in different Compose projects. The backend already uses host networking (that is how it reaches ShopCloud on `127.0.0.1:8081`), and the monitoring stack publishes Loki on the host's `127.0.0.1:3100`, so the backend reaches Loki at `http://127.0.0.1:3100` with no extra wiring. I chose this over joining the two projects with a shared external Docker network because it is the pattern the backend already uses for the lab, it needs no change to either compose project's networks, neither project has to start first to create a network, and Loki stays reachable from this machine only. If the backend ever leaves host networking, the alternative is an external network that both projects join, with `LOKI_URL=http://loki:3100`.
 
+### Container scenario and Falco
+
+The lab compose file has a second target, `test_container`: an `alpine:3.20` container that only runs `sleep`, labelled `cloudattacklab.role=test-target`, with no network, a read-only root, 32 MB of memory and 0.1 CPU. The container scenario only ever touches this container; ShopCloud and the platform containers are never targeted.
+
+- Execution. A container scenario's script runs inside the backend and gets a handle with one action, `run_marker()`. It runs the command fixed in `backend/app/lab_manager/container.py` through the Docker adapter (`docker compose exec -T test_container ...`). The command is not taken from scenario parameters or the API request (the run request accepts only `scenario_id`), and the adapter has no method that takes a command.
+- Base telemetry: Docker events. The test container's events (`docker events`, filtered on the lab project and the test-target label) are normalized with source `docker`, `container_id` and resource `test_container`. `exec_start` becomes `suspicious_process` (nothing should ever start a process in this container), `start` becomes `container_started`, `die`/`stop` become `container_stopped`. Reference: `docker:test_container:exec_start-<timeNano>`.
+- Extra evidence: Falco. With `FALCO_ENABLED=true`, Falco's JSON alerts about the run's test container are read like ShopCloud's logs (Docker logs, or Loki `{service="falco"}` with `TELEMETRY_SOURCE=loki`) and normalized with source `falco`, event type `suspicious_process` and `rule_id` set to the Falco rule name. Reference: `<docker|loki>:falco:<event time in ns>-<rule hash>`. Alerts about other containers are ignored. Falco having nothing to report is not an error; it is extra evidence.
+- Detection. `rules/suspicious_container_process.yaml` fires on one `suspicious_process` event for `test_container`. It groups by resource, so the Docker event and the Falco event of a run fall into one alert, and so one incident.
+- Response `stop_container`, with approval like `temporary_rate_limit`. The container comes from the incident's own events, never from a request. It is stopped only if it has the label `cloudattacklab.role=test-target` and belongs to the lab's Compose project (`cloudattacklab-lab`); this is checked when the response is requested and again right before `docker stop`. Anything else (ShopCloud, Falco, backend, dashboard, PostgreSQL, a container in another project) is refused. Verification inspects the container and confirms it is no longer running.
+- Cleanup `recreate_test_container` recreates the test container, so the lab is back at baseline (and the `stop_container` response becomes `reverted`). Lab reset recreates every container, the test container included.
+- The Lab page lists every lab container and shows whether Falco is on and healthy. The alert detail shows each event's source and Falco rule, and the incident timeline names each event's source.
+
+**Falco requirements.** Falco is optional and off by default (`FALCO_ENABLED=false`), so the platform runs on machines without it; container scenarios then use Docker events only. To turn it on, set `FALCO_ENABLED=true` in `.env`, recreate the backend (`docker compose up -d backend`) and Start or Reset the lab. Falco (`falcosecurity/falco:0.45.2`, pinned, with the lab's rule baked in by `lab/falco/Dockerfile`) needs:
+
+- A Linux kernel with BTF (`/sys/kernel/btf/vmlinux`) for the modern eBPF engine. Checked on WSL 2 with kernel 6.18.
+- A privileged container. The modern eBPF engine loads BPF programs into the host kernel and attaches them to system-call tracepoints, which needs kernel capabilities (`CAP_BPF`, `CAP_PERFMON`, `CAP_SYS_RESOURCE`, `CAP_SYS_PTRACE`); it also reads the host's `/proc` and `/etc` (mounted read-only) to see every process, and the Docker socket to name containers. An unprivileged container cannot do any of this. Falco can in some setups run with just those capabilities; the lab uses `privileged: true`, as in the command verified on this machine, because it is the setting that works across kernels. Falco only observes; it changes nothing on the host. Because privileged containers are powerful, Falco stays off unless you turn it on.
+- About 512 MB of memory (its limit in the lab compose file).
+
+If `FALCO_ENABLED=true` but the Falco container is not running, a container run is refused with a clear pre-flight message.
+
 ### Frontend development
 
 ```bash
@@ -104,6 +125,12 @@ Two notes for this repo's setup, both already configured in `frontend/vite.confi
 | `backend/app/reports/service.py` | Builds the run report |
 | `backend/app/telemetry/source.py` | The telemetry source interface and the Docker source |
 | `backend/app/telemetry/loki.py` | The Loki telemetry source |
+| `scenarios/suspicious_container_activity.yaml` | The container scenario |
+| `scenarios/scripts/suspicious_container_activity.py` | Its script (runs in the backend with a test-container handle) |
+| `backend/app/lab_manager/container.py` | The fixed marker command and the test-container guard |
+| `backend/app/telemetry/container.py` | Docker events and Falco alerts, normalized |
+| `rules/suspicious_container_process.yaml` | The container detection rule |
+| `lab/falco/` | Falco's Dockerfile (pinned version) and the lab's Falco rule |
 | `monitoring/` | Loki, Alloy and Grafana (`docker compose -f monitoring/docker-compose.monitoring.yml up -d`) |
 | `mock_shopcloud/` | Fake ShopCloud that follows the interface |
 | `lab/docker-compose.lab.yml` | The isolated lab (ShopCloud) |

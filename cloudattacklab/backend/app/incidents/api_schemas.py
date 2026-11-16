@@ -33,6 +33,8 @@ class Evidence(BaseModel):
     id: str
     href: str
     raw_event_reference: Optional[str] = None
+    source: Optional[str] = None   # for an event: application, docker or falco
+    rule_id: Optional[str] = None  # for a Falco event: the Falco rule name
 
 
 class TimelineEntry(BaseModel):
