@@ -184,6 +184,9 @@ function Facts({ rows }) {
 
 function responseResult(result) {
   if (!result) return '—'
+  if (result.check === 'container_not_running' && result.received) {
+    return `${result.passed ? 'passed' : 'failed'}: the test container ${result.sent.container} is ${result.received.running ? 'still running' : 'no longer running'}`
+  }
   if (result.received && result.sent) {
     return `${result.passed ? 'passed' : 'failed'}: ${result.received.blocked_429} of ${result.sent.attempts} follow-up logins were blocked with 429`
   }
