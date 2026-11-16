@@ -67,15 +67,20 @@ def build_timeline(session: Session, incident: Incident) -> list[dict[str, Any]]
             )
             if part
         )
+        # Name the source first (application, docker, falco), and Falco's rule.
+        rule = f" (Falco rule: {event.rule_id})" if event.source == "falco" and event.rule_id else ""
         entries.append(
             _entry(
                 event.timestamp,
                 "event",
-                f"{event.event_type}{' ' + who if who else ''} on {event.resource}: {event.message}",
+                f"{event.source} event: {event.event_type}{' ' + who if who else ''} on {event.resource}"
+                f"{rule}: {event.message}",
                 kind="event",
                 id=event.event_id,
                 href=f"{API}/events/{event.event_id}",
                 raw_event_reference=event.raw_event_reference,
+                source=event.source,
+                rule_id=event.rule_id,
             )
         )
 

@@ -57,7 +57,17 @@ class TelemetryStatusOut(BaseModel):
     error: Optional[str]
 
 
+class FalcoStatusOut(BaseModel):
+    """FALCO_ENABLED and, when it is on, the Falco container's state and health."""
+
+    enabled: bool
+    state: Optional[str]    # e.g. "running", "exited"; None if there is no Falco container
+    health: Optional[str]   # "healthy", "starting", "unhealthy" or None
+    healthy: bool           # enabled, running and its health check passes
+
+
 class LabDetail(LabOut):
     containers: list[ContainerOut]
     target_health: TargetHealthOut
     telemetry: TelemetryStatusOut
+    falco: FalcoStatusOut
