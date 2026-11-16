@@ -108,7 +108,7 @@ def _parse_summary(stdout: str) -> Optional[dict[str, Any]]:
 
 
 # --- container scenarios -----------------------------------------------------
-class TestContainerHandle:
+class ContainerHandle:
     """What a container scenario's script is given: one fixed action, nothing else.
 
     `run_marker()` runs MARKER_COMMAND (lab_manager/container.py) in the target's
@@ -127,7 +127,7 @@ class TestContainerHandle:
         return self._run()
 
 
-def execute_container_script(script_path: Path, handle: TestContainerHandle, timeout_seconds: int) -> RunResult:
+def execute_container_script(script_path: Path, handle: ContainerHandle, timeout_seconds: int) -> RunResult:
     """Load a container scenario's script and call its `run(handle)`, bounded by the timeout.
 
     The script returns its summary as a dict. A non-zero `exit_code` in it, an

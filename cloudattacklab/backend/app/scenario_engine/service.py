@@ -53,8 +53,11 @@ class Feed:
     source: TelemetrySource
     what: str                                   # for messages, e.g. "shopcloud log lines"
     normalizer: Optional[Callable[..., Any]] = None  # None: ShopCloud's mapping
-    required: bool = True     # a late source that returns nothing at all fails the run
+    required: bool = True     # a settling source that returns nothing at all fails the run
     settle: bool = False      # after the run, poll until the record count stops growing
+    hint: str = (             # added to the error when a required source returned nothing
+        "Check that the monitoring stack's Alloy is running and shipping the lab container's logs."
+    )
 
 
 class ScenarioService:
@@ -233,7 +236,7 @@ class ScenarioService:
 
             if is_container:
                 # In-process, with a handle that can only run the fixed marker command.
-                handle = runner.TestContainerHandle(self.adapter, target_name, service)
+                handle = runner.ContainerHandle(self.adapter, target_name, service)
                 result = runner.execute_container_script(Path(script_path), handle, scenario.execution.timeout_seconds)
             else:
                 result = runner.execute_script(
@@ -340,6 +343,10 @@ class ScenarioService:
                 DockerEventSource(self.adapter),
                 what="docker events",
                 normalizer=make_docker_event_normalizer(scenario.target),
+                # An event can reach the daemon's log a moment after `docker exec`
+                # returns, so poll until the count stops growing.
+                settle=True,
+                hint="Check that the backend can reach the Docker daemon.",
             )
         ]
         if self.settings.falco_enabled:
@@ -384,8 +391,7 @@ class ScenarioService:
                 if feed.required and settled.collected == 0:
                     raise TelemetrySourceError(
                         f"{feed.source.name} returned no {feed.what} for this run "
-                        f"after waiting {self.settings.loki_settle_timeout_seconds:g} s. Check that the monitoring "
-                        "stack's Alloy is running and shipping the lab container's logs."
+                        f"after waiting {self.settings.loki_settle_timeout_seconds:g} s. {feed.hint}"
                     )
         except TelemetrySourceError as exc:
             log.warning("telemetry source %s failed for run %s: %s", feed.source.name, ctx.run_id, exc)
