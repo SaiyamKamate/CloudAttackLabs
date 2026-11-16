@@ -1,13 +1,14 @@
 # The isolated lab. The Lab Manager will start, stop and reset this file.
 # By hand:  docker compose -f lab/docker-compose.lab.yml up --build -d
 #
-# To use the real ShopCloud, change `build:` to its folder. Nothing else changes
-# as long as it follows docs/shopcloud-interface.md.
+# The target is the real ShopCloud (../shopcloud). The fake one in
+# ../mock_shopcloud follows the same interface (docs/shopcloud-interface.md);
+# point `build:` at it to swap them. Nothing else changes.
 name: cloudattacklab-lab
 
 services:
   shopcloud:
-    build: ../mock_shopcloud
+    build: ../shopcloud
     environment:
       LAB_CONTROL_TOKEN: ${LAB_CONTROL_TOKEN:-lab-dev-token}
     ports:
