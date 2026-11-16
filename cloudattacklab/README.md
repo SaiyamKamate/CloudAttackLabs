@@ -2,7 +2,7 @@
 
 A local-first security experimentation platform: start an isolated Docker lab, run a controlled attack scenario against ShopCloud, collect real logs, detect, investigate and verify a response.
 
-**Status:** Backend, lab control, the Scenario Engine, telemetry ingestion with the first detection, a basic dashboard, and one response action with approval and verification are implemented (steps 3–7 in `docs/api-contract.md`), plus, in step 8, the second application scenario, `unauthorized_resource_access`, in step 9 incident correlation, the incident timeline, a risk score and a run report, in step 10 reading ShopCloud's logs from Loki (`TELEMETRY_SOURCE=loki`), and in step 11 the container scenario `suspicious_container_activity` with Docker events, optional Falco (`FALCO_ENABLED=true`) and the `stop_container` response. Not started: login/auth, the `isolate_container` action, Kubernetes and cloud adapters, Prometheus, PDF export and sharing of reports.
+**Status:** Backend, lab control, the Scenario Engine, telemetry ingestion with the first detection, a basic dashboard, and one response action with approval and verification are implemented (steps 3–7 in `docs/api-contract.md`), plus, in step 8, the second application scenario, `unauthorized_resource_access`, in step 9 incident correlation, the incident timeline, a risk score and a run report, in step 10 reading ShopCloud's logs from Loki (`TELEMETRY_SOURCE=loki`), and in step 11 the container scenario `suspicious_container_activity` with Docker events, optional Falco (`FALCO_ENABLED=true`) and the `stop_container` response, and in step 12 the real ShopCloud (`shopcloud/`) as the lab target in place of the fake one. Not started: login/auth, the `isolate_container` action, Kubernetes and cloud adapters, Prometheus, PDF export and sharing of reports.
 
 What works now:
 
@@ -90,6 +90,27 @@ The lab compose file has a second target, `test_container`: an `alpine:3.20` con
 
 If `FALCO_ENABLED=true` but the Falco container is not running, a container run is refused with a clear pre-flight message.
 
+### ShopCloud: the real one and the fake one
+
+The lab target is now the real ShopCloud in `shopcloud/`, a small reference shop. It is separate from the platform: FastAPI with its own SQLite database inside its container (`/app/data/shop.db`), no platform code and not the platform's PostgreSQL. It follows `docs/shopcloud-interface.md` exactly (`tools/check_shopcloud.py` prints 14/14 against it) and adds a little more so it looks like a shop:
+
+- Data, all synthetic: five products, the two test accounts from the interface (`lab_user`, `lab_restricted`) and three orders belonging to `lab_user`. Passwords are stored as scrypt hashes, and login tokens only as a SHA-256 of the token; sessions expire after 8 hours.
+- `GET /api/products` and `GET /api/products/{id}` (public), and one page at `/` that lists the products, has a sign-in form and shows "My orders" after sign-in (plain HTML and a small script; the token is kept in memory only, and a strict Content-Security-Policy is sent).
+- JSON logs on stdout for every request to `/api/*`, `/lab/*` and the page `/`, with the fields from the interface. Besides the interface's event names it uses: `products_listed`, `product_viewed`, `product_not_found` (404 for an unknown product), `page_viewed`, `rate_limit_read` (`GET /lab/rate-limit`), `rate_limit_rejected` (422 on `POST /lab/rate-limit`), `not_found` and `method_not_allowed` (an unknown path or method under `/api` or `/lab`). These are not in the interface yet; the platform stores them as event type `other` and no rule uses them. `/health` and the static files are not logged. Passwords and tokens are never logged.
+- The database is created and seeded at start-up, so a new container is always at the baseline. `POST /lab/reset` restores the seeded data in one transaction, removes every session and turns the rate limit off.
+- No intentional security holes: the scenarios test detection and response against normal behaviour (failed logins, denied access). The container runs as a non-root user (`shop`, uid 10001) and uvicorn ignores `X-Forwarded-For`, so `source_ip` is always the real peer.
+
+Which one is used where:
+
+| | Used for |
+|---|---|
+| `shopcloud/` | The lab target: `lab/docker-compose.lab.yml` builds it, so the dashboard, the scenarios and the integration tests (`pytest -m integration`) run against it. Its own tests: `pytest shopcloud/tests` |
+| `mock_shopcloud/` | A fast, in-memory stand-in that follows the same interface. Not used by the lab any more; kept for quick local runs (`uvicorn app:app` from its folder) and to check `tools/check_shopcloud.py` itself. To use it as the lab target, set `build: ../mock_shopcloud` in the lab compose file. The platform's unit tests use neither (they use fakes) |
+
+The backend builds the lab from inside its container, so `docker-compose.yml` mounts `./shopcloud` (read-only) next to `./mock_shopcloud`. After pulling this change, recreate the backend once: `docker compose up -d backend`.
+
+![The ShopCloud page, signed in as lab_user](docs/shopcloud-page.jpg)
+
 ### Frontend development
 
 ```bash
@@ -132,8 +153,9 @@ Two notes for this repo's setup, both already configured in `frontend/vite.confi
 | `rules/suspicious_container_process.yaml` | The container detection rule |
 | `lab/falco/` | Falco's Dockerfile (pinned version) and the lab's Falco rule |
 | `monitoring/` | Loki, Alloy and Grafana (`docker compose -f monitoring/docker-compose.monitoring.yml up -d`) |
-| `mock_shopcloud/` | Fake ShopCloud that follows the interface |
-| `lab/docker-compose.lab.yml` | The isolated lab (ShopCloud) |
+| `shopcloud/` | The real ShopCloud, the lab target (FastAPI, SQLite), with its tests in `shopcloud/tests` |
+| `mock_shopcloud/` | Fake ShopCloud that follows the interface (fast, in memory; not the lab target) |
+| `lab/docker-compose.lab.yml` | The isolated lab (ShopCloud, the test container, optional Falco) |
 | `docker-compose.yml` | Platform services (PostgreSQL for now) |
 | `tools/check_shopcloud.py` | Checks any running ShopCloud against the interface |
 
@@ -143,7 +165,8 @@ Two notes for this repo's setup, both already configured in `frontend/vite.confi
 python -m venv .venv && source .venv/bin/activate
 pip install -r backend/requirements.txt
 
-pytest backend/tests                                   # contract tests
+pytest backend/tests                                   # platform tests
+pytest shopcloud/tests                                 # ShopCloud's own tests
 
 docker compose -f lab/docker-compose.lab.yml up --build -d
 python tools/check_shopcloud.py http://127.0.0.1:8081  # should print 14/14

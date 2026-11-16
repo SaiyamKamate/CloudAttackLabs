@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ShopCloud</title>
+  <link rel="stylesheet" href="/static/shop.css">
+  <script src="/static/shop.js" defer></script>
+</head>
+<body>
+  <header>
+    <h1>ShopCloud</h1>
+    <p class="note">A reference shop for the CloudAttackLab lab. All products, accounts and orders are synthetic.</p>
+  </header>
+
+  <main>
+    <section aria-labelledby="products-title">
+      <h2 id="products-title">Products</h2>
+      <ul id="products" class="products"><li class="muted">Loading…</li></ul>
+    </section>
+
+    <aside>
+      <section id="login-box" aria-labelledby="login-title">
+        <h2 id="login-title">Sign in</h2>
+        <form id="login-form">
+          <label>Username <input name="username" autocomplete="username" required></label>
+          <label>Password <input name="password" type="password" autocomplete="current-password" required></label>
+          <button type="submit">Sign in</button>
+          <p id="login-error" class="error" role="alert" hidden></p>
+        </form>
+      </section>
+
+      <section id="account-box" aria-labelledby="orders-title" hidden>
+        <h2 id="orders-title">My orders</h2>
+        <p>Signed in as <strong id="who"></strong> <button id="logout" type="button" class="link">Sign out</button></p>
+        <div id="orders"></div>
+      </section>
+    </aside>
+  </main>
+</body>
+</html>

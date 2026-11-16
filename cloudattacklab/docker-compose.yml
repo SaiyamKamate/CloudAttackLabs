@@ -58,6 +58,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       # The lab definition and its build context, read-only.
       - ./lab:/workspace/lab:ro
+      - ./shopcloud:/workspace/shopcloud:ro
       - ./mock_shopcloud:/workspace/mock_shopcloud:ro
       # Scenario definitions and their scripts, read-only.
       - ./scenarios:/workspace/scenarios:ro

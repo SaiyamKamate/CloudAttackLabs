@@ -1,0 +1,22 @@
+:root { --ink: #1d2433; --muted: #5d6677; --line: #dde2ea; --accent: #1f6feb; --bg: #f6f7fa; --card: #fff; --err: #b42318; }
+* { box-sizing: border-box; }
+body { margin: 0; font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--ink); background: var(--bg); }
+header { padding: 20px 24px 8px; border-bottom: 1px solid var(--line); background: var(--card); }
+header h1 { margin: 0; font-size: 24px; color: var(--accent); }
+.note, .muted { color: var(--muted); }
+.note { margin: 4px 0 12px; font-size: 13px; }
+main { display: grid; grid-template-columns: 1fr 340px; gap: 24px; padding: 24px; max-width: 1100px; margin: 0 auto; }
+@media (max-width: 760px) { main { grid-template-columns: 1fr; padding: 16px; } }
+h2 { font-size: 17px; margin: 0 0 12px; }
+.products { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+.product, aside section { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 14px; }
+.product h3 { margin: 0 0 4px; font-size: 15px; }
+.product p { margin: 0 0 6px; font-size: 13px; color: var(--muted); }
+.product .price { color: var(--ink); font-weight: 600; font-size: 14px; }
+form label { display: block; margin-bottom: 10px; font-size: 13px; }
+form input { display: block; width: 100%; margin-top: 4px; padding: 7px 9px; border: 1px solid var(--line); border-radius: 6px; font: inherit; }
+button { background: var(--accent); color: #fff; border: 0; border-radius: 6px; padding: 8px 14px; font: inherit; cursor: pointer; }
+button.link { background: none; color: var(--accent); padding: 0 4px; }
+.error { color: var(--err); font-size: 13px; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { text-align: left; padding: 5px 4px; border-bottom: 1px solid var(--line); }
