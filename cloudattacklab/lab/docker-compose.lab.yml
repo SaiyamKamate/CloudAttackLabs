@@ -22,6 +22,48 @@ services:
       timeout: 3s
       retries: 5
 
+  # The container scenario's target (lab target `test_container`). It does
+  # nothing but sleep. The scenario runs one fixed, harmless command in it, and
+  # stop_container may only stop a container with this label in this project.
+  test_container:
+    image: alpine:3.20
+    command: ["sleep", "infinity"]
+    init: true          # so `sleep` stops at once on `docker stop`
+    labels:
+      cloudattacklab.role: test-target
+    network_mode: none  # it needs no network at all
+    read_only: true
+    mem_limit: 32m
+    cpus: 0.1
+
+  # Optional runtime security sensor, only with FALCO_ENABLED=true (the backend
+  # then adds `--profile falco`). It must be privileged: the modern eBPF engine
+  # loads BPF programs into the host kernel and reads host /proc to see every
+  # process, which an unprivileged container cannot do. It only reads; it
+  # changes nothing. Alerts are JSON lines on stdout.
+  falco:
+    build: ./falco
+    profiles: ["falco"]
+    privileged: true
+    command:
+      - falco
+      - -o
+      - engine.kind=modern_ebpf
+      - -o
+      - json_output=true
+      - -o
+      - stdout_output.enabled=true
+    volumes:
+      - /var/run/docker.sock:/host/var/run/docker.sock
+      - /proc:/host/proc:ro
+      - /etc:/host/etc:ro
+    mem_limit: 512m
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8765/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 24
+
 networks:
   lab:
     name: cloudattacklab-lab
