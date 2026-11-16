@@ -1,0 +1,21 @@
+id: suspicious_container_process
+# Fires on one process started inside the lab's designated test container.
+# Nothing should ever start a process there, so one is enough (threshold 1 in
+# the scenario's `detection`).
+event_type: suspicious_process
+# One group per affected resource. Docker's exec event and Falco's alert about
+# the same container both carry resource `test_container`, so within a run
+# they fall into the same group and end up in one alert (and one incident),
+# not two.
+group_by: resource
+# Only the designated test container.
+match:
+  resource: test_container
+severity: high
+title: Suspicious process in the test container
+description: >
+  A process was started inside the lab's test container, which runs nothing
+  but `sleep`. In a real environment an unexpected shell in a running container
+  is a common sign that someone has got into it.
+default_threshold: 1
+default_window_seconds: 60
