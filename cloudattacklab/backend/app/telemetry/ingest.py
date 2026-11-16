@@ -16,7 +16,7 @@ import logging
 import time
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Callable
+from typing import Callable, Optional
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -74,7 +74,17 @@ def _event_row(event: NormalizedEvent, raw: dict) -> Event:
 
 
 class TelemetryIngestor:
-    def __init__(self, session: Session, source: TelemetrySource, ctx: RunContext, *, grace_seconds: float = 3) -> None:
+    def __init__(
+        self,
+        session: Session,
+        source: TelemetrySource,
+        ctx: RunContext,
+        *,
+        grace_seconds: float = 3,
+        normalizer: Optional[Callable[..., Optional[NormalizedEvent]]] = None,
+    ) -> None:
+        # How one record becomes an event; ShopCloud's mapping unless the source needs another.
+        self.normalizer = normalizer or normalize
         self.session = session
         self.source = source
         self.ctx = ctx
@@ -108,7 +118,7 @@ class TelemetryIngestor:
                 result.invalid_json += 1
                 continue
 
-            event = normalize(record, self.ctx, origin)
+            event = self.normalizer(record, self.ctx, origin)
             if event is None:
                 result.skipped += 1
                 continue
@@ -135,13 +145,16 @@ def ingest_until_settled(
     timeout_seconds: float,
     sleep: Callable[[float], None] = time.sleep,
     clock: Callable[[], float] = time.monotonic,
+    empty_is_settled: bool = False,
 ) -> IngestResult:
     """Ingest repeatedly until the source returns the same number of records twice
     in a row, or the timeout passes. Returns the combined result.
 
     Used after a run for sources whose records arrive late, so the last requests
-    of a run are not missed. An empty answer never counts as settled: a run
-    always makes requests, so no records means they have not arrived yet.
+    of a run are not missed. An empty answer does not count as settled (a run
+    always makes requests, so no records means they have not arrived yet),
+    unless `empty_is_settled` is set for an optional source such as Falco,
+    which may rightly have nothing to report.
     """
     total = IngestResult()
     deadline = clock() + timeout_seconds
@@ -149,7 +162,7 @@ def ingest_until_settled(
     while True:
         result = ingest_once()
         total.add(result)
-        if previous is not None and result.collected == previous and result.collected > 0:
+        if previous is not None and result.collected == previous and (result.collected > 0 or empty_is_settled):
             break
         if clock() + interval_seconds > deadline:
             log.info("telemetry did not settle within %ss; stopping with %d records", timeout_seconds, result.collected)
