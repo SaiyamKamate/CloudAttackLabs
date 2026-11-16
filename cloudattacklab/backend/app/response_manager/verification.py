@@ -50,3 +50,14 @@ def login_returns_429(target: TargetClient, *, username: str, max_attempts: int)
 
 
 CHECKS: dict[str, Callable[..., dict[str, Any]]] = {"login_returns_429": login_returns_429}
+
+
+def container_not_running(adapter, container_id: str) -> dict[str, Any]:
+    """After stop_container: inspect the container and confirm it is no longer running."""
+    info = adapter.inspect(container_id)
+    return {
+        "check": "container_not_running",
+        "passed": not info.running,
+        "sent": {"request": "docker inspect", "container": info.name, "container_id": info.short_id},
+        "received": {"running": info.running},
+    }
