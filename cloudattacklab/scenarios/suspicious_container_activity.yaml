@@ -1,0 +1,52 @@
+schema_version: "1.0"
+id: suspicious_container_activity
+name: Suspicious Container Activity
+category: container_runtime
+description: >
+  Runs one harmless, predefined command (a shell that prints `id` and exits)
+  inside the lab's dedicated test container, the way an intruder would start a
+  shell in a running container. Checks that the Docker exec event, and Falco's
+  alert when Falco is on, are collected and detected.
+version: 1.0.0
+target: test_container
+type: container
+
+requires:
+  - container_target
+
+prerequisites:
+  - check: container_running
+    detail: test_container
+
+execution:
+  # Runs inside the backend and gets only a handle to the test container. The
+  # command is fixed in backend/app/lab_manager/container.py; these parameters
+  # are never used to build it.
+  script: suspicious_container_activity.py
+  timeout_seconds: 30
+  parameters: {}
+
+expected_telemetry:
+  # The Docker exec event is the base telemetry. Falco's alert is extra
+  # evidence when FALCO_ENABLED=true, so it is not required here.
+  - source: docker
+    event_type: suspicious_process
+    min_count: 1
+
+detection:
+  rule: suspicious_container_process
+  threshold: 1
+  window_seconds: 60
+
+response:
+  action: stop_container
+  requires_approval: true
+  parameters: {}
+  verification:
+    check: container_not_running
+    description: Inspect the test container and confirm it is no longer running.
+
+cleanup:
+  enabled: true
+  steps:
+    - recreate_test_container

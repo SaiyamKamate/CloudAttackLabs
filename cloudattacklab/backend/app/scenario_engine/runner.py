@@ -105,3 +105,64 @@ def _parse_summary(stdout: str) -> Optional[dict[str, Any]]:
     except ValueError:
         return None
     return parsed if isinstance(parsed, dict) else None
+
+
+# --- container scenarios -----------------------------------------------------
+class TestContainerHandle:
+    """What a container scenario's script is given: one fixed action, nothing else.
+
+    `run_marker()` runs MARKER_COMMAND (lab_manager/container.py) in the target's
+    test container through the lab adapter. There is no way to pass a command,
+    choose another container, or reach the adapter itself.
+    """
+
+    __slots__ = ("_run", "target", "name")
+
+    def __init__(self, adapter, target: str, service: str) -> None:
+        self.target = target
+        self.name = service
+        self._run = lambda: adapter.exec_marker(service)
+
+    def run_marker(self):
+        return self._run()
+
+
+def execute_container_script(script_path: Path, handle: TestContainerHandle, timeout_seconds: int) -> RunResult:
+    """Load a container scenario's script and call its `run(handle)`, bounded by the timeout.
+
+    The script returns its summary as a dict. A non-zero `exit_code` in it, an
+    exception, or running past the timeout makes the run fail.
+    """
+    import importlib.util
+    import threading
+
+    outcome: dict[str, Any] = {}
+
+    def target() -> None:
+        try:
+            spec = importlib.util.spec_from_file_location(f"scenario_script_{script_path.stem}", script_path)
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            run = getattr(module, "run", None)
+            if not callable(run):
+                raise RuntimeError(f"{script_path.name} has no run(container) function")
+            outcome["summary"] = run(handle)
+        except Exception as exc:  # reported on the run, never raised into the engine
+            outcome["error"] = f"{type(exc).__name__}: {exc}"
+
+    worker = threading.Thread(target=target, name=f"script-{script_path.stem}", daemon=True)
+    worker.start()
+    worker.join(timeout_seconds)
+    if worker.is_alive():
+        return RunResult(outcome="failed", summary=None, error=f"script timed out after {timeout_seconds}s")
+    if "error" in outcome:
+        return RunResult(outcome="failed", summary=None, error=f"script failed: {outcome['error']}")
+    summary = outcome.get("summary")
+    if not isinstance(summary, dict):
+        return RunResult(outcome="failed", summary=None, error="script did not return a summary dict")
+    exit_code = summary.get("exit_code")
+    if exit_code != 0:
+        return RunResult(
+            outcome="failed", summary=summary, error=f"the command in the test container exited with {exit_code}"
+        )
+    return RunResult(outcome="completed", summary=summary, error=None, exit_code=0)
