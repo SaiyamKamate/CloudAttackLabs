@@ -47,8 +47,10 @@ def test_start_check_reset_stop_the_real_lab(real_client):
     assert response.json()["status"] == "running"
 
     details = real_client.get(url).json()
-    (container,) = details["containers"]
-    assert container["service"] == "shopcloud"
+    by_service = {c["service"]: c for c in details["containers"]}
+    container = by_service["shopcloud"]
+    test_container = by_service["test_container"]
+    assert test_container["state"] == "running"
     assert container["state"] == "running" and container["health"] == "healthy"
     assert details["target_health"]["healthy"] is True
     assert details["target_health"]["body"]["status"] == "ok"
@@ -67,8 +69,12 @@ def test_start_check_reset_stop_the_real_lab(real_client):
     assert response.status_code == 200, response.text
 
     after = real_client.get(url).json()
-    assert after["containers"][0]["container_id"] != container["container_id"]  # a new container
-    assert after["containers"][0]["health"] == "healthy"
+    after_by_service = {c["service"]: c for c in after["containers"]}
+    assert after_by_service["shopcloud"]["container_id"] != container["container_id"]  # a new container
+    assert after_by_service["shopcloud"]["health"] == "healthy"
+    # Reset also brings the test container back to baseline: a new, running one.
+    assert after_by_service["test_container"]["container_id"] != test_container["container_id"]
+    assert after_by_service["test_container"]["state"] == "running"
     assert after["target_health"]["healthy"] is True
     assert httpx.get(f"{shopcloud}/lab/rate-limit", headers=lab_headers).json()["enabled"] is False
 
