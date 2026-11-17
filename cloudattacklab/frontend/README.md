@@ -1,16 +1,21 @@
-# React + Vite
+# CloudAttackLab dashboard
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+The React (Vite) dashboard of CloudAttackLab: the pages Lab, Scenarios, Alerts and Incidents, and the run report view. How to use it is in the [user guide](../docs/user-guide.md).
 
-Currently, two official plugins are available:
+| File | What it is |
+|---|---|
+| `src/App.jsx` | The page switcher |
+| `src/pages/` | One component per page, plus `ResponsePanel.jsx` (request, approve, reject a response) and `ReportPage.jsx` |
+| `src/api.js` | Every call to the backend API ([api-contract.md](../docs/api-contract.md)). Paths are relative (`/api/v1/...`) |
+| `vite.config.js` | Development server: forwards `/api` to the backend on `127.0.0.1:8000`, and polls for file changes (needed on a Windows drive under WSL) |
+| `nginx.conf`, `Dockerfile` | The production container: nginx serves the built files on `127.0.0.1:5173` and forwards `/api/` to the backend |
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+Normally the dashboard runs in its container (`docker compose up -d --build` from the project folder). For development with hot reload:
 
-## React Compiler
+```bash
+cd frontend
+npm install
+npm run dev        # http://localhost:5173, forwards /api to the backend on :8000
+```
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+These three commands were not run while writing this page (no Node.js inside WSL on the test machine). Stop the dashboard container first (`docker compose stop frontend`), because it uses the same port. See [troubleshooting](../docs/troubleshooting.md#vite-does-not-notice-saved-files-on-a-windows-drive) if saved files do not show up.

@@ -4,7 +4,7 @@ This is a repeatable measurement of CloudAttackLab against the metrics in projec
 
 - Script: `tools/evaluate.py` (with `tools/benign_traffic.py`; charts from `tools/evaluation_charts.py`)
 - Raw results: [`evaluation/results/2026-11-17/`](../evaluation/results/2026-11-17/)
-- How to repeat it: the README, "How to repeat this evaluation"
+- How to repeat it: [How to repeat this evaluation](#how-to-repeat-this-evaluation), at the end of this page
 
 ## How it was measured
 
@@ -208,3 +208,24 @@ CPU % is Docker's figure, where 100% is one full CPU. Per sample, the containers
 - **The evaluator is also the author.** The script, the traffic and the definitions in this document were written by the same project, without independent review.
 - **Resource sampling is coarse.** `docker stats --no-stream` takes about 2 s per sample, so short peaks can be missed. A container run lasts about 3 s and has only one or two samples.
 - **No comparison.** Nothing here compares CloudAttackLab with another tool or platform, and none of it supports a claim that CloudAttackLab is better or worse than one.
+
+## How to repeat this evaluation
+
+`tools/evaluate.py` measures the platform through its API only (project guide section 14: run success, detection rate, false positives, detection latency, correlation, response and verification, lab setup time, resource use).
+
+From the `cloudattacklab/` folder, where the `docker` CLI works (here: inside WSL), with the platform images built and nothing else using the lab:
+
+```bash
+python3 tools/evaluate.py                    # full plan, about 35 minutes
+```
+
+The defaults are 10 runs of each scenario with `TELEMETRY_SOURCE=docker`, 3 back-to-back correlation rounds with benign traffic (`tools/benign_traffic.py`), a 10-minute benign-only session, and 5 runs of each scenario with `TELEMETRY_SOURCE=loki` and Falco on. Every count is an option (`--docker-runs`, `--loki-runs`, `--correlation-rounds`, `--benign-minutes`, `--setup-trials`; `--help` lists them). The script switches the telemetry source by recreating the backend with environment variables, never by editing `.env`. It starts the monitoring stack for the Loki phase, and at the end stops the lab, puts the backend back on the `.env` settings and stops everything (`--keep-running` to skip that). The lab is reset before every run. Runs, alerts and incidents are added to your local database.
+
+Raw CSV and JSON go to `evaluation/results/<UTC date>/`, including `environment.json` (commit, OS, Docker, CPU, RAM, scenario versions, thresholds, telemetry source, Falco). Then:
+
+```bash
+python3 tools/evaluate.py --summarize evaluation/results/<date>          # the summary tables
+python3 tools/evaluation_charts.py evaluation/results/<date> docs/evaluation   # PNG charts (needs matplotlib)
+```
+
+(This section moved here from the README on 17 November 2026. These commands produced the results above; they were not run again while writing the documentation.)
