@@ -86,7 +86,17 @@ export default function LabPage() {
       <table>
         <tbody>
           <tr><th align="left">Name</th><td>{lab.name}</td></tr>
-          <tr><th align="left">Status</th><td><b>{lab.status}</b></td></tr>
+          <tr>
+            <th align="left">Status</th>
+            <td>
+              <b>{detail?.status ?? lab.status}</b>
+              {detail?.status_detail && (
+                <div style={{ color: ['degraded', 'stopped'].includes(detail.status) ? 'crimson' : undefined }}>
+                  {detail.status_detail}
+                </div>
+              )}
+            </td>
+          </tr>
           <tr>
             <th align="left">Containers</th>
             <td>

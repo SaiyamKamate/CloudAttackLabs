@@ -63,6 +63,7 @@ def compose_labels(project, service, **extra):
 class FakeContainerLab(FakeAdapter):
     """The fake lab plus a test container, a ShopCloud container and a platform container."""
 
+    services = ("shopcloud",)  # the test container (and Falco) come from self.containers
     project = LAB_PROJECT
 
     def __init__(self, *, falco=False):

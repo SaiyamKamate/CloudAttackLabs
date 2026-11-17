@@ -86,6 +86,9 @@ class ActiveRunOut(BaseModel):
 
 
 class LabDetail(LabOut):
+    # Set when the status was compared with the real containers and something is
+    # down (or was corrected), e.g. "Lab degraded: test_container is exited. ..."
+    status_detail: Optional[str]
     active_run: Optional[ActiveRunOut]
     containers: list[ContainerOut]
     target_health: TargetHealthOut

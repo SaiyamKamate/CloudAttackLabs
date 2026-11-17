@@ -27,6 +27,7 @@ class LabStatus(str, Enum):
     created = "created"
     starting = "starting"
     running = "running"
+    degraded = "degraded"   # stored as running, but Docker shows a lab container down
     stopped = "stopped"
     error = "error"
 
