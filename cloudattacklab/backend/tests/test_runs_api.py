@@ -142,6 +142,7 @@ def test_list_scenarios(client):
     body = client.get(f"{API}/scenarios").json()
     assert [s["id"] for s in body] == [
         "authentication_abuse",
+        "benign_baseline",
         "suspicious_container_activity",
         "unauthorized_resource_access",
     ]

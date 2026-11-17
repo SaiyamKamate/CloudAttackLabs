@@ -83,7 +83,7 @@ def test_scenario_file_is_valid_under_the_existing_schema():
 
 def test_both_scenarios_are_listed():
     engine = ScenarioEngine(ROOT / "scenarios", {"shopcloud"})
-    assert [s.id for s in engine.list()] == ["authentication_abuse", SCENARIO_ID]
+    assert [s.id for s in engine.list()] == ["authentication_abuse", "benign_baseline", SCENARIO_ID]
 
 
 # --- the rule ---------------------------------------------------------------
