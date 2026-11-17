@@ -25,13 +25,15 @@ Everything, including the evaluation, was run on one laptop: Windows 11, Docker 
 
 A run's events are the target's log records (and the test container's Docker events) whose timestamps fall between the run's start and the moment its script finished, plus `TELEMETRY_SINCE_GRACE_SECONDS` (3 s). Nothing in a ShopCloud request says which run sent it, so any other request to ShopCloud in that window, for example someone browsing the shop page during a demo run, is stored as one of the run's events.
 
-The evaluation saw this happen: in each of 3 `authentication_abuse` runs with benign traffic running alongside, one benign failed login was linked to the attack alert (21 events instead of 20).
+The evaluation saw this happen: in each of 3 `authentication_abuse` runs with benign traffic running alongside, one benign failed login was linked to the attack alert (21 events instead of 20). Matching by time puts the benign failed login in the run, and because every request appears to come from the Docker gateway address (next section), the rule cannot tell it from the attack's own failed logins.
 
 What limits it: one run per lab at a time; cleanup of other runs and lab reset are refused while a run is active; the window ends when the script finishes; and ShopCloud's records of the platform's own calls (`lab_reset`, `rate_limit_changed`) are never stored as a run's events. Do not use the shop by hand while a scenario runs.
 
 ## Telemetry is collected only during runs
 
-The other side of the same design: outside a run, nothing is collected, stored or checked by the rules. Ten minutes of benign traffic with no scenario running produced 0 events, 0 alerts and 0 incidents in the evaluation. That shows the platform raises nothing on its own; it does **not** show that the rules would ignore that traffic if they saw it. CloudAttackLab is a lab for running scenarios, not a monitoring system for the shop.
+The other side of the same design: outside a run, nothing is collected, stored or checked by the rules. CloudAttackLab is a lab for running scenarios, not a monitoring system for the shop.
+
+To see what the rules make of normal traffic, run the `benign_baseline` scenario while the traffic is sent: it is an observation run, which sends nothing, collects for 600 s like any run and then checks every rule. In the evaluation, 10 minutes of benign traffic with near-misses (9 failed logins in 60 s, 4 denials) stored 329 events and raised 1 alert, a false positive from `suspicious_container_process` for an ordinary `date` in the test container (see [thresholds](#thresholds-and-benign-traffic-are-the-projects-own) and the [evaluation](evaluation-results.md#false-positives)).
 
 ## Every source IP is the Docker gateway address
 
@@ -41,11 +43,11 @@ As a result, "one source IP" in `repeated_failed_logins` is always this address:
 
 ## Detection runs once, at the end of a run
 
-Rules are evaluated once, when the scenario's script has finished, over all of the run's events. There is no streaming detection. The "detection latency" in reports therefore mostly measures how much of the run was left after the threshold was crossed (about 10 s for `authentication_abuse`), plus, with Loki, the wait for late records (about 4 s). It is not the latency of a real-time detector.
+Rules are evaluated once, when the scenario's script has finished, over all of the run's events. There is no streaming detection. The report's `detection_latency_seconds`, the time from the threshold-crossing event to the alert, therefore mostly measures how much of the run was left after the threshold was crossed (median 10.8 s for `authentication_abuse` with Docker logs). Measured from the run's last event instead, the alert follows in about 0.1 s with Docker logs, about 2.4 s for the container scenario (Docker events are polled until they settle) and about 4 s with Loki (the wait for late records). Neither is the latency of a real-time detector. See the [evaluation](evaluation-results.md#detection-latency).
 
 ## Thresholds and benign traffic are the project's own
 
-The thresholds (10 failed logins in 60 s, 5 denials in 60 s, 1 process in the test container) were chosen for these scenarios, and the scenarios were written to cross them. The 100% detection rate in the evaluation shows that the pipeline works end to end; it says nothing about how well the rules separate attacks from normal use. The benign traffic used in the evaluation is a script, not recorded user behaviour. See the evaluation's [threats to validity](evaluation-results.md#threats-to-validity).
+The thresholds (10 failed logins in 60 s, 5 denials in 60 s, 1 process in the test container) were chosen for these scenarios, and the scenarios were written to cross them. The 100% detection rate in the evaluation shows that the pipeline works end to end; it says little about how well the rules separate attacks from normal use. The benign baseline shows the two count rules hold one below their thresholds, and that `suspicious_container_process` flags every process in the test container, an operator's `date` included: 1 of the 3 rules raised a false positive in that session. The benign traffic used in the evaluation is a script, not recorded user behaviour. See the evaluation's [threats to validity](evaluation-results.md#threats-to-validity).
 
 ## `stop_container` trusts Docker labels
 

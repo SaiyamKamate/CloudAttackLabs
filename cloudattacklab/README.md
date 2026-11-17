@@ -37,24 +37,24 @@ docker compose --env-file .env -f monitoring/docker-compose.monitoring.yml up -d
 | [Safety controls](docs/safety.md) | Each safety control and where the code enforces it |
 | [API contract](docs/api-contract.md) | Every backend endpoint, its body, results and errors |
 | [ShopCloud interface](docs/shopcloud-interface.md) | What ShopCloud must provide to the platform: endpoints, test accounts, log format |
-| [Evaluation results](docs/evaluation-results.md) | Measurements of 17 November 2026 (detection rate, latency, correlation, responses, setup time, resources), with threats to validity and how to repeat them |
+| [Evaluation results](docs/evaluation-results.md) | Measurements of 17 November 2026 (detection rate, false positives, latency, correlation, responses, setup time, resources), with threats to validity and how to repeat them |
 | [Audit, November 2026](docs/audit-2026-11.md) | The independent audit of 16 November 2026. A record of that day: its findings were fixed or are listed as known limitations |
 
 ## Status
 
-Version 1.0 of the planned workflow is built and was evaluated on 17 November 2026 on one laptop: 54 scenario runs, all `completed`; in the 45 runs measured for detection, the expected alert was raised every time; all 30 approved responses were executed, verified and reverted by cleanup. Details, and why these numbers prove less than they seem, are in the [evaluation](docs/evaluation-results.md).
+Version 1.0 of the planned workflow is built and was evaluated on 17 November 2026 on one laptop: 54 scenario runs, all `completed`; in the 45 runs measured for detection, the expected alert was raised every time; all 30 approved responses were executed, verified and reverted by cleanup. Ten minutes of benign traffic checked by every rule raised one false positive (an ordinary command in the test container), and none from near-misses just under the login and access thresholds. Details, and why these numbers prove less than they seem, are in the [evaluation](docs/evaluation-results.md).
 
 What exists:
 
 - The platform: FastAPI backend with PostgreSQL, and a React dashboard (Lab, Scenarios, Alerts, Incidents, run report).
 - The lab: the real ShopCloud (`shopcloud/`) and a test container, started, stopped and reset by the backend through Docker Compose.
-- Three scenarios: `authentication_abuse`, `unauthorized_resource_access` and `suspicious_container_activity`, each with a detection rule and cleanup.
+- Three scenarios: `authentication_abuse`, `unauthorized_resource_access` and `suspicious_container_activity`, each with a detection rule and cleanup. A fourth, `benign_baseline`, attacks nothing: it only watches the lab for ten minutes and checks every rule, to measure false positives.
 - Telemetry from ShopCloud's logs (through Docker or Loki), Docker events and, optionally, Falco; normalized into one event schema.
 - Rule-based detection, incident correlation, an explained risk score, an evidence timeline, and a JSON run report.
 - Two responses with approval, verification and revert: `temporary_rate_limit` and `stop_container`.
 - An audit log of every action, and the safety controls in [safety.md](docs/safety.md).
 - A monitoring stack (Loki, Alloy, Grafana with a provisioned dashboard).
-- Tests: `pytest backend/tests` (246 unit tests), `pytest shopcloud/tests` (22), and `pytest -m integration` (8, against the real lab).
+- Tests: `pytest backend/tests` (260 unit tests), `pytest shopcloud/tests` (22), and `pytest -m integration` (8, against the real lab).
 - An evaluation script, `tools/evaluate.py`, and a ShopCloud interface checker, `tools/check_shopcloud.py`.
 
 Tested only on Windows 11 with Docker Engine inside WSL 2. See [known limitations](docs/known-limitations.md).
