@@ -24,6 +24,7 @@ from ..models import Lab, LabStatus, RunStatus, ScenarioRun
 from ..response_manager.revert import mark_reverted
 from ..schemas.scenario import ScenarioDefinition
 from ..lab_manager.target import TargetClient, TargetError
+from ..lab_manager.target_guard import TargetGuard
 from ..config import FALCO_SERVICE
 from ..lab_manager.container import TargetRefused
 from ..telemetry.container import DockerEventSource, make_docker_event_normalizer, make_falco_normalizer
@@ -79,6 +80,8 @@ class ScenarioService:
         self.adapter = adapter
         self.detection = detection
         self.actor = actor
+        # Checks, before every run, that the target URL points into the lab.
+        self.guard = TargetGuard(settings.lab_targets, settings.lab_compose_file, adapter)
         # Background threads open their own session on the same database.
         self._bind: Engine = session.get_bind()
 
@@ -117,6 +120,10 @@ class ScenarioService:
                 )
             if lab.target not in self.target_clients:
                 raise ApiError(409, "unknown_target", f"'{lab.target}' is not a configured lab target.")
+            # Nothing is sent unless the configured URL is inside the lab (SHOPCLOUD_URL).
+            url_check = self.guard.check(lab.target)
+            if not url_check.allowed:
+                raise ApiError(409, "target_url_refused", url_check.error)
         if lab.status != LabStatus.running.value:
             raise ApiError(409, "lab_not_running", f"Lab '{lab.name}' is {lab.status}; start it before a run.")
 

@@ -47,6 +47,14 @@ class TargetHealthOut(BaseModel):
     error: Optional[str]
 
 
+class TargetUrlOut(BaseModel):
+    """The configured URL of the lab's target and whether it points into the lab."""
+
+    url: str
+    allowed: bool
+    error: Optional[str]     # why it is refused; runs are refused until it is fixed
+
+
 class TelemetryStatusOut(BaseModel):
     """Which telemetry source the backend uses (TELEMETRY_SOURCE) and, for Loki,
     whether it can be read right now."""
@@ -69,5 +77,6 @@ class FalcoStatusOut(BaseModel):
 class LabDetail(LabOut):
     containers: list[ContainerOut]
     target_health: TargetHealthOut
+    target_url: TargetUrlOut
     telemetry: TelemetryStatusOut
     falco: FalcoStatusOut

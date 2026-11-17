@@ -75,6 +75,12 @@ export default function LabPage() {
     <section>
       <h2>Lab</h2>
       {error && <p style={{ color: 'crimson' }}>Error: {error}</p>}
+      {detail?.target_url && !detail.target_url.allowed && (
+        <p style={{ color: 'crimson', border: '1px solid crimson', padding: '0.5rem' }}>
+          <b>Target URL refused.</b> {detail.target_url.error} Runs, start and reset are refused until
+          SHOPCLOUD_URL in .env points at the lab (for example http://127.0.0.1:8081) and the backend is restarted.
+        </p>
+      )}
 
       <table>
         <tbody>
@@ -87,6 +93,10 @@ export default function LabPage() {
                 <div key={c.service}>{`${c.service}: ${c.state} (${c.health ?? 'no health check'})`}</div>
               ))}
             </td>
+          </tr>
+          <tr>
+            <th align="left">ShopCloud URL</th>
+            <td>{detail?.target_url ? `${detail.target_url.url} (${detail.target_url.allowed ? 'inside the lab' : 'REFUSED'})` : '—'}</td>
           </tr>
           <tr>
             <th align="left">ShopCloud health</th>

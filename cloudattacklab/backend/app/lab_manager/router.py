@@ -12,10 +12,11 @@ from ..db import get_session
 from .adapter import LabAdapter
 from ..telemetry.loki import LokiSource
 from ..telemetry.source import TelemetrySourceError
-from .api_schemas import FalcoStatusOut, LabCreate, LabDetail, LabOut, TelemetryStatusOut
+from .api_schemas import FalcoStatusOut, LabCreate, LabDetail, LabOut, TargetUrlOut, TelemetryStatusOut
 from .docker_adapter import DockerComposeAdapter
 from .service import LabManager
 from .target import HttpTargetClient, TargetClient
+from .target_guard import GuardedTargetClient, TargetGuard
 
 router = APIRouter(prefix="/labs", tags=["labs"])
 
@@ -32,18 +33,31 @@ def get_adapter() -> LabAdapter:
     )
 
 
+def get_target_guard(
+    settings: Settings = Depends(get_settings), adapter: LabAdapter = Depends(get_adapter)
+) -> TargetGuard:
+    """Checks that each configured lab target URL points into the lab (target_guard.py)."""
+    return TargetGuard(settings.lab_targets, settings.lab_compose_file, adapter)
+
+
 @lru_cache
 def get_target_clients() -> dict[str, TargetClient]:
     settings = get_settings()
-    return {name: HttpTargetClient(url, settings.lab_control_token) for name, url in settings.lab_targets.items()}
+    guard = TargetGuard(settings.lab_targets, settings.lab_compose_file, get_adapter())
+    # Every request first checks that the URL is inside the lab.
+    return {
+        name: GuardedTargetClient(HttpTargetClient(url, settings.lab_control_token), name, guard)
+        for name, url in settings.lab_targets.items()
+    }
 
 
 def get_manager(
     session: Session = Depends(get_session),
     adapter: LabAdapter = Depends(get_adapter),
     target_clients: dict[str, TargetClient] = Depends(get_target_clients),
+    guard: TargetGuard = Depends(get_target_guard),
 ) -> LabManager:
-    return LabManager(session, adapter, target_clients)
+    return LabManager(session, adapter, target_clients, guard=guard)
 
 
 # Plain `def` endpoints: FastAPI runs them in a thread pool, so a slow
@@ -77,10 +91,12 @@ def get_lab(
     settings: Settings = Depends(get_settings),
 ):
     lab, containers, target_health = manager.details(lab_id)
+    url_check = manager.target_url_check(lab)
     return LabDetail(
         **LabOut.model_validate(lab).model_dump(),
         containers=containers,
         target_health=target_health,
+        target_url=TargetUrlOut(url=url_check.url, allowed=url_check.allowed, error=url_check.error),
         telemetry=telemetry,
         falco=falco_status(settings.falco_enabled, containers),
     )

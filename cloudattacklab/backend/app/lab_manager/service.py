@@ -20,6 +20,7 @@ from ..models import Lab, LabStatus
 from ..response_manager.revert import mark_reverted
 from .adapter import ContainerStatus, LabAdapter, LabAdapterError
 from .target import TargetClient, TargetError, TargetHealth
+from .target_guard import TargetGuard, TargetUrlCheck
 
 ACTIVE = (LabStatus.starting.value, LabStatus.running.value)
 
@@ -44,11 +45,13 @@ class LabManager:
         adapter: LabAdapter,
         target_clients: dict[str, TargetClient],
         *,
+        guard: Optional[TargetGuard] = None,
         actor: str = audit.ANONYMOUS_ACTOR,
     ) -> None:
         self.session = session
         self.adapter = adapter
         self.target_clients = target_clients  # the configured lab targets
+        self.guard = guard  # checks that the target URL points into the lab
         self.actor = actor
 
     # --- create / read ----------------------------------------------------
@@ -90,6 +93,7 @@ class LabManager:
     # --- start / stop / reset ---------------------------------------------
     def start(self, lab_id: uuid.UUID) -> Lab:
         lab = self.get(lab_id)
+        self._require_target_url(lab)
         with _exclusive():
             other = self._other_active_lab(lab)
             if other is not None:
@@ -125,6 +129,7 @@ class LabManager:
         with _exclusive():
             if lab.status != LabStatus.running.value:
                 raise ApiError(409, "lab_not_running", f"Lab '{lab.name}' is {lab.status}; start it before a reset.")
+            self._require_target_url(lab)
             previous = lab.status
             client = self._client(lab)
             try:
@@ -140,6 +145,17 @@ class LabManager:
             mark_reverted(self.session, lab_id=lab.id, trigger="lab.reset", actor=self.actor)
             self._finish(lab, "lab.reset", LabStatus.running, previous)
         return lab
+
+    # --- the target URL ---------------------------------------------------
+    def target_url_check(self, lab: Lab) -> TargetUrlCheck:
+        if self.guard is None:
+            return TargetUrlCheck(lab.target, "", True)
+        return self.guard.check(lab.target)
+
+    def _require_target_url(self, lab: Lab) -> None:
+        check = self.target_url_check(lab)
+        if not check.allowed:
+            raise ApiError(409, "target_url_refused", check.error)
 
     # --- internals --------------------------------------------------------
     def _client(self, lab: Lab) -> TargetClient:
