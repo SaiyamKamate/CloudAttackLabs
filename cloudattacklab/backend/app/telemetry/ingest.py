@@ -3,8 +3,15 @@
 Invalid-JSON lines are skipped and counted. The same request_id is never stored
 twice, whichever source it came from: raw_event_reference is
 `<source>:shopcloud:<request_id>`, and a record is a duplicate when any stored
-event at or after the window start has the same request_id. Events are kept only
-from the run's start time onward.
+event at or after the window start has the same request_id.
+
+A run's window: events are kept only from the run's start until its script
+finished plus a small grace (TELEMETRY_SINCE_GRACE_SECONDS, for clock and log
+timing); the source is asked from slightly before the start because `docker
+logs --since` has one-second resolution. Platform bookkeeping records that
+ShopCloud logs when the platform itself calls it (`lab_reset`,
+`rate_limit_changed`) are never stored as a run's events, so they can never
+become a scenario's evidence.
 
 Sources whose records arrive late (Loki) are read once more after the run with
 `ingest_until_settled`, which polls until the number of records stops growing.
@@ -15,7 +22,7 @@ import json
 import logging
 import time
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Callable, Optional
 
 from sqlalchemy import select
@@ -28,6 +35,9 @@ from .source import TelemetrySource
 
 log = logging.getLogger("cloudattacklab.telemetry")
 
+# ShopCloud events caused by the platform's own control calls (reset, rate limit), not by a scenario.
+PLATFORM_BOOKKEEPING = frozenset({"lab_reset", "rate_limit_changed"})
+
 
 @dataclass
 class IngestResult:
@@ -36,6 +46,8 @@ class IngestResult:
     duplicates: int = 0
     invalid_json: int = 0
     skipped: int = 0  # valid JSON but not a usable record (no request_id, bad timestamp, ...)
+    outside_window: int = 0  # before the run started or after it finished
+    bookkeeping: int = 0  # lab_reset / rate_limit_changed: the platform's own calls
 
     def add(self, other: "IngestResult") -> None:
         self.collected = other.collected  # the latest read, not a sum
@@ -43,6 +55,8 @@ class IngestResult:
         self.duplicates += other.duplicates
         self.invalid_json += other.invalid_json
         self.skipped += other.skipped
+        self.outside_window += other.outside_window
+        self.bookkeeping += other.bookkeeping
 
 
 def request_id_of(reference: str) -> str:
@@ -92,8 +106,11 @@ class TelemetryIngestor:
 
     def ingest(self) -> IngestResult:
         result = IngestResult()
-        window_start = self.ctx.started_at - self.grace
-        lines = self.source.collect(since=window_start)
+        window_start = self.ctx.started_at
+        # Until the script finished (or, while it runs, until now), plus the grace.
+        window_end = (self.ctx.until or datetime.now(timezone.utc)) + self.grace
+        # Ask from a little earlier: `docker logs --since` has one-second resolution.
+        lines = self.source.collect(since=window_start - self.grace)
         result.collected = len(lines)
         origin = getattr(self.source, "name", "docker")
         stored_exec: list[dict] = []
@@ -119,12 +136,16 @@ class TelemetryIngestor:
                 result.invalid_json += 1
                 continue
 
+            if record.get("event") in PLATFORM_BOOKKEEPING:
+                result.bookkeeping += 1
+                continue
             event = self.normalizer(record, self.ctx, origin)
             if event is None:
                 result.skipped += 1
                 continue
-            if event.timestamp < window_start:
-                continue  # before this run; not ours
+            if event.timestamp < window_start or event.timestamp > window_end:
+                result.outside_window += 1
+                continue  # before this run started or after it finished; not ours
             request_id = request_id_of(event.raw_event_reference)
             if request_id in seen:
                 result.duplicates += 1

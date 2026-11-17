@@ -410,3 +410,46 @@ def test_run_with_its_evidence_and_no_errors_is_completed(client, adapter, monke
     run = wait_terminal(client, start_run(client, lab["id"]).json()["id"])
 
     assert run["status"] == "completed" and run["error"] is None
+
+
+# --- audit bug 7: a run's window and platform bookkeeping --------------------
+def _record(event, status, at, path="/api/login"):
+    import json
+    import uuid
+
+    return json.dumps(
+        {
+            "timestamp": at.isoformat().replace("+00:00", "Z"), "service": "shopcloud", "level": "info",
+            "event": event, "request_id": str(uuid.uuid4()), "source_ip": "172.21.0.1", "method": "POST",
+            "path": path, "status": status, "username": "lab_user", "message": event,
+        }
+    )
+
+
+def test_run_keeps_only_events_inside_its_window_and_no_bookkeeping(client, rdb, adapter, monkeypatch):
+    from datetime import datetime, timedelta, timezone
+
+    import uuid
+
+    from app.models import Event
+
+    patch_script(monkeypatch, RunResult("completed", fake_summary(), None))
+    lab = running_lab(client)
+    now = datetime.now(timezone.utc)
+    adapter.log_text = "\n".join(
+        [_record("login_failed", 401, now - timedelta(seconds=2))]                  # before the run: not ours
+        + [_record("login_failed", 401, now + timedelta(milliseconds=300 + i)) for i in range(20)]
+        + [_record("lab_reset", 200, now + timedelta(milliseconds=400), "/lab/reset")]          # bookkeeping
+        + [_record("rate_limit_changed", 200, now + timedelta(milliseconds=450), "/lab/rate-limit")]
+        + [_record("login_failed", 401, now + timedelta(seconds=60))]               # long after it finished
+    )
+
+    run = wait_terminal(client, start_run(client, lab["id"]).json()["id"])
+
+    events = list(rdb.scalars(select(Event).where(Event.run_id == uuid.UUID(run["id"]))))
+    assert run["status"] == "completed"
+    assert len(events) == 20
+    assert {e.event_type for e in events} == {"authentication_failure"}  # no config_changed
+    report = client.get(f"{API}/runs/{run['id']}/report").json()
+    assert report["telemetry"]["collected_total"] == 20
+    assert all(a["event_count"] <= 20 for a in report["alerts"])

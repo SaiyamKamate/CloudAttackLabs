@@ -5,6 +5,7 @@ run id straight away. Cleanup also runs automatically if a run fails or times ou
 """
 from __future__ import annotations
 
+import dataclasses
 import logging
 import threading
 import uuid
@@ -404,6 +405,9 @@ class ScenarioService:
                 for feed in feeds:
                     self._ingest_once(feed, ctx)
                 stop.wait(self.settings.telemetry_collect_interval_seconds)
+            # The script has finished: from now on only events up to this moment
+            # (plus the grace) belong to the run, however long the settling takes.
+            ctx = dataclasses.replace(ctx, until=_utcnow())
             for feed in feeds:
                 if not feed.settle:
                     self._ingest_once(feed, ctx)  # final pass after the run stops

@@ -37,6 +37,8 @@ class RunContext:
     scenario_id: Optional[str]
     started_at: datetime
     container_id: Optional[str] = None
+    # Set once the run's script has finished: events after this time are not the run's.
+    until: Optional[datetime] = None
 
 
 def _severity(event_type: EventType) -> Severity:
