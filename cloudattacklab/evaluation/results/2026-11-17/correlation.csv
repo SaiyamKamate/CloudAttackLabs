@@ -1,0 +1,10 @@
+round,scenario_id,run_id,status,has_alert,incident_count,every_alert_in_an_incident,incidents_belong_to_run,incident_alerts_from_this_run,alert_events_from_this_run,events_from_other_runs,benign_events_in_alerts,alert_event_count,own_incident_only,no_benign_merged
+1,authentication_abuse,e7919516-ddb0-4c9c-ab4a-25e11844dfa8,completed,True,1,True,True,True,True,0,1,21,True,False
+1,unauthorized_resource_access,8fb885df-91c6-4ed1-88a7-e9ca32166bc3,completed,True,1,True,True,True,True,0,0,8,True,True
+1,suspicious_container_activity,8f81a011-ffa8-43d0-963e-4f7a1231246b,completed,True,1,True,True,True,True,0,0,1,True,True
+2,authentication_abuse,51a40829-e67e-48f3-a1e9-d436381f5672,completed,True,1,True,True,True,True,0,1,21,True,False
+2,unauthorized_resource_access,21a6e213-7e78-404d-9c7d-70f5c1aa1328,completed,True,1,True,True,True,True,0,0,8,True,True
+2,suspicious_container_activity,9679eda8-a489-492d-bcb9-eef67d697232,completed,True,1,True,True,True,True,0,0,1,True,True
+3,authentication_abuse,5b35bd5d-3859-4d54-9e3a-5232536a4f3c,completed,True,1,True,True,True,True,0,1,21,True,False
+3,unauthorized_resource_access,88db572c-e931-44e3-8903-626671699920,completed,True,1,True,True,True,True,0,0,8,True,True
+3,suspicious_container_activity,9de08007-ee1a-4bcd-96f8-f9bca6fe2462,completed,True,1,True,True,True,True,0,0,1,True,True

@@ -1,0 +1,21 @@
+{
+  "started_at": "2026-11-17T13:39:23.982290+00:00",
+  "finished_at": "2026-11-17T13:49:33.421802+00:00",
+  "minutes": 10.0,
+  "actions": {
+    "browse": 113,
+    "login": 94,
+    "orders": 52,
+    "typo": 11,
+    "container_cmd": 8
+  },
+  "http_errors": 0,
+  "alerts_before": 56,
+  "alerts_after": 56,
+  "new_alerts": 0,
+  "incidents_before": 56,
+  "incidents_after": 56,
+  "new_incidents": 0,
+  "events_stored_since_start": 0,
+  "runs_started_during_session": 0
+}

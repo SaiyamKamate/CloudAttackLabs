@@ -1,0 +1,52 @@
+operation,requested_at,ok,error,api_returned_seconds,ready_seconds,phase,telemetry_source,falco,trial
+start,2026-11-17T13:25:04.941926+00:00,True,,8.273,8.383,docker,docker,False,1
+start,2026-11-17T13:25:14.117702+00:00,True,,8.858,9.015,docker,docker,False,2
+start,2026-11-17T13:25:23.826255+00:00,True,,9.3,9.443,docker,docker,False,3
+reset,2026-11-17T13:25:33.269014+00:00,True,,10.07,10.187,docker,docker,False,before authentication_abuse #1
+reset,2026-11-17T13:26:06.919559+00:00,True,,11.182,11.35,docker,docker,False,before unauthorized_resource_access #1
+reset,2026-11-17T13:26:27.036532+00:00,True,,10.711,10.823,docker,docker,False,before suspicious_container_activity #1
+reset,2026-11-17T13:26:44.416249+00:00,True,,9.112,9.227,docker,docker,False,before authentication_abuse #2
+reset,2026-11-17T13:27:17.113453+00:00,True,,8.905,9.024,docker,docker,False,before unauthorized_resource_access #2
+reset,2026-11-17T13:27:34.936014+00:00,True,,8.272,8.391,docker,docker,False,before suspicious_container_activity #2
+reset,2026-11-17T13:27:49.477000+00:00,True,,8.298,8.426,docker,docker,False,before authentication_abuse #3
+reset,2026-11-17T13:28:19.682037+00:00,True,,8.28,8.393,docker,docker,False,before unauthorized_resource_access #3
+reset,2026-11-17T13:28:36.731388+00:00,True,,8.415,8.521,docker,docker,False,before suspicious_container_activity #3
+reset,2026-11-17T13:28:51.187437+00:00,True,,8.57,8.692,docker,docker,False,before authentication_abuse #4
+reset,2026-11-17T13:29:21.799664+00:00,True,,8.592,8.738,docker,docker,False,before unauthorized_resource_access #4
+reset,2026-11-17T13:29:39.421430+00:00,True,,8.11,8.233,docker,docker,False,before suspicious_container_activity #4
+reset,2026-11-17T13:29:53.476486+00:00,True,,7.822,7.966,docker,docker,False,before authentication_abuse #5
+reset,2026-11-17T13:30:24.957519+00:00,True,,8.648,8.761,docker,docker,False,before unauthorized_resource_access #5
+reset,2026-11-17T13:30:42.376307+00:00,True,,8.783,8.899,docker,docker,False,before suspicious_container_activity #5
+reset,2026-11-17T13:30:57.736393+00:00,True,,8.429,8.535,docker,docker,False,before authentication_abuse #6
+reset,2026-11-17T13:31:29.799648+00:00,True,,9.577,9.687,docker,docker,False,before unauthorized_resource_access #6
+reset,2026-11-17T13:31:48.019647+00:00,True,,8.176,8.302,docker,docker,False,before suspicious_container_activity #6
+reset,2026-11-17T13:32:02.316165+00:00,True,,8.219,8.339,docker,docker,False,before authentication_abuse #7
+reset,2026-11-17T13:32:34.010968+00:00,True,,8.898,9.011,docker,docker,False,before unauthorized_resource_access #7
+reset,2026-11-17T13:32:51.625716+00:00,True,,8.63,8.735,docker,docker,False,before suspicious_container_activity #7
+reset,2026-11-17T13:33:06.671575+00:00,True,,8.583,8.689,docker,docker,False,before authentication_abuse #8
+reset,2026-11-17T13:33:38.713894+00:00,True,,8.453,8.574,docker,docker,False,before unauthorized_resource_access #8
+reset,2026-11-17T13:33:55.864162+00:00,True,,8.255,8.385,docker,docker,False,before suspicious_container_activity #8
+reset,2026-11-17T13:34:10.496937+00:00,True,,8.117,8.24,docker,docker,False,before authentication_abuse #9
+reset,2026-11-17T13:34:42.148961+00:00,True,,8.306,8.45,docker,docker,False,before unauthorized_resource_access #9
+reset,2026-11-17T13:34:59.449677+00:00,True,,8.211,8.32,docker,docker,False,before suspicious_container_activity #9
+reset,2026-11-17T13:35:13.702599+00:00,True,,8.263,8.379,docker,docker,False,before authentication_abuse #10
+reset,2026-11-17T13:35:43.877354+00:00,True,,8.03,8.14,docker,docker,False,before unauthorized_resource_access #10
+reset,2026-11-17T13:36:00.725182+00:00,True,,8.813,8.919,docker,docker,False,before suspicious_container_activity #10
+start,2026-11-17T13:49:53.603958+00:00,True,,8.359,8.582,loki,loki,True,1
+start,2026-11-17T13:50:02.913427+00:00,True,,8.423,8.561,loki,loki,True,2
+start,2026-11-17T13:50:12.308756+00:00,True,,9.018,9.157,loki,loki,True,3
+reset,2026-11-17T13:50:21.465733+00:00,True,,9.434,9.635,loki,loki,True,before authentication_abuse #1
+reset,2026-11-17T13:51:00.538733+00:00,True,,10.024,10.226,loki,loki,True,before unauthorized_resource_access #1
+reset,2026-11-17T13:51:24.561779+00:00,True,,10.166,10.304,loki,loki,True,before suspicious_container_activity #1
+reset,2026-11-17T13:51:42.943443+00:00,True,,8.695,8.85,loki,loki,True,before authentication_abuse #2
+reset,2026-11-17T13:52:20.147318+00:00,True,,9.01,9.183,loki,loki,True,before unauthorized_resource_access #2
+reset,2026-11-17T13:52:42.780176+00:00,True,,8.596,8.745,loki,loki,True,before suspicious_container_activity #2
+reset,2026-11-17T13:53:02.174733+00:00,True,,8.995,9.151,loki,loki,True,before authentication_abuse #3
+reset,2026-11-17T13:53:41.536249+00:00,True,,10.002,10.19,loki,loki,True,before unauthorized_resource_access #3
+reset,2026-11-17T13:54:07.935942+00:00,True,,8.564,8.707,loki,loki,True,before suspicious_container_activity #3
+reset,2026-11-17T13:54:28.516980+00:00,True,,10.367,10.544,loki,loki,True,before authentication_abuse #4
+reset,2026-11-17T13:55:07.974814+00:00,True,,9.957,10.091,loki,loki,True,before unauthorized_resource_access #4
+reset,2026-11-17T13:55:32.901718+00:00,True,,9.488,9.684,loki,loki,True,before suspicious_container_activity #4
+reset,2026-11-17T13:55:51.722424+00:00,True,,8.88,9.048,loki,loki,True,before authentication_abuse #5
+reset,2026-11-17T13:56:28.325746+00:00,True,,9.262,9.393,loki,loki,True,before unauthorized_resource_access #5
+reset,2026-11-17T13:56:51.203950+00:00,True,,8.741,8.908,loki,loki,True,before suspicious_container_activity #5

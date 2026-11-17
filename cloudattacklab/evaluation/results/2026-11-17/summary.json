@@ -1,0 +1,1030 @@
+{
+  "execution": [
+    {
+      "telemetry_source": "docker",
+      "scenario_id": "authentication_abuse",
+      "ok": 10,
+      "total": 10,
+      "rate": 1.0,
+      "statuses": {
+        "completed": 10
+      }
+    },
+    {
+      "telemetry_source": "docker",
+      "scenario_id": "suspicious_container_activity",
+      "ok": 10,
+      "total": 10,
+      "rate": 1.0,
+      "statuses": {
+        "completed": 10
+      }
+    },
+    {
+      "telemetry_source": "docker",
+      "scenario_id": "unauthorized_resource_access",
+      "ok": 10,
+      "total": 10,
+      "rate": 1.0,
+      "statuses": {
+        "completed": 10
+      }
+    },
+    {
+      "telemetry_source": "loki",
+      "scenario_id": "authentication_abuse",
+      "ok": 5,
+      "total": 5,
+      "rate": 1.0,
+      "statuses": {
+        "completed": 5
+      }
+    },
+    {
+      "telemetry_source": "loki",
+      "scenario_id": "suspicious_container_activity",
+      "ok": 5,
+      "total": 5,
+      "rate": 1.0,
+      "statuses": {
+        "completed": 5
+      }
+    },
+    {
+      "telemetry_source": "loki",
+      "scenario_id": "unauthorized_resource_access",
+      "ok": 5,
+      "total": 5,
+      "rate": 1.0,
+      "statuses": {
+        "completed": 5
+      }
+    }
+  ],
+  "detection": [
+    {
+      "telemetry_source": "docker",
+      "scenario_id": "authentication_abuse",
+      "ok": 10,
+      "total": 10,
+      "rate": 1.0,
+      "alert_events_by_source": {
+        "{\"application\": 20}": 10
+      }
+    },
+    {
+      "telemetry_source": "docker",
+      "scenario_id": "suspicious_container_activity",
+      "ok": 10,
+      "total": 10,
+      "rate": 1.0,
+      "alert_events_by_source": {
+        "{\"docker\": 1}": 10
+      }
+    },
+    {
+      "telemetry_source": "docker",
+      "scenario_id": "unauthorized_resource_access",
+      "ok": 10,
+      "total": 10,
+      "rate": 1.0,
+      "alert_events_by_source": {
+        "{\"application\": 8}": 10
+      }
+    },
+    {
+      "telemetry_source": "loki",
+      "scenario_id": "authentication_abuse",
+      "ok": 5,
+      "total": 5,
+      "rate": 1.0,
+      "alert_events_by_source": {
+        "{\"application\": 20}": 5
+      }
+    },
+    {
+      "telemetry_source": "loki",
+      "scenario_id": "suspicious_container_activity",
+      "ok": 5,
+      "total": 5,
+      "rate": 1.0,
+      "alert_events_by_source": {
+        "{\"docker\": 1, \"falco\": 1}": 5
+      }
+    },
+    {
+      "telemetry_source": "loki",
+      "scenario_id": "unauthorized_resource_access",
+      "ok": 5,
+      "total": 5,
+      "rate": 1.0,
+      "alert_events_by_source": {
+        "{\"application\": 8}": 5
+      }
+    }
+  ],
+  "latency": [
+    {
+      "telemetry_source": "docker",
+      "scenario_id": "authentication_abuse",
+      "n": 10,
+      "min": 10.594,
+      "median": 10.758,
+      "max": 11.123
+    },
+    {
+      "telemetry_source": "docker",
+      "scenario_id": "suspicious_container_activity",
+      "n": 10,
+      "min": 2.133,
+      "median": 2.436,
+      "max": 2.603
+    },
+    {
+      "telemetry_source": "docker",
+      "scenario_id": "unauthorized_resource_access",
+      "n": 10,
+      "min": 3.114,
+      "median": 3.139,
+      "max": 3.201
+    },
+    {
+      "telemetry_source": "loki",
+      "scenario_id": "authentication_abuse",
+      "n": 5,
+      "min": 14.829,
+      "median": 15.152,
+      "max": 15.59
+    },
+    {
+      "telemetry_source": "loki",
+      "scenario_id": "suspicious_container_activity",
+      "n": 5,
+      "min": 4.288,
+      "median": 4.981,
+      "max": 6.965
+    },
+    {
+      "telemetry_source": "loki",
+      "scenario_id": "unauthorized_resource_access",
+      "n": 5,
+      "min": 7.147,
+      "median": 7.158,
+      "max": 7.217
+    }
+  ],
+  "response": [
+    {
+      "telemetry_source": "docker",
+      "scenario_id": "authentication_abuse",
+      "action": "temporary_rate_limit",
+      "requested": 10,
+      "executed": {
+        "ok": 10,
+        "total": 10,
+        "rate": 1.0
+      },
+      "verified": {
+        "ok": 10,
+        "total": 10,
+        "rate": 1.0
+      },
+      "reverted_by_cleanup": {
+        "ok": 10,
+        "total": 10,
+        "rate": 1.0
+      },
+      "seconds": {
+        "n": 10,
+        "min": 0.517,
+        "median": 0.546,
+        "max": 0.9
+      }
+    },
+    {
+      "telemetry_source": "docker",
+      "scenario_id": "suspicious_container_activity",
+      "action": "stop_container",
+      "requested": 10,
+      "executed": {
+        "ok": 10,
+        "total": 10,
+        "rate": 1.0
+      },
+      "verified": {
+        "ok": 10,
+        "total": 10,
+        "rate": 1.0
+      },
+      "reverted_by_cleanup": {
+        "ok": 10,
+        "total": 10,
+        "rate": 1.0
+      },
+      "seconds": {
+        "n": 10,
+        "min": 0.203,
+        "median": 0.237,
+        "max": 0.421
+      }
+    },
+    {
+      "telemetry_source": "loki",
+      "scenario_id": "authentication_abuse",
+      "action": "temporary_rate_limit",
+      "requested": 5,
+      "executed": {
+        "ok": 5,
+        "total": 5,
+        "rate": 1.0
+      },
+      "verified": {
+        "ok": 5,
+        "total": 5,
+        "rate": 1.0
+      },
+      "reverted_by_cleanup": {
+        "ok": 5,
+        "total": 5,
+        "rate": 1.0
+      },
+      "seconds": {
+        "n": 5,
+        "min": 0.566,
+        "median": 0.774,
+        "max": 1.255
+      }
+    },
+    {
+      "telemetry_source": "loki",
+      "scenario_id": "suspicious_container_activity",
+      "action": "stop_container",
+      "requested": 5,
+      "executed": {
+        "ok": 5,
+        "total": 5,
+        "rate": 1.0
+      },
+      "verified": {
+        "ok": 5,
+        "total": 5,
+        "rate": 1.0
+      },
+      "reverted_by_cleanup": {
+        "ok": 5,
+        "total": 5,
+        "rate": 1.0
+      },
+      "seconds": {
+        "n": 5,
+        "min": 0.273,
+        "median": 0.321,
+        "max": 0.426
+      }
+    }
+  ],
+  "post_run_verification": [
+    {
+      "telemetry_source": "docker",
+      "scenario_id": "unauthorized_resource_access",
+      "ok": 10,
+      "total": 10,
+      "rate": 1.0
+    },
+    {
+      "telemetry_source": "loki",
+      "scenario_id": "unauthorized_resource_access",
+      "ok": 5,
+      "total": 5,
+      "rate": 1.0
+    }
+  ],
+  "lab_setup": [
+    {
+      "telemetry_source": "docker",
+      "operation": "reset",
+      "falco": "False",
+      "ok": {
+        "ok": 30,
+        "total": 30,
+        "rate": 1.0
+      },
+      "n": 30,
+      "min": 7.966,
+      "median": 8.555,
+      "max": 11.35
+    },
+    {
+      "telemetry_source": "docker",
+      "operation": "start",
+      "falco": "False",
+      "ok": {
+        "ok": 3,
+        "total": 3,
+        "rate": 1.0
+      },
+      "n": 3,
+      "min": 8.383,
+      "median": 9.015,
+      "max": 9.443
+    },
+    {
+      "telemetry_source": "loki",
+      "operation": "reset",
+      "falco": "True",
+      "ok": {
+        "ok": 15,
+        "total": 15,
+        "rate": 1.0
+      },
+      "n": 15,
+      "min": 8.707,
+      "median": 9.393,
+      "max": 10.544
+    },
+    {
+      "telemetry_source": "loki",
+      "operation": "start",
+      "falco": "True",
+      "ok": {
+        "ok": 3,
+        "total": 3,
+        "rate": 1.0
+      },
+      "n": 3,
+      "min": 8.561,
+      "median": 8.582,
+      "max": 9.157
+    }
+  ],
+  "resources": [
+    {
+      "telemetry_source": "docker",
+      "scenario_id": "authentication_abuse",
+      "container": "backend-1",
+      "samples": 140,
+      "cpu_mean": 7.23,
+      "cpu_max": 25.68,
+      "mem_mean_mib": 97.6,
+      "mem_max_mib": 126.5
+    },
+    {
+      "telemetry_source": "docker",
+      "scenario_id": "authentication_abuse",
+      "container": "frontend-1",
+      "samples": 140,
+      "cpu_mean": 0.47,
+      "cpu_max": 7.45,
+      "mem_mean_mib": 14.0,
+      "mem_max_mib": 15.1
+    },
+    {
+      "telemetry_source": "docker",
+      "scenario_id": "authentication_abuse",
+      "container": "lab-shopcloud-1",
+      "samples": 140,
+      "cpu_mean": 10.56,
+      "cpu_max": 44.87,
+      "mem_mean_mib": 53.7,
+      "mem_max_mib": 66.7
+    },
+    {
+      "telemetry_source": "docker",
+      "scenario_id": "authentication_abuse",
+      "container": "lab-test_container-1",
+      "samples": 140,
+      "cpu_mean": 0.0,
+      "cpu_max": 0.03,
+      "mem_mean_mib": 0.6,
+      "mem_max_mib": 1.8
+    },
+    {
+      "telemetry_source": "docker",
+      "scenario_id": "authentication_abuse",
+      "container": "postgres-1",
+      "samples": 140,
+      "cpu_mean": 1.04,
+      "cpu_max": 5.4,
+      "mem_mean_mib": 28.5,
+      "mem_max_mib": 30.1
+    },
+    {
+      "telemetry_source": "docker",
+      "scenario_id": "benign",
+      "container": "backend-1",
+      "samples": 223,
+      "cpu_mean": 2.14,
+      "cpu_max": 12.12,
+      "mem_mean_mib": 91.8,
+      "mem_max_mib": 102.7
+    },
+    {
+      "telemetry_source": "docker",
+      "scenario_id": "benign",
+      "container": "frontend-1",
+      "samples": 223,
+      "cpu_mean": 0.71,
+      "cpu_max": 8.23,
+      "mem_mean_mib": 14.6,
+      "mem_max_mib": 16.5
+    },
+    {
+      "telemetry_source": "docker",
+      "scenario_id": "benign",
+      "container": "lab-shopcloud-1",
+      "samples": 223,
+      "cpu_mean": 9.63,
+      "cpu_max": 52.78,
+      "mem_mean_mib": 54.5,
+      "mem_max_mib": 66.5
+    },
+    {
+      "telemetry_source": "docker",
+      "scenario_id": "benign",
+      "container": "lab-test_container-1",
+      "samples": 223,
+      "cpu_mean": 0.08,
+      "cpu_max": 6.53,
+      "mem_mean_mib": 0.9,
+      "mem_max_mib": 2.5
+    },
+    {
+      "telemetry_source": "docker",
+      "scenario_id": "benign",
+      "container": "postgres-1",
+      "samples": 223,
+      "cpu_mean": 0.72,
+      "cpu_max": 5.86,
+      "mem_mean_mib": 29.6,
+      "mem_max_mib": 30.7
+    },
+    {
+      "telemetry_source": "docker",
+      "scenario_id": "suspicious_container_activity",
+      "container": "backend-1",
+      "samples": 26,
+      "cpu_mean": 4.12,
+      "cpu_max": 12.75,
+      "mem_mean_mib": 87.7,
+      "mem_max_mib": 91.6
+    },
+    {
+      "telemetry_source": "docker",
+      "scenario_id": "suspicious_container_activity",
+      "container": "frontend-1",
+      "samples": 26,
+      "cpu_mean": 0.28,
+      "cpu_max": 3.15,
+      "mem_mean_mib": 13.7,
+      "mem_max_mib": 14.2
+    },
+    {
+      "telemetry_source": "docker",
+      "scenario_id": "suspicious_container_activity",
+      "container": "lab-shopcloud-1",
+      "samples": 26,
+      "cpu_mean": 1.67,
+      "cpu_max": 18.62,
+      "mem_mean_mib": 52.5,
+      "mem_max_mib": 62.9
+    },
+    {
+      "telemetry_source": "docker",
+      "scenario_id": "suspicious_container_activity",
+      "container": "lab-test_container-1",
+      "samples": 26,
+      "cpu_mean": 0.0,
+      "cpu_max": 0.01,
+      "mem_mean_mib": 1.5,
+      "mem_max_mib": 2.1
+    },
+    {
+      "telemetry_source": "docker",
+      "scenario_id": "suspicious_container_activity",
+      "container": "postgres-1",
+      "samples": 26,
+      "cpu_mean": 1.14,
+      "cpu_max": 4.88,
+      "mem_mean_mib": 28.7,
+      "mem_max_mib": 30.4
+    },
+    {
+      "telemetry_source": "docker",
+      "scenario_id": "unauthorized_resource_access",
+      "container": "backend-1",
+      "samples": 52,
+      "cpu_mean": 10.28,
+      "cpu_max": 27.23,
+      "mem_mean_mib": 98.6,
+      "mem_max_mib": 125.0
+    },
+    {
+      "telemetry_source": "docker",
+      "scenario_id": "unauthorized_resource_access",
+      "container": "frontend-1",
+      "samples": 52,
+      "cpu_mean": 0.49,
+      "cpu_max": 4.64,
+      "mem_mean_mib": 13.9,
+      "mem_max_mib": 15.1
+    },
+    {
+      "telemetry_source": "docker",
+      "scenario_id": "unauthorized_resource_access",
+      "container": "lab-shopcloud-1",
+      "samples": 52,
+      "cpu_mean": 2.11,
+      "cpu_max": 14.03,
+      "mem_mean_mib": 52.7,
+      "mem_max_mib": 62.0
+    },
+    {
+      "telemetry_source": "docker",
+      "scenario_id": "unauthorized_resource_access",
+      "container": "lab-test_container-1",
+      "samples": 52,
+      "cpu_mean": 0.06,
+      "cpu_max": 2.77,
+      "mem_mean_mib": 0.8,
+      "mem_max_mib": 2.4
+    },
+    {
+      "telemetry_source": "docker",
+      "scenario_id": "unauthorized_resource_access",
+      "container": "postgres-1",
+      "samples": 52,
+      "cpu_mean": 1.33,
+      "cpu_max": 6.71,
+      "mem_mean_mib": 28.6,
+      "mem_max_mib": 29.7
+    },
+    {
+      "telemetry_source": "loki",
+      "scenario_id": "authentication_abuse",
+      "container": "backend-1",
+      "samples": 52,
+      "cpu_mean": 10.32,
+      "cpu_max": 25.25,
+      "mem_mean_mib": 94.9,
+      "mem_max_mib": 103.1
+    },
+    {
+      "telemetry_source": "loki",
+      "scenario_id": "authentication_abuse",
+      "container": "frontend-1",
+      "samples": 52,
+      "cpu_mean": 0.87,
+      "cpu_max": 6.77,
+      "mem_mean_mib": 13.2,
+      "mem_max_mib": 14.4
+    },
+    {
+      "telemetry_source": "loki",
+      "scenario_id": "authentication_abuse",
+      "container": "lab-falco-1",
+      "samples": 52,
+      "cpu_mean": 2.61,
+      "cpu_max": 8.36,
+      "mem_mean_mib": 110.7,
+      "mem_max_mib": 122.0
+    },
+    {
+      "telemetry_source": "loki",
+      "scenario_id": "authentication_abuse",
+      "container": "lab-shopcloud-1",
+      "samples": 52,
+      "cpu_mean": 10.01,
+      "cpu_max": 41.26,
+      "mem_mean_mib": 52.5,
+      "mem_max_mib": 64.2
+    },
+    {
+      "telemetry_source": "loki",
+      "scenario_id": "authentication_abuse",
+      "container": "lab-test_container-1",
+      "samples": 52,
+      "cpu_mean": 0.01,
+      "cpu_max": 0.03,
+      "mem_mean_mib": 0.5,
+      "mem_max_mib": 0.7
+    },
+    {
+      "telemetry_source": "loki",
+      "scenario_id": "authentication_abuse",
+      "container": "monitoring-alloy-1",
+      "samples": 52,
+      "cpu_mean": 2.12,
+      "cpu_max": 6.51,
+      "mem_mean_mib": 59.8,
+      "mem_max_mib": 63.6
+    },
+    {
+      "telemetry_source": "loki",
+      "scenario_id": "authentication_abuse",
+      "container": "monitoring-grafana-1",
+      "samples": 52,
+      "cpu_mean": 3.78,
+      "cpu_max": 7.02,
+      "mem_mean_mib": 362.7,
+      "mem_max_mib": 404.8
+    },
+    {
+      "telemetry_source": "loki",
+      "scenario_id": "authentication_abuse",
+      "container": "monitoring-loki-1",
+      "samples": 52,
+      "cpu_mean": 4.34,
+      "cpu_max": 12.55,
+      "mem_mean_mib": 88.5,
+      "mem_max_mib": 95.1
+    },
+    {
+      "telemetry_source": "loki",
+      "scenario_id": "authentication_abuse",
+      "container": "postgres-1",
+      "samples": 52,
+      "cpu_mean": 1.77,
+      "cpu_max": 9.15,
+      "mem_mean_mib": 28.8,
+      "mem_max_mib": 29.9
+    },
+    {
+      "telemetry_source": "loki",
+      "scenario_id": "suspicious_container_activity",
+      "container": "backend-1",
+      "samples": 15,
+      "cpu_mean": 8.6,
+      "cpu_max": 18.82,
+      "mem_mean_mib": 89.5,
+      "mem_max_mib": 93.5
+    },
+    {
+      "telemetry_source": "loki",
+      "scenario_id": "suspicious_container_activity",
+      "container": "frontend-1",
+      "samples": 15,
+      "cpu_mean": 0.9,
+      "cpu_max": 3.94,
+      "mem_mean_mib": 13.3,
+      "mem_max_mib": 14.2
+    },
+    {
+      "telemetry_source": "loki",
+      "scenario_id": "suspicious_container_activity",
+      "container": "lab-falco-1",
+      "samples": 15,
+      "cpu_mean": 3.21,
+      "cpu_max": 9.97,
+      "mem_mean_mib": 113.1,
+      "mem_max_mib": 121.6
+    },
+    {
+      "telemetry_source": "loki",
+      "scenario_id": "suspicious_container_activity",
+      "container": "lab-shopcloud-1",
+      "samples": 15,
+      "cpu_mean": 2.54,
+      "cpu_max": 20.56,
+      "mem_mean_mib": 51.5,
+      "mem_max_mib": 61.5
+    },
+    {
+      "telemetry_source": "loki",
+      "scenario_id": "suspicious_container_activity",
+      "container": "lab-test_container-1",
+      "samples": 15,
+      "cpu_mean": 0.03,
+      "cpu_max": 0.38,
+      "mem_mean_mib": 1.0,
+      "mem_max_mib": 1.9
+    },
+    {
+      "telemetry_source": "loki",
+      "scenario_id": "suspicious_container_activity",
+      "container": "monitoring-alloy-1",
+      "samples": 15,
+      "cpu_mean": 2.07,
+      "cpu_max": 5.61,
+      "mem_mean_mib": 61.6,
+      "mem_max_mib": 64.3
+    },
+    {
+      "telemetry_source": "loki",
+      "scenario_id": "suspicious_container_activity",
+      "container": "monitoring-grafana-1",
+      "samples": 15,
+      "cpu_mean": 4.67,
+      "cpu_max": 7.75,
+      "mem_mean_mib": 358.4,
+      "mem_max_mib": 403.9
+    },
+    {
+      "telemetry_source": "loki",
+      "scenario_id": "suspicious_container_activity",
+      "container": "monitoring-loki-1",
+      "samples": 15,
+      "cpu_mean": 3.41,
+      "cpu_max": 4.54,
+      "mem_mean_mib": 91.6,
+      "mem_max_mib": 94.8
+    },
+    {
+      "telemetry_source": "loki",
+      "scenario_id": "suspicious_container_activity",
+      "container": "postgres-1",
+      "samples": 15,
+      "cpu_mean": 1.09,
+      "cpu_max": 4.27,
+      "mem_mean_mib": 28.9,
+      "mem_max_mib": 30.1
+    },
+    {
+      "telemetry_source": "loki",
+      "scenario_id": "unauthorized_resource_access",
+      "container": "backend-1",
+      "samples": 26,
+      "cpu_mean": 8.4,
+      "cpu_max": 18.68,
+      "mem_mean_mib": 93.6,
+      "mem_max_mib": 102.8
+    },
+    {
+      "telemetry_source": "loki",
+      "scenario_id": "unauthorized_resource_access",
+      "container": "frontend-1",
+      "samples": 26,
+      "cpu_mean": 0.29,
+      "cpu_max": 2.97,
+      "mem_mean_mib": 13.3,
+      "mem_max_mib": 14.8
+    },
+    {
+      "telemetry_source": "loki",
+      "scenario_id": "unauthorized_resource_access",
+      "container": "lab-falco-1",
+      "samples": 26,
+      "cpu_mean": 2.35,
+      "cpu_max": 4.46,
+      "mem_mean_mib": 113.0,
+      "mem_max_mib": 122.3
+    },
+    {
+      "telemetry_source": "loki",
+      "scenario_id": "unauthorized_resource_access",
+      "container": "lab-shopcloud-1",
+      "samples": 26,
+      "cpu_mean": 9.11,
+      "cpu_max": 37.1,
+      "mem_mean_mib": 52.5,
+      "mem_max_mib": 62.8
+    },
+    {
+      "telemetry_source": "loki",
+      "scenario_id": "unauthorized_resource_access",
+      "container": "lab-test_container-1",
+      "samples": 26,
+      "cpu_mean": 0.01,
+      "cpu_max": 0.01,
+      "mem_mean_mib": 0.5,
+      "mem_max_mib": 0.5
+    },
+    {
+      "telemetry_source": "loki",
+      "scenario_id": "unauthorized_resource_access",
+      "container": "monitoring-alloy-1",
+      "samples": 26,
+      "cpu_mean": 1.98,
+      "cpu_max": 7.83,
+      "mem_mean_mib": 60.2,
+      "mem_max_mib": 63.8
+    },
+    {
+      "telemetry_source": "loki",
+      "scenario_id": "unauthorized_resource_access",
+      "container": "monitoring-grafana-1",
+      "samples": 26,
+      "cpu_mean": 4.02,
+      "cpu_max": 6.41,
+      "mem_mean_mib": 362.7,
+      "mem_max_mib": 404.1
+    },
+    {
+      "telemetry_source": "loki",
+      "scenario_id": "unauthorized_resource_access",
+      "container": "monitoring-loki-1",
+      "samples": 26,
+      "cpu_mean": 3.98,
+      "cpu_max": 9.51,
+      "mem_mean_mib": 90.6,
+      "mem_max_mib": 94.8
+    },
+    {
+      "telemetry_source": "loki",
+      "scenario_id": "unauthorized_resource_access",
+      "container": "postgres-1",
+      "samples": 26,
+      "cpu_mean": 1.66,
+      "cpu_max": 10.07,
+      "mem_mean_mib": 28.7,
+      "mem_max_mib": 30.2
+    }
+  ],
+  "correlation": {
+    "runs": 9,
+    "own_incident_only": {
+      "ok": 9,
+      "total": 9,
+      "rate": 1.0
+    },
+    "no_benign_merged": {
+      "ok": 6,
+      "total": 9,
+      "rate": 0.667
+    },
+    "events_from_other_runs": 0,
+    "benign_events_in_alerts": 3,
+    "per_run": [
+      {
+        "round": 1,
+        "scenario_id": "authentication_abuse",
+        "run_id": "e7919516-ddb0-4c9c-ab4a-25e11844dfa8",
+        "status": "completed",
+        "has_alert": true,
+        "incident_count": 1,
+        "every_alert_in_an_incident": true,
+        "incidents_belong_to_run": true,
+        "incident_alerts_from_this_run": true,
+        "alert_events_from_this_run": true,
+        "events_from_other_runs": 0,
+        "benign_events_in_alerts": 1,
+        "alert_event_count": 21,
+        "own_incident_only": true,
+        "no_benign_merged": false
+      },
+      {
+        "round": 1,
+        "scenario_id": "unauthorized_resource_access",
+        "run_id": "8fb885df-91c6-4ed1-88a7-e9ca32166bc3",
+        "status": "completed",
+        "has_alert": true,
+        "incident_count": 1,
+        "every_alert_in_an_incident": true,
+        "incidents_belong_to_run": true,
+        "incident_alerts_from_this_run": true,
+        "alert_events_from_this_run": true,
+        "events_from_other_runs": 0,
+        "benign_events_in_alerts": 0,
+        "alert_event_count": 8,
+        "own_incident_only": true,
+        "no_benign_merged": true
+      },
+      {
+        "round": 1,
+        "scenario_id": "suspicious_container_activity",
+        "run_id": "8f81a011-ffa8-43d0-963e-4f7a1231246b",
+        "status": "completed",
+        "has_alert": true,
+        "incident_count": 1,
+        "every_alert_in_an_incident": true,
+        "incidents_belong_to_run": true,
+        "incident_alerts_from_this_run": true,
+        "alert_events_from_this_run": true,
+        "events_from_other_runs": 0,
+        "benign_events_in_alerts": 0,
+        "alert_event_count": 1,
+        "own_incident_only": true,
+        "no_benign_merged": true
+      },
+      {
+        "round": 2,
+        "scenario_id": "authentication_abuse",
+        "run_id": "51a40829-e67e-48f3-a1e9-d436381f5672",
+        "status": "completed",
+        "has_alert": true,
+        "incident_count": 1,
+        "every_alert_in_an_incident": true,
+        "incidents_belong_to_run": true,
+        "incident_alerts_from_this_run": true,
+        "alert_events_from_this_run": true,
+        "events_from_other_runs": 0,
+        "benign_events_in_alerts": 1,
+        "alert_event_count": 21,
+        "own_incident_only": true,
+        "no_benign_merged": false
+      },
+      {
+        "round": 2,
+        "scenario_id": "unauthorized_resource_access",
+        "run_id": "21a6e213-7e78-404d-9c7d-70f5c1aa1328",
+        "status": "completed",
+        "has_alert": true,
+        "incident_count": 1,
+        "every_alert_in_an_incident": true,
+        "incidents_belong_to_run": true,
+        "incident_alerts_from_this_run": true,
+        "alert_events_from_this_run": true,
+        "events_from_other_runs": 0,
+        "benign_events_in_alerts": 0,
+        "alert_event_count": 8,
+        "own_incident_only": true,
+        "no_benign_merged": true
+      },
+      {
+        "round": 2,
+        "scenario_id": "suspicious_container_activity",
+        "run_id": "9679eda8-a489-492d-bcb9-eef67d697232",
+        "status": "completed",
+        "has_alert": true,
+        "incident_count": 1,
+        "every_alert_in_an_incident": true,
+        "incidents_belong_to_run": true,
+        "incident_alerts_from_this_run": true,
+        "alert_events_from_this_run": true,
+        "events_from_other_runs": 0,
+        "benign_events_in_alerts": 0,
+        "alert_event_count": 1,
+        "own_incident_only": true,
+        "no_benign_merged": true
+      },
+      {
+        "round": 3,
+        "scenario_id": "authentication_abuse",
+        "run_id": "5b35bd5d-3859-4d54-9e3a-5232536a4f3c",
+        "status": "completed",
+        "has_alert": true,
+        "incident_count": 1,
+        "every_alert_in_an_incident": true,
+        "incidents_belong_to_run": true,
+        "incident_alerts_from_this_run": true,
+        "alert_events_from_this_run": true,
+        "events_from_other_runs": 0,
+        "benign_events_in_alerts": 1,
+        "alert_event_count": 21,
+        "own_incident_only": true,
+        "no_benign_merged": false
+      },
+      {
+        "round": 3,
+        "scenario_id": "unauthorized_resource_access",
+        "run_id": "88db572c-e931-44e3-8903-626671699920",
+        "status": "completed",
+        "has_alert": true,
+        "incident_count": 1,
+        "every_alert_in_an_incident": true,
+        "incidents_belong_to_run": true,
+        "incident_alerts_from_this_run": true,
+        "alert_events_from_this_run": true,
+        "events_from_other_runs": 0,
+        "benign_events_in_alerts": 0,
+        "alert_event_count": 8,
+        "own_incident_only": true,
+        "no_benign_merged": true
+      },
+      {
+        "round": 3,
+        "scenario_id": "suspicious_container_activity",
+        "run_id": "9de08007-ee1a-4bcd-96f8-f9bca6fe2462",
+        "status": "completed",
+        "has_alert": true,
+        "incident_count": 1,
+        "every_alert_in_an_incident": true,
+        "incidents_belong_to_run": true,
+        "incident_alerts_from_this_run": true,
+        "alert_events_from_this_run": true,
+        "events_from_other_runs": 0,
+        "benign_events_in_alerts": 0,
+        "alert_event_count": 1,
+        "own_incident_only": true,
+        "no_benign_merged": true
+      }
+    ],
+    "benign_counts": {
+      "browse": 31,
+      "login": 31,
+      "orders": 12,
+      "typo": 6,
+      "container_cmd": 5
+    }
+  },
+  "benign": {
+    "started_at": "2026-11-17T13:39:23.982290+00:00",
+    "finished_at": "2026-11-17T13:49:33.421802+00:00",
+    "minutes": 10.0,
+    "actions": {
+      "browse": 113,
+      "login": 94,
+      "orders": 52,
+      "typo": 11,
+      "container_cmd": 8
+    },
+    "http_errors": 0,
+    "alerts_before": 56,
+    "alerts_after": 56,
+    "new_alerts": 0,
+    "incidents_before": 56,
+    "incidents_after": 56,
+    "new_incidents": 0,
+    "events_stored_since_start": 0,
+    "runs_started_during_session": 0
+  }
+}
