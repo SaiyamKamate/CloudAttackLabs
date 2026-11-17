@@ -83,7 +83,7 @@ def setup_chart(results: Path, out: Path) -> None:
     ax.invert_yaxis()
     ax.grid(axis="x", color=GRID, linewidth=0.8)
     ax.set_xlim(0, max(max(v) for v in groups.values()) * 1.45)
-    style(ax, "Lab start and reset: request to healthy target (bar = median, line = min to max)", xlabel="seconds")
+    style(ax, "Lab start and reset, request to healthy target", xlabel="seconds (bar = median, line = min to max)")
     fig.tight_layout()
     fig.savefig(out / "lab-setup-time.png")
     plt.close(fig)
@@ -101,13 +101,15 @@ def memory_chart(results: Path, out: Path) -> None:
     containers = sorted({k[0] for k in peak}, key=lambda c: -max(peak.get((c, s), 0) for s in ("docker", "loki")))
     fig, ax = plt.subplots(figsize=(8, 0.5 * len(containers) + 1.4), dpi=150)
     height = 0.36
+    labelled: set[str] = set()
     for i, container in enumerate(containers):
         for j, source in enumerate(("docker", "loki")):
             if (container, source) in peak:
                 value = peak[(container, source)]
                 y = i + (j - 0.5) * (height + 0.04)
                 ax.barh(y, value, height=height, color=SOURCE_COLOR[source], zorder=3,
-                        label=source if i == 0 else None)
+                        label=None if source in labelled else source)
+                labelled.add(source)
                 ax.text(value + 5, y, f"{value:.0f}", va="center", color=MUTED, fontsize=8)
     ax.set_yticks(range(len(containers)), containers)
     ax.invert_yaxis()

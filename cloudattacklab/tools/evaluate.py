@@ -193,7 +193,9 @@ def record_environment(api: Api, lab: dict, rules_dir: Path) -> dict:
             rule[key] = match.group(1).strip() if match else None
         rules[path.name] = rule
     commit = _try(["git", "rev-parse", "HEAD"])
-    dirty = _try(["git", "status", "--porcelain"])
+    # filemode/autocrlf off: git inside WSL otherwise reports every file on a Windows drive as changed.
+    dirty = _try(["git", "-c", "core.filemode=false", "-c", "core.autocrlf=true", "status", "--porcelain",
+                  "--", ".", ":!evaluation"])
     return {
         "recorded_at": iso(utcnow()),
         "git": {"commit": commit, "branch": _try(["git", "rev-parse", "--abbrev-ref", "HEAD"]),
@@ -774,8 +776,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Repeatable CloudAttackLab evaluation (API only).")
     parser.add_argument("--docker-runs", type=int, default=10, help="runs of each scenario with TELEMETRY_SOURCE=docker")
     parser.add_argument("--loki-runs", type=int, default=5, help="runs of each scenario with TELEMETRY_SOURCE=loki and Falco on")
-    parser.add_argument("--benign-minutes", type=float, default=5, help="length of the benign-only session")
-    parser.add_argument("--correlation-rounds", type=int, default=1, help="back-to-back rounds of the three scenarios")
+    parser.add_argument("--benign-minutes", type=float, default=10, help="length of the benign-only session")
+    parser.add_argument("--correlation-rounds", type=int, default=3, help="back-to-back rounds of the three scenarios")
     parser.add_argument("--setup-trials", type=int, default=3, help="lab start measurements per phase")
     parser.add_argument("--scenarios", nargs="+", default=list(SCENARIOS))
     parser.add_argument("--seed", type=int, default=1, help="seed for the benign traffic")
