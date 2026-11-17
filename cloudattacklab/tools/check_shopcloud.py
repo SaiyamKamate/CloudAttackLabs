@@ -2,13 +2,19 @@
 
 Works against the fake one and the real one. Uses only the standard library.
 
-    python tools/check_shopcloud.py http://127.0.0.1:8081 --lab-token lab-dev-token
+    python tools/check_shopcloud.py http://127.0.0.1:8081
+
+The lab token is LAB_CONTROL_TOKEN, read like docker compose reads it: from the
+environment, else from the project's .env, else the compose default
+(lab-dev-token). `--lab-token` overrides it.
 
 It resets the target at the start and the end, so only run it against a lab.
 """
 import argparse
 import json
+import os
 import sys
+from pathlib import Path
 import urllib.error
 import urllib.request
 
@@ -37,11 +43,32 @@ def check(name, condition, detail=""):
     print(f"{'PASS' if condition else 'FAIL'}  {name}{'' if condition else '  -> ' + str(detail)}")
 
 
+ENV_FILE = Path(__file__).resolve().parents[1] / ".env"
+
+
+def default_lab_token() -> str:
+    """LAB_CONTROL_TOKEN from the environment, else from .env, else docker-compose.yml's default."""
+    if os.environ.get("LAB_CONTROL_TOKEN"):
+        return os.environ["LAB_CONTROL_TOKEN"]
+    try:
+        for line in ENV_FILE.read_text(encoding="utf-8").splitlines():
+            key, sep, value = line.strip().partition("=")
+            if sep and key.strip() == "LAB_CONTROL_TOKEN" and value.strip():
+                return value.strip().strip("'\"")
+    except OSError:
+        pass
+    return "lab-dev-token"
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("base_url")
-    parser.add_argument("--lab-token", default="lab-dev-token")
+    parser.add_argument(
+        "--lab-token", default=None, help="default: LAB_CONTROL_TOKEN from the environment or .env, else lab-dev-token"
+    )
     args = parser.parse_args()
+    if args.lab_token is None:
+        args.lab_token = default_lab_token()
     base = args.base_url.rstrip("/")
     lab = {"X-Lab-Token": args.lab_token}
 
