@@ -34,7 +34,8 @@ class LabStatus(str, Enum):
 class RunStatus(str, Enum):
     pending = "pending"
     running = "running"
-    completed = "completed"
+    completed = "completed"      # the script finished and the expected evidence is all there
+    incomplete = "incomplete"    # the script finished, but expected telemetry is missing or requests errored
     failed = "failed"
     cleaned_up = "cleaned_up"
 

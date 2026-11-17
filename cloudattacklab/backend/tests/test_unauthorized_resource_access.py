@@ -36,6 +36,7 @@ from test_runs_api import (  # noqa: E402,F401
     adapter,
     client,
     file_engine,
+    login_failures as runs_login_failures,
     patch_script,
     rdb,
     running_lab,
@@ -420,10 +421,11 @@ def test_a_200_response_fails_the_run_and_keeps_the_summary(client, rdb, target,
     assert failure.detail["summary"]["access_control_failed"] is True
 
 
-def test_authentication_abuse_run_is_unchanged(client, target, monkeypatch):
+def test_authentication_abuse_run_is_unchanged(client, adapter, target, monkeypatch):
     summary = {"scenario": "authentication_abuse", "attempts_sent": 20, "unauthorized_401": 20, "rate_limited_429": 0}
     patch_script(monkeypatch, RunResult("completed", summary, None))
     lab = running_lab(client)
+    adapter.log_text = runs_login_failures(20)
     run = wait_terminal(client, start_run(client, lab["id"]).json()["id"])
     assert run["status"] == "completed"
     assert run["summary"] == summary        # no verification added

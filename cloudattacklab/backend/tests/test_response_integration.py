@@ -30,7 +30,7 @@ from app.models import Base  # noqa: E402
 pytestmark = pytest.mark.integration
 
 API = "/api/v1"
-TERMINAL = {"completed", "failed", "cleaned_up"}
+TERMINAL = {"completed", "incomplete", "failed", "cleaned_up"}
 
 
 @pytest.fixture

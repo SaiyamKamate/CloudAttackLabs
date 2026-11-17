@@ -38,7 +38,7 @@ from app.telemetry.source import DockerLogSource, TelemetrySourceError  # noqa: 
 from conftest import FakeAdapter, FakeTarget  # noqa: E402
 
 API = "/api/v1"
-TERMINAL = {"completed", "failed", "cleaned_up"}
+TERMINAL = {"completed", "incomplete", "failed", "cleaned_up"}
 SAMPLE = json.loads((Path(__file__).parent / "fixtures" / "loki_query_range_shopcloud.json").read_text())
 LOKI = "http://loki.test:3100"
 

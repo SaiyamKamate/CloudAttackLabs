@@ -8,6 +8,7 @@ from __future__ import annotations
 import logging
 import threading
 import uuid
+from collections import Counter
 from dataclasses import dataclass
 from typing import Any, Callable, Optional
 
@@ -20,7 +21,7 @@ from ..config import Settings
 from ..detection.engine import DetectionEngine
 from ..errors import ApiError
 from ..lab_manager.adapter import LabAdapter, LabAdapterError
-from ..models import Lab, LabStatus, RunStatus, ScenarioRun
+from ..models import Event, Lab, LabStatus, RunStatus, ScenarioRun
 from ..response_manager.revert import mark_reverted
 from ..schemas.scenario import ScenarioDefinition
 from ..lab_manager.target import TargetClient, TargetError
@@ -40,7 +41,12 @@ from .verification import run_verification
 
 log = logging.getLogger("cloudattacklab.scenarios")
 
-TERMINAL = (RunStatus.completed.value, RunStatus.failed.value, RunStatus.cleaned_up.value)
+TERMINAL = (
+    RunStatus.completed.value,
+    RunStatus.incomplete.value,
+    RunStatus.failed.value,
+    RunStatus.cleaned_up.value,
+)
 ACTIVE_RUN = (RunStatus.pending.value, RunStatus.running.value)
 
 # One active run per lab, across the single backend process.
@@ -294,15 +300,23 @@ class ScenarioService:
 
                 run.finished_at = _utcnow()
                 if result.outcome == "completed":
-                    run.status = RunStatus.completed.value
+                    # The script finished, but the run is only `completed` when its
+                    # evidence is whole: otherwise `incomplete`, with the reasons.
+                    shortfalls = run_shortfalls(session, run, scenario, result.summary)
+                    outcome = RunStatus.incomplete.value if shortfalls else RunStatus.completed.value
+                    run.status = outcome
                     run.summary = summary
+                    run.error = ("Run incomplete: " + "; ".join(shortfalls) + ".") if shortfalls else None
+                    detail = {"scenario_id": scenario.id, "outcome": outcome, "summary": summary}
+                    if shortfalls:
+                        detail["error"] = run.error
                     audit.record(
                         session,
                         actor=self.actor,
                         action="run.finish",
                         object_type="scenario_run",
                         object_id=str(run.id),
-                        detail={"scenario_id": scenario.id, "outcome": "completed", "summary": summary},
+                        detail=detail,
                     )
                     session.commit()
                 else:
@@ -568,6 +582,34 @@ class ScenarioService:
     def _release(self, lab_id: uuid.UUID) -> None:
         with _active_lock:
             _active_labs.discard(lab_id)
+
+
+def run_shortfalls(
+    session: Session, run: ScenarioRun, scenario: ScenarioDefinition, summary: Optional[dict[str, Any]]
+) -> list[str]:
+    """Why a run whose script finished still cannot count as `completed`. Empty if it can.
+
+    - an expected_telemetry item of the scenario was not met (fewer events of that
+      source and type were collected for the run than its min_count);
+    - the script reported request errors (requests that got no answer at all).
+    """
+    reasons: list[str] = []
+    counts = Counter(
+        (source, event_type)
+        for source, event_type in session.execute(
+            select(Event.source, Event.event_type).where(Event.run_id == run.id)
+        )
+    )
+    for item in scenario.expected_telemetry:
+        got = counts.get((item.source, item.event_type), 0)
+        if got < item.min_count:
+            reasons.append(
+                f"expected at least {item.min_count} {item.source} {item.event_type} event(s), collected {got}"
+            )
+    errors = (summary or {}).get("errors")
+    if isinstance(errors, int) and not isinstance(errors, bool) and errors > 0:
+        reasons.append(f"the script reported {errors} request error(s) (requests the target never answered)")
+    return reasons
 
 
 def _utcnow():

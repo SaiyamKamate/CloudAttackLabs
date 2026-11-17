@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { api } from '../api.js'
 
-const TERMINAL = ['completed', 'failed', 'cleaned_up']
+const TERMINAL = ['completed', 'incomplete', 'failed', 'cleaned_up']
 
 // List scenarios and run one against the running lab, then follow the run.
 export default function ScenariosPage({ run, setRun, openReport }) {
@@ -111,7 +111,11 @@ export default function ScenariosPage({ run, setRun, openReport }) {
         <div style={{ marginTop: '1rem' }}>
           <h3>Run {run.scenario_id}</h3>
           <p>Status: <b>{run.status}</b> {running && '(updating…)'}</p>
-          {run.error && <p style={{ color: 'crimson' }}>Run error: {run.error}</p>}
+          {run.error && (
+            <p style={{ color: 'crimson' }}>
+              {run.error.startsWith('Run incomplete') ? run.error : `Run error: ${run.error}`}
+            </p>
+          )}
           {run.summary?.verification && <p>{verificationText(run.summary.verification)}</p>}
           {run.summary && <pre>{JSON.stringify(run.summary, null, 2)}</pre>}
           <button onClick={cleanup} disabled={busy || running || Boolean(otherActive)}>Cleanup</button>{' '}

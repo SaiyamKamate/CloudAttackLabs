@@ -31,7 +31,7 @@ from app.telemetry.source import TelemetrySourceError  # noqa: E402
 pytestmark = pytest.mark.integration
 
 API = "/api/v1"
-TERMINAL = {"completed", "failed", "cleaned_up"}
+TERMINAL = {"completed", "incomplete", "failed", "cleaned_up"}
 
 
 @pytest.fixture

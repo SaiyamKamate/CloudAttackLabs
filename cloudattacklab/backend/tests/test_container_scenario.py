@@ -49,7 +49,7 @@ from app.telemetry.normalize import RunContext  # noqa: E402
 from conftest import FakeAdapter, FakeTarget  # noqa: E402
 
 API = "/api/v1"
-TERMINAL = {"completed", "failed", "cleaned_up"}
+TERMINAL = {"completed", "incomplete", "failed", "cleaned_up"}
 FIXTURES = Path(__file__).parent / "fixtures"
 LAB_PROJECT = "cloudattacklab-lab"
 ROLE = {"cloudattacklab.role": "test-target"}
