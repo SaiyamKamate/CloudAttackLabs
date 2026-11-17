@@ -1,4 +1,5 @@
-"""Run a scenario's detection rule over a run's events and raise alerts.
+"""Run a scenario's detection rule (every rule, for an observation run) over a
+run's events and raise alerts.
 
 One alert per run and group (one source_ip, or one username on one path),
 not one per event. Every
@@ -17,6 +18,7 @@ from sqlalchemy.orm import Session
 from ..incidents.service import attach_alerts
 from ..models import Alert, Event, ScenarioRun
 from ..schemas.scenario import ScenarioDefinition
+from .checks import RuleCheck, run_checks
 from .rules import RuleDefinition, field_value, load_rules
 
 log = logging.getLogger("cloudattacklab.detection")
@@ -30,46 +32,57 @@ class DetectionEngine:
         return load_rules(self.rules_dir)
 
     def run_for_run(self, session: Session, run: ScenarioRun, scenario: ScenarioDefinition) -> list[Alert]:
-        """Evaluate the scenario's detection rule over this run's events. Returns new alerts."""
-        detection = scenario.detection
-        rule = self.rules().get(detection.rule)
-        if rule is None:
-            log.warning("run %s: detection rule '%s' not found; no alert", run.id, detection.rule)
-            return []
+        """Evaluate this run's events and return the new alerts.
 
-        threshold = detection.threshold
-        window = timedelta(seconds=detection.window_seconds)
-
-        events = list(
-            session.scalars(
-                select(Event)
-                .where(Event.run_id == run.id, Event.event_type == rule.event_type)
-                .order_by(Event.timestamp)
-            )
-        )
-        groups: dict[tuple[str, ...], list[Event]] = defaultdict(list)
-        for event in events:
-            if not _matches(event, rule):
-                continue
-            key = _group_key(event, rule)
-            if key is not None:
-                groups[key].append(event)
-
-        already = _groups_already_alerted(session, run, rule)
+        An attack scenario's run is checked against the scenario's own rule; an
+        observation run against every rule (detection/checks.py).
+        """
+        rules = self.rules()
         new_alerts: list[Alert] = []
-        for key, group in groups.items():
-            if key in already:
-                continue  # one alert per run and group value
-            contributing = _first_window_reaching(group, threshold, window)
-            if contributing is None:
+        for check in run_checks(scenario, run.parameters):
+            rule = rules.get(check.rule)
+            if rule is None:
+                log.warning("run %s: detection rule '%s' not found; no alert", run.id, check.rule)
                 continue
-            new_alerts.append(_build_alert(run, rule, detection, key, contributing))
-
-        session.add_all(new_alerts)
+            alerts = _evaluate(session, run, rule, check)
+            session.add_all(alerts)
+            if alerts:
+                # correlate into incidents, scored with this rule's threshold
+                attach_alerts(session, run, scenario, alerts, threshold=check.threshold)
+            new_alerts.extend(alerts)
         if new_alerts:
-            attach_alerts(session, run, scenario, new_alerts)  # correlate into incidents
             session.commit()
         return new_alerts
+
+
+def _evaluate(session: Session, run: ScenarioRun, rule: RuleDefinition, check: RuleCheck) -> list[Alert]:
+    """New alerts for one rule over this run's events (one per group value)."""
+    window = timedelta(seconds=check.window_seconds)
+    events = list(
+        session.scalars(
+            select(Event)
+            .where(Event.run_id == run.id, Event.event_type == rule.event_type)
+            .order_by(Event.timestamp)
+        )
+    )
+    groups: dict[tuple[str, ...], list[Event]] = defaultdict(list)
+    for event in events:
+        if not _matches(event, rule):
+            continue
+        key = _group_key(event, rule)
+        if key is not None:
+            groups[key].append(event)
+
+    already = _groups_already_alerted(session, run, rule)
+    new_alerts: list[Alert] = []
+    for key, group in groups.items():
+        if key in already:
+            continue  # one alert per run and group value
+        contributing = _first_window_reaching(group, check.threshold, window)
+        if contributing is None:
+            continue
+        new_alerts.append(_build_alert(run, rule, check, key, contributing))
+    return new_alerts
 
 
 def _first_window_reaching(events: list[Event], threshold: int, window: timedelta) -> list[Event] | None:
@@ -104,7 +117,7 @@ def _group_key(event: Event, rule: RuleDefinition) -> tuple[str, ...] | None:
     return tuple(str(value) for value in values)
 
 
-def _build_alert(run, rule, detection, key, contributing) -> Alert:
+def _build_alert(run, rule, check: RuleCheck, key, contributing) -> Alert:
     # e.g. "source_ip=172.20.0.5" or "username=lab_restricted, raw.path=/api/orders"
     group = ", ".join(f"{name}={value}" for name, value in zip(rule.group_fields, key))
     first = contributing[0].timestamp
@@ -116,7 +129,7 @@ def _build_alert(run, rule, detection, key, contributing) -> Alert:
         title=f"{rule.title} ({group})",
         description=(
             f"{len(contributing)} {rule.event_type} events from {group} "
-            f"within {span}s (threshold {detection.threshold} in {detection.window_seconds}s)."
+            f"within {span}s (threshold {check.threshold} in {check.window_seconds}s)."
         ),
         lab_id=run.lab_id,
         run_id=run.id,
