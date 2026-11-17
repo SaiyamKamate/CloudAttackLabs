@@ -2,7 +2,8 @@
 
 It mixes, in time order: the scenario starting, the events behind the alerts,
 each alert firing, the scenario finishing, every response step (requested,
-approved or rejected, executed, verified or failed, reverted) and cleanup.
+approved or rejected, executed, verified or failed, reverted), cleanup, and the
+incident being closed.
 
 Every entry has a time, a type, a short description and a link to its evidence.
 Nothing is stored: the list is built from the run, the events, the alerts and
@@ -134,6 +135,23 @@ def build_timeline(session: Session, incident: Incident) -> list[dict[str, Any]]
                         href=f"{API}/audit?object_type=scenario_run&object_id={run.id}&action={row.action}",
                     )
                 )
+
+    closed = session.scalars(
+        select(AuditLog)
+        .where(AuditLog.object_type == "incident", AuditLog.object_id == str(incident.id), AuditLog.action == "incident.closed")
+        .order_by(AuditLog.id)
+    )
+    for row in closed:
+        entries.append(
+            _entry(
+                row.timestamp,
+                "incident_closed",
+                f"Incident closed by {row.actor} (risk score {(row.detail or {}).get('risk_score')}).",
+                kind="audit",
+                id=row.id,
+                href=f"{API}/audit?object_type=incident&object_id={incident.id}&action=incident.closed",
+            )
+        )
 
     # Stable sort: entries with the same time keep the order they were added in.
     entries.sort(key=lambda entry: entry["time"])

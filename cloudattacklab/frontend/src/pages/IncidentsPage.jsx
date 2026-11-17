@@ -39,6 +39,16 @@ export default function IncidentsPage({ openReport }) {
     }
   }
 
+  async function closeSelected() {
+    setError(null)
+    try {
+      await api.closeIncident(selected.id)
+    } catch (err) {
+      setError(err.message)
+    }
+    await refreshSelected()
+  }
+
   // After a response step the risk score and the timeline have changed.
   async function refreshSelected() {
     await open(selected.id)
@@ -78,7 +88,8 @@ export default function IncidentsPage({ openReport }) {
           <h3>{selected.title}</h3>
           <p>
             Status: <b>{selected.status}</b>. Correlation key: <code>{selected.correlation_key ?? '—'}</code>{' '}
-            {selected.run_id && <button onClick={() => openReport(selected.run_id)}>View report</button>}
+            {selected.run_id && <button onClick={() => openReport(selected.run_id)}>View report</button>}{' '}
+            {selected.status === 'open' && <button onClick={closeSelected}>Close incident</button>}
           </p>
 
           <h4>Risk score: {score(selected.risk_score)}</h4>
@@ -86,7 +97,12 @@ export default function IncidentsPage({ openReport }) {
             ? <p style={{ whiteSpace: 'pre-line' }}>{selected.risk_explanation}</p>
             : <p><i>This incident was created before risk scoring existed, so it has no score.</i></p>}
 
-          <ResponsePanel key={selected.id} incidentId={selected.id} onChange={refreshSelected} />
+          <ResponsePanel
+            key={`${selected.id}-${selected.status}`}
+            incidentId={selected.id}
+            onChange={refreshSelected}
+            closed={selected.status === 'closed'}
+          />
 
           <h4>Linked alerts ({selected.alerts.length})</h4>
           <table border="1" cellPadding="6" style={TABLE}>

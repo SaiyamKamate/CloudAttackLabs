@@ -6,7 +6,9 @@ its explanation, limited to 0-100:
 - base points for the highest alert severity,
 - plus points for events over the detection threshold,
 - plus points for each additional correlated alert,
-- minus points when a response action was verified as working.
+- minus points when a response action was verified as working and is still
+  applied. Once cleanup or a lab reset reverted it, it no longer lowers the
+  score, and the explanation says so.
 
 It only compares incidents inside this lab. It does not predict financial loss
 and is not a universal measure of risk; the explanation says so.
@@ -18,7 +20,9 @@ from typing import Optional
 
 from sqlalchemy.orm import Session
 
-from ..models import Incident
+from sqlalchemy import select
+
+from ..models import AuditLog, Incident, ResponseAction, ResponseStatus, ScenarioRun
 
 SEVERITY_POINTS = {"info": 10, "low": 25, "medium": 40, "high": 60, "critical": 80}
 SEVERITY_ORDER = ["info", "low", "medium", "high", "critical"]
@@ -53,12 +57,15 @@ def compute_risk(
     event_counts: list[int],
     threshold: Optional[int],
     verified_response: Optional[str] = None,
+    reverted_response: Optional[tuple[str, str]] = None,
 ) -> Risk:
     """Score one incident. Pure: the same input always gives the same result.
 
     severities / event_counts: one entry per alert of the incident.
     threshold: the scenario's detection threshold, if known.
-    verified_response: the action name of a response that was verified, if any.
+    verified_response: the action name of a verified response that is still applied, if any.
+    reverted_response: (action, what reverted it) of a response that was verified as
+        working but has been reverted since; it is listed with 0 points.
     """
     factors: list[RiskFactor] = []
 
@@ -95,6 +102,15 @@ def compute_risk(
         factors.append(
             RiskFactor(-VERIFIED_RESPONSE_POINTS, f"a response action ({verified_response}) was verified as working")
         )
+    elif reverted_response:
+        action, trigger = reverted_response
+        factors.append(
+            RiskFactor(
+                0,
+                f"a response action ({action}) was verified as working, but it was reverted by {trigger}, "
+                f"so it no longer lowers the score (it gave -{VERIFIED_RESPONSE_POINTS} while it was applied)",
+            )
+        )
 
     total = sum(factor.points for factor in factors)
     score = max(0, min(100, total))
@@ -110,20 +126,50 @@ def compute_risk(
 def refresh_risk(session: Session, incident: Incident, threshold: Optional[int]) -> Risk:
     """Recompute and store the incident's score and explanation. The caller commits."""
     alerts = sorted(incident.alerts, key=lambda alert: str(alert.id))
-    verified = next(
-        (
-            response.action
-            for response in sorted(incident.responses, key=lambda r: r.requested_at)
-            if response.verified_at is not None and (response.verification_result or {}).get("passed") is True
-        ),
-        None,
-    )
+    worked = [
+        response
+        for response in sorted(incident.responses, key=lambda r: r.requested_at)
+        if response.verified_at is not None and (response.verification_result or {}).get("passed") is True
+    ]
+    applied = next((r.action for r in worked if r.status == ResponseStatus.verified.value), None)
+    reverted = next((r for r in reversed(worked) if r.status == ResponseStatus.reverted.value), None)
     risk = compute_risk(
         severities=[alert.severity for alert in alerts],
         event_counts=[alert.event_count for alert in alerts],
         threshold=threshold,
-        verified_response=verified,
+        verified_response=applied,
+        reverted_response=(reverted.action, _reverted_by(session, reverted)) if reverted and not applied else None,
     )
     incident.risk_score = risk.score
     incident.risk_explanation = risk.explanation
     return risk
+
+
+def _reverted_by(session: Session, response: ResponseAction) -> str:
+    """What reverted a response, from its response.reverted audit row (e.g. "cleanup:manual", "lab.reset")."""
+    row = session.scalars(
+        select(AuditLog)
+        .where(
+            AuditLog.object_type == "response_action",
+            AuditLog.object_id == str(response.id),
+            AuditLog.action == "response.reverted",
+        )
+        .order_by(AuditLog.id.desc())
+    ).first()
+    trigger = (row.detail or {}).get("trigger") if row is not None else None
+    return trigger or "cleanup"
+
+
+def scenario_threshold(session: Session, incident: Incident) -> Optional[int]:
+    """The detection threshold of the scenario behind the incident's run, if it can be read."""
+    run = session.get(ScenarioRun, incident.run_id) if incident.run_id else None
+    if run is None:
+        return None
+    from ..errors import ApiError
+    from ..scenario_engine.router import get_scenario_engine  # late: avoids an import cycle
+
+    try:
+        return get_scenario_engine().get(run.scenario_id).detection.threshold
+    except ApiError:
+        return None
+

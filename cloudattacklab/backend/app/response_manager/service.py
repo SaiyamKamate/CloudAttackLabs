@@ -31,7 +31,7 @@ from ..incidents.risk import refresh_risk
 from ..lab_manager.adapter import LabAdapter, LabAdapterError
 from ..lab_manager.container import TargetRefused, check_test_container
 from ..lab_manager.target import TargetClient, TargetError
-from ..models import Incident, Lab, LabStatus, ResponseAction, ResponseStatus, ScenarioRun
+from ..models import Incident, IncidentStatus, Lab, LabStatus, ResponseAction, ResponseStatus, ScenarioRun
 from ..scenario_engine.engine import ScenarioEngine
 from ..schemas.scenario import MAX_ATTEMPTS, ScenarioDefinition
 from .verification import CHECKS, EXTRA_ATTEMPTS, container_not_running
@@ -85,6 +85,8 @@ class ResponseManager:
         incident = self.session.get(Incident, incident_id)
         if incident is None:
             raise ApiError(404, "incident_not_found", f"No incident with id {incident_id}.")
+        if incident.status == IncidentStatus.closed.value:
+            raise ApiError(409, "incident_closed", f"Incident {incident.id} is closed; no new response can be requested.")
         scenario = self._scenario_for(incident)
         action, parameters = self._planned_action(scenario, incident)
         if action == "stop_container":
