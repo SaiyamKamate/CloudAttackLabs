@@ -36,7 +36,7 @@ Start runs `docker compose up` for the lab and waits until ShopCloud is healthy,
 
 ## 2. Run `authentication_abuse` (failed logins)
 
-Open **Scenarios**. It lists the three scenarios found in `scenarios/`:
+Open **Scenarios**. It lists the scenarios found in `scenarios/`: the three attack scenarios used below, and *Benign Baseline (observe only)*, which runs no attack and only watches the lab for ten minutes (it is for measuring false positives; see the [evaluation](evaluation-results.md#false-positives)):
 
 ![The Scenarios page](images/02-scenarios.jpg)
 
@@ -111,7 +111,7 @@ Further down are the **linked alerts** and the **timeline**: one list, in time o
 
 ## 6. View and download the report
 
-Click **View report** on the incident (or on the run, on the Scenarios page). The report shows, for one run: the lab and scenario, the run's times and parameters, what the script reported, the telemetry expected next to what was collected, the alerts with their detection latency, the incident and risk score, the response and its verification, and the cleanup status.
+Click **View report** on the incident (or on the run, on the Scenarios page). The report shows, for one run: the lab and scenario, the run's times and parameters, what the script reported, the telemetry expected next to what was collected, the alerts with the time from the threshold-crossing event to the alert, the incident and risk score, the response and its verification, and the cleanup status.
 
 ![The run report](images/12-run-report.jpg)
 

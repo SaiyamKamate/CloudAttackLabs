@@ -63,7 +63,7 @@ Lab statuses: `created`, `starting`, `running`, `degraded` (some lab container i
 
 | Method | Path | Body | Returns | 409 errors |
 |---|---|---|---|---|
-| `GET` | `/scenarios` | | `200` list of `{id, name, category, description, version, target, type}`, one per **valid** file in `scenarios/` | |
+| `GET` | `/scenarios` | | `200` list of `{id, name, category, description, version, target, type}`, one per **valid** file in `scenarios/`; `type` is `application`, `container` or `observation` | |
 | `GET` | `/scenarios/{scenario_id}` | | `200` the full scenario definition (format: `contracts/scenario.schema.json`) | |
 | `POST` | `/labs/{lab_id}/runs` | `{"scenario_id": "..."}`, nothing else | `201` Run with status `pending`. The run continues in the background | `lab_not_running`, `target_mismatch`, `unknown_target`, `target_url_refused`, `run_in_progress`, `preflight_failed` (names the check) |
 | `GET` | `/runs/{run_id}` | | `200` Run | |
@@ -115,7 +115,7 @@ Response statuses: `pending_approval`, `approved`, `rejected`, `executed`, `veri
 
 | Method | Path | Query | Returns |
 |---|---|---|---|
-| `GET` | `/runs/{run_id}/report` | | `200` the run report (JSON): `report_version`, `generated_at`, `lab`, `scenario`, `run`, `script_summary`, `telemetry` (expected and collected), `detection`, `alerts` (with `threshold_crossed_at` and `detection_latency_seconds`), `incidents`, `responses`, `post_run_verification`, `cleanup` |
+| `GET` | `/runs/{run_id}/report` | | `200` the run report (JSON): `report_version`, `generated_at`, `lab`, `scenario`, `run`, `script_summary`, `telemetry` (expected and collected), `detection` (`rule`, `threshold`, `window_seconds` of an attack scenario's rule, null for an observation run, and `rules`: every rule the run was checked against, with `threshold`, `window_seconds` and `taken_from`), `alerts` (with `threshold_crossed_at` and `detection_latency_seconds`, the time from the threshold-crossing event to the alert), `incidents`, `responses`, `post_run_verification`, `cleanup` |
 | `GET` | `/audit` | `object_type`, `object_id`, `action`, `limit` (1–1000, default 100) | `200` list of `{id, timestamp, actor, action, object_type, object_id, detail}`, **newest first** |
 
 Audit actions: `lab.start`, `lab.stop`, `lab.reset`, `lab.status_corrected`, `run.start`, `run.finish`, `run.failure`, `cleanup`, `response.requested`, `response.approved`, `response.rejected`, `response.executed`, `response.verified`, `response.failed`, `response.reverted`, `incident.closed`.

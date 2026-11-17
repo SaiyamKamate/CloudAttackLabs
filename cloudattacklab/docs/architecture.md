@@ -72,10 +72,10 @@ Things to notice:
 | Module | Code | What it does |
 |---|---|---|
 | Lab Manager | `backend/app/lab_manager/` | Creates, starts, stops and resets the lab; reports container status and ShopCloud's health; corrects the stored lab status against Docker when a lab is read |
-| Scenario Engine | `backend/app/scenario_engine/`, `backend/app/schemas/scenario.py`, `scenarios/` | Loads and validates scenario files, runs pre-flight checks, runs the scenario's script in the background with a timeout, collects telemetry during the run, decides the run's outcome, runs cleanup |
+| Scenario Engine | `backend/app/scenario_engine/`, `backend/app/schemas/scenario.py`, `scenarios/` | Loads and validates scenario files, runs pre-flight checks, runs the scenario's script in the background with a timeout (an observation run has none and only watches), collects telemetry during the run, decides the run's outcome, runs cleanup |
 | Telemetry sources | `backend/app/telemetry/source.py`, `loki.py`, `container.py`, `factory.py` | Read raw records: ShopCloud's logs (from Docker or Loki), the test container's Docker events, Falco's alerts |
 | Normalization | `backend/app/telemetry/normalize.py`, `container.py`, `ingest.py` | Turn each raw record into a `NormalizedEvent` and store it, never twice, with the raw record kept beside it |
-| Detection Engine | `backend/app/detection/`, `rules/` | Loads and validates rule files and runs the scenario's rule over the run's events; raises one alert per group that reaches the threshold |
+| Detection Engine | `backend/app/detection/`, `rules/` | Loads and validates rule files and runs the scenario's rule (every rule, for an observation run) over the run's events; raises one alert per group that reaches the threshold |
 | Incidents | `backend/app/incidents/` | Groups a run's alerts into incidents, computes the risk score, builds the timeline, closes incidents |
 | Response Manager | `backend/app/response_manager/` | Creates a response from the scenario's definition, waits for approval, executes it, verifies it, marks it reverted after cleanup or reset |
 | Reports | `backend/app/reports/` | Builds the JSON report of one run |
@@ -120,6 +120,8 @@ A run goes through these steps (`scenario_engine/service.py`):
 6. The Detection Engine runs once over the run's events.
 7. If the scenario names a post-run check (`verification_check`), it is repeated once.
 8. The outcome is decided: `completed`, `incomplete` or `failed` (see the [user guide](user-guide.md#2-run-authentication_abuse-failed-logins)). On `failed`, cleanup runs automatically.
+
+**Observation runs.** A scenario of type `observation` (the shipped one is `benign_baseline`) has no script, no `detection` and no response. Its run goes through the same steps, except that step 4 is a wait of `execution.parameters.duration_seconds` (600 s for `benign_baseline`) during which the platform sends nothing. It collects everything an attack run of either type would: ShopCloud's logs from `TELEMETRY_SOURCE`, the test container's Docker events and, with Falco on, Falco's alerts, through the same ingest and normalization code. In step 6 every rule is checked, each with the threshold and window of the scenario that uses it (`detection/checks.py`); the list is fixed when the run starts and kept in the run's `parameters.detection_rules`. Traffic sent from outside during the run, for example by `tools/benign_traffic.py`, is therefore stored and checked exactly as it would be during an attack run, and every alert the run raises is a false positive. The evaluation uses it to measure the [false-positive rate](evaluation-results.md#false-positives).
 
 ### Telemetry sources and normalization
 
@@ -175,7 +177,7 @@ A rule is a YAML file in `rules/` (`detection/rules.py`), counting events of one
 - `match` (optional): keep only events with these values, for example `raw.status: 403`;
 - `severity`, `title`, `description`, and fallback `default_threshold` and `default_window_seconds`.
 
-The threshold and window actually used come from the scenario's `detection` section. The rule fires when one group reaches the threshold within the window; there is one alert per run and group, and every event of the group is linked to the alert (`alert_events`). Detection runs once, when the script has finished, not as a stream.
+The threshold and window actually used come from the scenario's `detection` section (for an observation run, from the scenario that uses each rule; see above). An attack run is checked against its own rule only. The rule fires when one group reaches the threshold within the window; there is one alert per run and group, and every event of the group is linked to the alert (`alert_events`). Detection runs once, when the script has finished (or the observation has ended), not as a stream. The report's `detection_latency_seconds` is therefore the time from the threshold-crossing event to the alert, and mostly reflects how much of the run was left; see the [evaluation](evaluation-results.md#detection-latency).
 
 ### Incidents
 
