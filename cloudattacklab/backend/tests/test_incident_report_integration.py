@@ -71,7 +71,9 @@ def test_scenario_alert_incident_response_and_report_against_the_real_lab(client
     assert report["telemetry"]["expected"][0]["collected_count"] == 20
     assert report["telemetry"]["all_expected_met"] is True
     assert report["alerts"][0]["detection_latency_seconds"] >= 0
-    assert report["incidents"][0]["id"] == incident_id and report["incidents"][0]["risk_score"] == 40
+    # Cleanup reverted the response, so its -20 no longer applies, and the explanation says so.
+    assert report["incidents"][0]["id"] == incident_id and report["incidents"][0]["risk_score"] == 60
+    assert "reverted by cleanup:manual" in report["incidents"][0]["risk_explanation"]
     assert report["responses"][0]["status"] == "reverted"
     assert report["responses"][0]["verification_result"]["passed"] is True
     assert report["cleanup"]["status"] == "done"
