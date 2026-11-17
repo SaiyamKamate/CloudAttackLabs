@@ -30,7 +30,7 @@ export default function ReportPage({ runId, onClose }) {
   if (error) {
     return <section><p style={{ color: 'crimson' }}>Error: {error}</p><button onClick={onClose}>Back</button></section>
   }
-  if (!report) return <section><p>Loading the report…</p></section>
+  if (!report) return <section><p>Loading…</p></section>
 
   const { lab, scenario, run, telemetry, cleanup } = report
   const verification = report.post_run_verification

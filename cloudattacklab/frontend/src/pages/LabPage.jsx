@@ -7,6 +7,7 @@ export default function LabPage() {
   const [detail, setDetail] = useState(null) // containers + target health
   const [error, setError] = useState(null)
   const [busy, setBusy] = useState(false)
+  const [loaded, setLoaded] = useState(false) // false until the first answer (or error) arrives
 
   async function load() {
     try {
@@ -21,6 +22,8 @@ export default function LabPage() {
       setDetail(await api.getLab(labs[0].id))
     } catch (err) {
       setError(err.message)
+    } finally {
+      setLoaded(true)
     }
   }
 
@@ -47,6 +50,15 @@ export default function LabPage() {
   const start = () => act(() => api.startLab(lab.id))
   const stop = () => act(() => api.stopLab(lab.id))
   const reset = () => act(() => api.resetLab(lab.id))
+
+  if (!loaded) {
+    return (
+      <section>
+        <h2>Lab</h2>
+        <p>Loading…</p>
+      </section>
+    )
+  }
 
   if (error && !lab) {
     return (

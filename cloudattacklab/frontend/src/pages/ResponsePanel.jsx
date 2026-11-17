@@ -12,6 +12,7 @@ export default function ResponsePanel({ incidentId, onChange }) {
   const [audit, setAudit] = useState([])
   const [error, setError] = useState(null)
   const [busy, setBusy] = useState(false)
+  const [loaded, setLoaded] = useState(false) // false until the first answer (or error) arrives
 
   async function load() {
     try {
@@ -22,6 +23,8 @@ export default function ResponsePanel({ incidentId, onChange }) {
       setError(null)
     } catch (err) {
       setError(err.message)
+    } finally {
+      setLoaded(true)
     }
   }
 
@@ -53,7 +56,8 @@ export default function ResponsePanel({ incidentId, onChange }) {
       <h4 style={{ marginTop: 0 }}>Response</h4>
       {error && <p style={{ color: 'crimson' }}>Error: {error}</p>}
 
-      {!response && <p>No response has been requested for this incident.</p>}
+      {!loaded && <p>Loading…</p>}
+      {loaded && !response && !error && <p>No response has been requested for this incident.</p>}
 
       {response && (
         <>

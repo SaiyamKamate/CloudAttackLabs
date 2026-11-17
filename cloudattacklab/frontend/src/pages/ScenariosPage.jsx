@@ -10,6 +10,7 @@ export default function ScenariosPage({ run, setRun, openReport }) {
   const [activeRun, setActiveRun] = useState(null) // the lab's unfinished run, from the backend
   const [error, setError] = useState(null)
   const [busy, setBusy] = useState(false)
+  const [loaded, setLoaded] = useState(false) // false until the first answer (or error) arrives
   const pollRef = useRef(null)
 
   async function load() {
@@ -22,6 +23,8 @@ export default function ScenariosPage({ run, setRun, openReport }) {
       setError(null)
     } catch (err) {
       setError(err.message)
+    } finally {
+      setLoaded(true)
     }
   }
 
@@ -88,7 +91,8 @@ export default function ScenariosPage({ run, setRun, openReport }) {
     <section>
       <h2>Scenarios</h2>
       {error && <p style={{ color: 'crimson' }}>Error: {error}</p>}
-      {!lab && <p><i>The lab is not running. Start it on the Lab page before running a scenario.</i></p>}
+      {!loaded && <p>Loading…</p>}
+      {loaded && !lab && <p><i>The lab is not running. Start it on the Lab page before running a scenario.</i></p>}
 
       <table border="1" cellPadding="6" style={{ borderCollapse: 'collapse' }}>
         <thead>
@@ -103,7 +107,8 @@ export default function ScenariosPage({ run, setRun, openReport }) {
               <td><button onClick={() => runScenario(s.id)} disabled={!lab || busy || running || Boolean(otherActive)}>Run</button></td>
             </tr>
           ))}
-          {scenarios.length === 0 && <tr><td colSpan="4">No scenarios.</td></tr>}
+          {!loaded && <tr><td colSpan="4">Loading…</td></tr>}
+          {loaded && scenarios.length === 0 && <tr><td colSpan="4">No scenarios.</td></tr>}
         </tbody>
       </table>
 

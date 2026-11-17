@@ -10,6 +10,7 @@ export default function IncidentsPage({ openReport }) {
   const [incidents, setIncidents] = useState([])
   const [selected, setSelected] = useState(null) // the incident detail
   const [error, setError] = useState(null)
+  const [loaded, setLoaded] = useState(false) // false until the first answer (or error) arrives
 
   async function load() {
     try {
@@ -18,6 +19,8 @@ export default function IncidentsPage({ openReport }) {
       setError(null)
     } catch (err) {
       setError(err.message)
+    } finally {
+      setLoaded(true)
     }
   }
 
@@ -65,7 +68,8 @@ export default function IncidentsPage({ openReport }) {
               <td><button onClick={() => open(i.id)}>View</button></td>
             </tr>
           ))}
-          {incidents.length === 0 && <tr><td colSpan="5">No incidents yet.</td></tr>}
+          {!loaded && <tr><td colSpan="5">Loading…</td></tr>}
+          {loaded && incidents.length === 0 && <tr><td colSpan="5">{error ? 'Could not load incidents.' : 'No incidents yet.'}</td></tr>}
         </tbody>
       </table>
 
