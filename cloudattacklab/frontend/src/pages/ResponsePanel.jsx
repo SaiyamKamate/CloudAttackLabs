@@ -7,11 +7,12 @@ const CLOSED = ['rejected', 'failed', 'reverted']
 // The response action for one incident: request it, approve or reject it, then
 // read its status, the verification result and its audit trail. `onChange`,
 // if given, is called after each step so the page around it can refresh.
-export default function ResponsePanel({ incidentId, onChange }) {
+export default function ResponsePanel({ incidentId, onChange, closed = false }) {
   const [response, setResponse] = useState(null) // the incident's latest response, if any
   const [audit, setAudit] = useState([])
   const [error, setError] = useState(null)
   const [busy, setBusy] = useState(false)
+  const [loaded, setLoaded] = useState(false) // false until the first answer (or error) arrives
 
   async function load() {
     try {
@@ -22,6 +23,8 @@ export default function ResponsePanel({ incidentId, onChange }) {
       setError(null)
     } catch (err) {
       setError(err.message)
+    } finally {
+      setLoaded(true)
     }
   }
 
@@ -46,14 +49,16 @@ export default function ResponsePanel({ incidentId, onChange }) {
     }
   }
 
-  const canRequest = !response || CLOSED.includes(response.status)
+  // A closed incident takes no new response.
+  const canRequest = !closed && (!response || CLOSED.includes(response.status))
 
   return (
     <div style={{ border: '1px solid #ccc', padding: '0.75rem', margin: '1rem 0' }}>
       <h4 style={{ marginTop: 0 }}>Response</h4>
       {error && <p style={{ color: 'crimson' }}>Error: {error}</p>}
 
-      {!response && <p>No response has been requested for this incident.</p>}
+      {!loaded && <p>Loading…</p>}
+      {loaded && !response && !error && <p>No response has been requested for this incident.</p>}
 
       {response && (
         <>

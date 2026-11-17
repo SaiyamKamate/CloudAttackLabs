@@ -119,3 +119,43 @@ def _title(scenario: ScenarioDefinition, context: AlertContext) -> str:
     if actor:
         title += f": {'source ' if actor[0] == 'ip' else 'user '}{actor[1]}"
     return title[:200]
+
+
+# --- closing ------------------------------------------------------------------
+# A response still waiting for a decision, or being executed, keeps the incident open.
+UNDECIDED = ("pending_approval", "approved")
+
+
+def close_incident(session: Session, incident: Incident, *, actor: str) -> Incident:
+    """Mark an incident closed and audit it. The caller commits.
+
+    Refused (409) when it is already closed, or while one of its responses is
+    still pending approval or being executed: decide that response first.
+    """
+    from .. import audit
+    from ..errors import ApiError
+    from ..models import IncidentStatus
+
+    if incident.status == IncidentStatus.closed.value:
+        raise ApiError(409, "incident_closed", f"Incident {incident.id} is already closed.")
+    undecided = [r for r in incident.responses if r.status in UNDECIDED]
+    if undecided:
+        raise ApiError(
+            409,
+            "response_in_progress",
+            f"Incident {incident.id} has a response that is {undecided[0].status}; approve or reject it first.",
+        )
+    incident.status = IncidentStatus.closed.value
+    audit.record(
+        session,
+        actor=actor,
+        action="incident.closed",
+        object_type="incident",
+        object_id=str(incident.id),
+        detail={
+            "title": incident.title,
+            "risk_score": incident.risk_score,
+            "responses": {str(r.id): r.status for r in incident.responses},
+        },
+    )
+    return incident

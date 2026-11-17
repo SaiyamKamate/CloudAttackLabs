@@ -3,7 +3,7 @@ authentication_abuse against the real lab and check the events came from Loki.
 
 Opt-in. Needs Docker, port 8081 and the monitoring stack:
 
-    docker compose -f monitoring/docker-compose.monitoring.yml up -d
+    docker compose --env-file .env -f monitoring/docker-compose.monitoring.yml up -d
     pytest -m integration backend/tests/test_loki_integration.py
 """
 import sys
@@ -31,7 +31,7 @@ from app.telemetry.source import TelemetrySourceError  # noqa: E402
 pytestmark = pytest.mark.integration
 
 API = "/api/v1"
-TERMINAL = {"completed", "failed", "cleaned_up"}
+TERMINAL = {"completed", "incomplete", "failed", "cleaned_up"}
 
 
 @pytest.fixture

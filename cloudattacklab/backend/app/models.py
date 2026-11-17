@@ -27,6 +27,7 @@ class LabStatus(str, Enum):
     created = "created"
     starting = "starting"
     running = "running"
+    degraded = "degraded"   # stored as running, but Docker shows a lab container down
     stopped = "stopped"
     error = "error"
 
@@ -34,7 +35,8 @@ class LabStatus(str, Enum):
 class RunStatus(str, Enum):
     pending = "pending"
     running = "running"
-    completed = "completed"
+    completed = "completed"      # the script finished and the expected evidence is all there
+    incomplete = "incomplete"    # the script finished, but expected telemetry is missing or requests errored
     failed = "failed"
     cleaned_up = "cleaned_up"
 

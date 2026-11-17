@@ -14,6 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .. import audit
+from ..incidents.risk import refresh_risk, scenario_threshold
 from ..models import Incident, ResponseAction, ResponseStatus
 
 # Statuses that mean the action is currently applied on the target.
@@ -59,4 +60,10 @@ def mark_reverted(
                 "status_before": before,
             },
         )
+    if rows:
+        # A reverted response no longer lowers the risk score: recompute it, and its
+        # explanation now says the response was reverted and by what.
+        session.flush()
+        for incident in {row.incident_id: row.incident for row in rows}.values():
+            refresh_risk(session, incident, scenario_threshold(session, incident))
     return rows

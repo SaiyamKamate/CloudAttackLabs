@@ -7,6 +7,7 @@ export default function AlertsPage() {
   const [alerts, setAlerts] = useState([])
   const [selected, setSelected] = useState(null) // the alert detail (with events)
   const [error, setError] = useState(null)
+  const [loaded, setLoaded] = useState(false) // false until the first answer (or error) arrives
 
   async function load() {
     try {
@@ -15,6 +16,8 @@ export default function AlertsPage() {
       setError(null)
     } catch (err) {
       setError(err.message)
+    } finally {
+      setLoaded(true)
     }
   }
 
@@ -57,7 +60,8 @@ export default function AlertsPage() {
               <td><button onClick={() => open(a.id)}>View events</button></td>
             </tr>
           ))}
-          {alerts.length === 0 && <tr><td colSpan="6">No alerts yet.</td></tr>}
+          {!loaded && <tr><td colSpan="6">Loading…</td></tr>}
+          {loaded && alerts.length === 0 && <tr><td colSpan="6">{error ? 'Could not load alerts.' : 'No alerts yet.'}</td></tr>}
         </tbody>
       </table>
 

@@ -1,24 +1,30 @@
 import { useEffect, useRef, useState } from 'react'
 import { api } from '../api.js'
 
-const TERMINAL = ['completed', 'failed', 'cleaned_up']
+const TERMINAL = ['completed', 'incomplete', 'failed', 'cleaned_up']
 
 // List scenarios and run one against the running lab, then follow the run.
 export default function ScenariosPage({ run, setRun, openReport }) {
   const [scenarios, setScenarios] = useState([])
   const [lab, setLab] = useState(null)   // a running lab, if there is one
+  const [activeRun, setActiveRun] = useState(null) // the lab's unfinished run, from the backend
   const [error, setError] = useState(null)
   const [busy, setBusy] = useState(false)
+  const [loaded, setLoaded] = useState(false) // false until the first answer (or error) arrives
   const pollRef = useRef(null)
 
   async function load() {
     try {
       const [list, labs] = await Promise.all([api.listScenarios(), api.listLabs()])
+      const running = labs.find((l) => l.status === 'running') || null
       setScenarios(list)
-      setLab(labs.find((l) => l.status === 'running') || null)
+      setLab(running)
+      setActiveRun(running ? (await api.getLab(running.id)).active_run : null)
       setError(null)
     } catch (err) {
       setError(err.message)
+    } finally {
+      setLoaded(true)
     }
   }
 
@@ -39,7 +45,10 @@ export default function ScenariosPage({ run, setRun, openReport }) {
       try {
         const latest = await api.getRun(runId)
         setRun(latest)
-        if (TERMINAL.includes(latest.status)) clearInterval(pollRef.current)
+        if (TERMINAL.includes(latest.status)) {
+          clearInterval(pollRef.current)
+          load() // the lab has no active run any more
+        }
       } catch (err) {
         setError(err.message)
         clearInterval(pollRef.current)
@@ -75,12 +84,15 @@ export default function ScenariosPage({ run, setRun, openReport }) {
   }
 
   const running = run && !TERMINAL.includes(run.status)
+  // Another run (not the one shown here) is still active in the lab.
+  const otherActive = activeRun && (!run || activeRun.id !== run.id) ? activeRun : null
 
   return (
     <section>
       <h2>Scenarios</h2>
       {error && <p style={{ color: 'crimson' }}>Error: {error}</p>}
-      {!lab && <p><i>The lab is not running. Start it on the Lab page before running a scenario.</i></p>}
+      {!loaded && <p>Loading…</p>}
+      {loaded && !lab && <p><i>The lab is not running. Start it on the Lab page before running a scenario.</i></p>}
 
       <table border="1" cellPadding="6" style={{ borderCollapse: 'collapse' }}>
         <thead>
@@ -92,10 +104,11 @@ export default function ScenariosPage({ run, setRun, openReport }) {
               <td>{s.name}<br /><code>{s.id}</code></td>
               <td>{s.category}</td>
               <td>{s.target}</td>
-              <td><button onClick={() => runScenario(s.id)} disabled={!lab || busy || running}>Run</button></td>
+              <td><button onClick={() => runScenario(s.id)} disabled={!lab || busy || running || Boolean(otherActive)}>Run</button></td>
             </tr>
           ))}
-          {scenarios.length === 0 && <tr><td colSpan="4">No scenarios.</td></tr>}
+          {!loaded && <tr><td colSpan="4">Loading…</td></tr>}
+          {loaded && scenarios.length === 0 && <tr><td colSpan="4">No scenarios.</td></tr>}
         </tbody>
       </table>
 
@@ -103,11 +116,21 @@ export default function ScenariosPage({ run, setRun, openReport }) {
         <div style={{ marginTop: '1rem' }}>
           <h3>Run {run.scenario_id}</h3>
           <p>Status: <b>{run.status}</b> {running && '(updating…)'}</p>
-          {run.error && <p style={{ color: 'crimson' }}>Run error: {run.error}</p>}
+          {run.error && (
+            <p style={{ color: 'crimson' }}>
+              {run.error.startsWith('Run incomplete') ? run.error : `Run error: ${run.error}`}
+            </p>
+          )}
           {run.summary?.verification && <p>{verificationText(run.summary.verification)}</p>}
           {run.summary && <pre>{JSON.stringify(run.summary, null, 2)}</pre>}
-          <button onClick={cleanup} disabled={busy || running}>Cleanup</button>{' '}
+          <button onClick={cleanup} disabled={busy || running || Boolean(otherActive)}>Cleanup</button>{' '}
           {!running && <button onClick={() => openReport(run.id)}>View report</button>}
+          {otherActive && (
+            <p><i>
+              Cleanup is disabled while run {otherActive.scenario_id} ({otherActive.status}) is in progress:
+              cleanup resets ShopCloud and would break that run.
+            </i></p>
+          )}
         </div>
       )}
     </section>

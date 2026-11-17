@@ -5,9 +5,11 @@ run id straight away. Cleanup also runs automatically if a run fails or times ou
 """
 from __future__ import annotations
 
+import dataclasses
 import logging
 import threading
 import uuid
+from collections import Counter
 from dataclasses import dataclass
 from typing import Any, Callable, Optional
 
@@ -20,10 +22,12 @@ from ..config import Settings
 from ..detection.engine import DetectionEngine
 from ..errors import ApiError
 from ..lab_manager.adapter import LabAdapter, LabAdapterError
-from ..models import Lab, LabStatus, RunStatus, ScenarioRun
+from ..models import Event, Lab, LabStatus, RunStatus, ScenarioRun
 from ..response_manager.revert import mark_reverted
 from ..schemas.scenario import ScenarioDefinition
 from ..lab_manager.target import TargetClient, TargetError
+from ..lab_manager.target_guard import TargetGuard
+from ..lab_manager.service import refuse_while_run_active
 from ..config import FALCO_SERVICE
 from ..lab_manager.container import TargetRefused
 from ..telemetry.container import DockerEventSource, make_docker_event_normalizer, make_falco_normalizer
@@ -38,7 +42,12 @@ from .verification import run_verification
 
 log = logging.getLogger("cloudattacklab.scenarios")
 
-TERMINAL = (RunStatus.completed.value, RunStatus.failed.value, RunStatus.cleaned_up.value)
+TERMINAL = (
+    RunStatus.completed.value,
+    RunStatus.incomplete.value,
+    RunStatus.failed.value,
+    RunStatus.cleaned_up.value,
+)
 ACTIVE_RUN = (RunStatus.pending.value, RunStatus.running.value)
 
 # One active run per lab, across the single backend process.
@@ -79,6 +88,8 @@ class ScenarioService:
         self.adapter = adapter
         self.detection = detection
         self.actor = actor
+        # Checks, before every run, that the target URL points into the lab.
+        self.guard = TargetGuard(settings.lab_targets, settings.lab_compose_file, adapter)
         # Background threads open their own session on the same database.
         self._bind: Engine = session.get_bind()
 
@@ -117,6 +128,10 @@ class ScenarioService:
                 )
             if lab.target not in self.target_clients:
                 raise ApiError(409, "unknown_target", f"'{lab.target}' is not a configured lab target.")
+            # Nothing is sent unless the configured URL is inside the lab (SHOPCLOUD_URL).
+            url_check = self.guard.check(lab.target)
+            if not url_check.allowed:
+                raise ApiError(409, "target_url_refused", url_check.error)
         if lab.status != LabStatus.running.value:
             raise ApiError(409, "lab_not_running", f"Lab '{lab.name}' is {lab.status}; start it before a run.")
 
@@ -174,6 +189,12 @@ class ScenarioService:
         run = self.get_run(run_id)
         if run.status in ACTIVE_RUN:
             raise ApiError(409, "run_in_progress", f"Run {run_id} is {run.status}; wait for it to finish.")
+        # Cleanup resets the shared target (or recreates the test container): never
+        # while another run in the same lab is still using it.
+        refuse_while_run_active(
+            self.session, run.lab_id, f"Cleanup of run {run_id}",
+            "cleanup resets the lab's target and would break that run",
+        )
         scenario = self.engine.get(run.scenario_id)
         target = self.target_clients.get(scenario.target)
         if target is None and scenario.target not in self.settings.container_targets:
@@ -280,15 +301,23 @@ class ScenarioService:
 
                 run.finished_at = _utcnow()
                 if result.outcome == "completed":
-                    run.status = RunStatus.completed.value
+                    # The script finished, but the run is only `completed` when its
+                    # evidence is whole: otherwise `incomplete`, with the reasons.
+                    shortfalls = run_shortfalls(session, run, scenario, result.summary)
+                    outcome = RunStatus.incomplete.value if shortfalls else RunStatus.completed.value
+                    run.status = outcome
                     run.summary = summary
+                    run.error = ("Run incomplete: " + "; ".join(shortfalls) + ".") if shortfalls else None
+                    detail = {"scenario_id": scenario.id, "outcome": outcome, "summary": summary}
+                    if shortfalls:
+                        detail["error"] = run.error
                     audit.record(
                         session,
                         actor=self.actor,
                         action="run.finish",
                         object_type="scenario_run",
                         object_id=str(run.id),
-                        detail={"scenario_id": scenario.id, "outcome": "completed", "summary": summary},
+                        detail=detail,
                     )
                     session.commit()
                 else:
@@ -376,6 +405,9 @@ class ScenarioService:
                 for feed in feeds:
                     self._ingest_once(feed, ctx)
                 stop.wait(self.settings.telemetry_collect_interval_seconds)
+            # The script has finished: from now on only events up to this moment
+            # (plus the grace) belong to the run, however long the settling takes.
+            ctx = dataclasses.replace(ctx, until=_utcnow())
             for feed in feeds:
                 if not feed.settle:
                     self._ingest_once(feed, ctx)  # final pass after the run stops
@@ -554,6 +586,34 @@ class ScenarioService:
     def _release(self, lab_id: uuid.UUID) -> None:
         with _active_lock:
             _active_labs.discard(lab_id)
+
+
+def run_shortfalls(
+    session: Session, run: ScenarioRun, scenario: ScenarioDefinition, summary: Optional[dict[str, Any]]
+) -> list[str]:
+    """Why a run whose script finished still cannot count as `completed`. Empty if it can.
+
+    - an expected_telemetry item of the scenario was not met (fewer events of that
+      source and type were collected for the run than its min_count);
+    - the script reported request errors (requests that got no answer at all).
+    """
+    reasons: list[str] = []
+    counts = Counter(
+        (source, event_type)
+        for source, event_type in session.execute(
+            select(Event.source, Event.event_type).where(Event.run_id == run.id)
+        )
+    )
+    for item in scenario.expected_telemetry:
+        got = counts.get((item.source, item.event_type), 0)
+        if got < item.min_count:
+            reasons.append(
+                f"expected at least {item.min_count} {item.source} {item.event_type} event(s), collected {got}"
+            )
+    errors = (summary or {}).get("errors")
+    if isinstance(errors, int) and not isinstance(errors, bool) and errors > 0:
+        reasons.append(f"the script reported {errors} request error(s) (requests the target never answered)")
+    return reasons
 
 
 def _utcnow():

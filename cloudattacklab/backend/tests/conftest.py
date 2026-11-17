@@ -44,6 +44,7 @@ class FakeAdapter(LabAdapter):
         if self.generation == 0:
             self.generation = 1
         self.running = True
+        self.down = {}
 
     def stop(self) -> None:
         self._call("stop")
@@ -53,12 +54,16 @@ class FakeAdapter(LabAdapter):
         self._call("reset")
         self.generation += 1
         self.running = True
+        self.down = {}
+
+    # The lab's services, as in lab/docker-compose.lab.yml (Falco is optional).
+    services = ("shopcloud", "test_container")
 
     def status(self) -> list[ContainerStatus]:
         self._call("status")
         if self.generation == 0:
             return []
-        return [
+        rows = [
             ContainerStatus(
                 service="shopcloud",
                 name="cloudattacklab-lab-shopcloud-1",
@@ -66,6 +71,22 @@ class FakeAdapter(LabAdapter):
                 state="running" if self.running else "exited",
                 health="healthy" if self.running else None,
             )
+        ]
+        if "test_container" in self.services:
+            rows.append(
+                ContainerStatus(
+                    service="test_container",
+                    name="cloudattacklab-lab-test_container-1",
+                    container_id=f"faketc{self.generation}",
+                    state="running" if self.running else "exited",
+                    health=None,
+                )
+            )
+        # Containers a test took down by hand: service -> state.
+        down = getattr(self, "down", {})
+        return [
+            ContainerStatus(r.service, r.name, r.container_id, down[r.service], None) if r.service in down else r
+            for r in rows
         ]
 
     def logs(self, service, since=None) -> str:

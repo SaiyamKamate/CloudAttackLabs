@@ -71,6 +71,7 @@ export const api = {
   // the action and its parameters come from the scenario, on the backend.
   listIncidents: (params = {}) => request('/incidents' + query(params)),
   getIncident: (incidentId) => request(`/incidents/${incidentId}`),
+  closeIncident: (incidentId) => request(`/incidents/${incidentId}/close`, { method: 'POST' }),
   requestResponse: (incidentId) => request(`/incidents/${incidentId}/responses`, { method: 'POST' }),
   approveResponse: (responseId) => request(`/responses/${responseId}/approve`, { method: 'POST' }),
   rejectResponse: (responseId) => request(`/responses/${responseId}/reject`, { method: 'POST' }),

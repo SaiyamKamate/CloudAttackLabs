@@ -4,12 +4,17 @@ Run locally (from backend/):  uvicorn app.main:app --port 8000
 """
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
+
 from fastapi import APIRouter, Depends, FastAPI
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
+from .config import get_settings
 from .db import get_session
+from .lab_manager.router import get_adapter
+from .startup import run_startup_checks
 from .errors import ApiError, register_error_handlers
 from .incidents.router import router as incidents_router
 from .lab_manager.router import router as labs_router
@@ -32,8 +37,17 @@ def health(session: Session = Depends(get_session)) -> dict[str, str]:
     return {"status": "ok", "database": "ok"}
 
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Settings and the adapter come through the app's dependency overrides, if any (tests).
+    settings = app.dependency_overrides.get(get_settings, get_settings)()
+    adapter = app.dependency_overrides.get(get_adapter, get_adapter)()
+    run_startup_checks(settings, adapter)
+    yield
+
+
 def create_app() -> FastAPI:
-    app = FastAPI(title="CloudAttackLab", version="0.3.0")
+    app = FastAPI(title="CloudAttackLab", version="0.3.0", lifespan=lifespan)
     register_error_handlers(app)
     app.include_router(health_router, prefix=API_PREFIX)
     app.include_router(labs_router, prefix=API_PREFIX)

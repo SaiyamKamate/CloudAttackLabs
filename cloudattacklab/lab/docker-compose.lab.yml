@@ -1,5 +1,6 @@
 # The isolated lab. The Lab Manager will start, stop and reset this file.
-# By hand:  docker compose -f lab/docker-compose.lab.yml up --build -d
+# By hand, from the project root, with the root .env (so ShopCloud gets your LAB_CONTROL_TOKEN):
+#   docker compose --env-file .env -f lab/docker-compose.lab.yml up --build -d
 #
 # The target is the real ShopCloud (../shopcloud). The fake one in
 # ../mock_shopcloud follows the same interface (docs/shopcloud-interface.md);

@@ -47,6 +47,14 @@ class TargetHealthOut(BaseModel):
     error: Optional[str]
 
 
+class TargetUrlOut(BaseModel):
+    """The configured URL of the lab's target and whether it points into the lab."""
+
+    url: str
+    allowed: bool
+    error: Optional[str]     # why it is refused; runs are refused until it is fixed
+
+
 class TelemetryStatusOut(BaseModel):
     """Which telemetry source the backend uses (TELEMETRY_SOURCE) and, for Loki,
     whether it can be read right now."""
@@ -66,8 +74,24 @@ class FalcoStatusOut(BaseModel):
     healthy: bool           # enabled, running and its health check passes
 
 
+class ActiveRunOut(BaseModel):
+    """The lab's run that has not finished. While it exists, lab reset and cleanup
+    of other runs are refused (409 run_in_progress)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    scenario_id: str
+    status: str
+
+
 class LabDetail(LabOut):
+    # Set when the status was compared with the real containers and something is
+    # down (or was corrected), e.g. "Lab degraded: test_container is exited. ..."
+    status_detail: Optional[str]
+    active_run: Optional[ActiveRunOut]
     containers: list[ContainerOut]
     target_health: TargetHealthOut
+    target_url: TargetUrlOut
     telemetry: TelemetryStatusOut
     falco: FalcoStatusOut

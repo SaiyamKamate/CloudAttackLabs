@@ -16,12 +16,36 @@ from sqlalchemy.orm import Session
 
 from .. import audit
 from ..errors import ApiError
-from ..models import Lab, LabStatus
+from ..models import Incident, Lab, LabStatus, ResponseAction, ResponseStatus, RunStatus, ScenarioRun
 from ..response_manager.revert import mark_reverted
 from .adapter import ContainerStatus, LabAdapter, LabAdapterError
 from .target import TargetClient, TargetError, TargetHealth
+from .target_guard import TargetGuard, TargetUrlCheck
 
-ACTIVE = (LabStatus.starting.value, LabStatus.running.value)
+ACTIVE = (LabStatus.starting.value, LabStatus.running.value, LabStatus.degraded.value)
+# A scenario run that has not finished yet.
+ACTIVE_RUN = (RunStatus.pending.value, RunStatus.running.value)
+
+
+def active_run_in_lab(session: Session, lab_id: uuid.UUID) -> Optional[ScenarioRun]:
+    """The lab's run that has not finished yet, if any (there is at most one)."""
+    return session.scalars(
+        select(ScenarioRun)
+        .where(ScenarioRun.lab_id == lab_id, ScenarioRun.status.in_(ACTIVE_RUN))
+        .order_by(ScenarioRun.started_at)
+    ).first()
+
+
+def refuse_while_run_active(session: Session, lab_id: uuid.UUID, what: str, why: str) -> None:
+    """409 run_in_progress if a run is active in the lab. `what` is the refused operation."""
+    run = active_run_in_lab(session, lab_id)
+    if run is not None:
+        raise ApiError(
+            409,
+            "run_in_progress",
+            f"Run {run.id} ({run.scenario_id}) is {run.status} in this lab. {what} is refused until it "
+            f"finishes, because {why}.",
+        )
 
 # One start/stop/reset at a time (single backend process).
 _operation_lock = threading.Lock()
@@ -44,11 +68,20 @@ class LabManager:
         adapter: LabAdapter,
         target_clients: dict[str, TargetClient],
         *,
+        guard: Optional[TargetGuard] = None,
+        expected_services: tuple[str, ...] = (),
+        container_services: tuple[str, ...] = (),
         actor: str = audit.ANONYMOUS_ACTOR,
     ) -> None:
         self.session = session
         self.adapter = adapter
         self.target_clients = target_clients  # the configured lab targets
+        self.guard = guard  # checks that the target URL points into the lab
+        # The lab services that must be running for the lab to count as running
+        # (the target, the test container, and Falco when it is enabled).
+        self.expected_services = expected_services
+        self.container_services = container_services  # the test container(s)
+        self.status_detail: Optional[str] = None  # set by details()
         self.actor = actor
 
     # --- create / read ----------------------------------------------------
@@ -80,16 +113,87 @@ class LabManager:
         other = self._other_active_lab(lab)
         if other is not None:
             # The physical lab currently belongs to another lab row; do not report its containers as ours.
+            self.status_detail = None
             return lab, [], TargetHealth(reachable=False, healthy=False, error=f"lab '{other.name}' is using the lab")
         try:
             containers = self.adapter.status()
         except LabAdapterError as exc:
             raise ApiError(502, "lab_runtime_error", str(exc)) from exc
+        self.status_detail = self.reconcile(lab, containers)
         return lab, containers, self._client(lab).health()
+
+    # --- stored status vs. the real containers -------------------------------
+    def reconcile(self, lab: Lab, containers: list[ContainerStatus]) -> Optional[str]:
+        """Compare a running (or degraded) lab's stored status with its real containers
+        and correct it. Returns a sentence saying what is down, or None if all is well.
+
+        - every expected container is down -> `stopped`
+        - some are down                     -> `degraded`, naming them
+        - all are up again                  -> `running`
+        A test container stopped by an applied stop_container response is expected
+        to be down (cleanup recreates it), so it does not make the lab degraded.
+        """
+        if lab.status not in (LabStatus.running.value, LabStatus.degraded.value) or not self.expected_services:
+            return None
+        by_service = {c.service: c for c in containers}
+        stopped_on_purpose = self._stopped_by_response(lab)
+        down: list[str] = []
+        notes: list[str] = []
+        for service in self.expected_services:
+            container = by_service.get(service)
+            state = container.state if container else "missing"
+            if container is not None and container.state == "running" and container.health != "unhealthy":
+                continue
+            if service in stopped_on_purpose and container is not None:
+                notes.append(f"{service} is {state}: stopped by an approved stop_container response; cleanup recreates it")
+                continue
+            down.append(f"{service} is {state}" + (" (unhealthy)" if container and container.health == "unhealthy" else ""))
+
+        if down and len(down) == len(self.expected_services):
+            new, detail = LabStatus.stopped, "Every lab container is down (" + ", ".join(down) + "). Start the lab again."
+        elif down:
+            new, detail = LabStatus.degraded, (
+                "Lab degraded: " + ", ".join(down) + ". Runs are refused; Reset (or Start) the lab to bring it back."
+            )
+        else:
+            new, detail = LabStatus.running, ("; ".join(notes) + ".") if notes else None
+
+        if lab.status != new.value:
+            previous = lab.status
+            lab.status = new.value
+            audit.record(
+                self.session,
+                actor=self.actor,
+                action="lab.status_corrected",
+                object_type="lab",
+                object_id=str(lab.id),
+                detail={
+                    "lab_name": lab.name,
+                    "status_before": previous,
+                    "status_after": new.value,
+                    "reason": detail or "every lab container is running again",
+                },
+            )
+            self.session.commit()
+        return detail
+
+    def _stopped_by_response(self, lab: Lab) -> set[str]:
+        """Container services that an applied stop_container response stopped."""
+        applied = self.session.scalars(
+            select(ResponseAction.id)
+            .join(Incident, ResponseAction.incident_id == Incident.id)
+            .where(
+                Incident.lab_id == lab.id,
+                ResponseAction.action == "stop_container",
+                ResponseAction.status.in_((ResponseStatus.executed.value, ResponseStatus.verified.value)),
+            )
+        ).first()
+        return set(self.container_services) if applied is not None else set()
 
     # --- start / stop / reset ---------------------------------------------
     def start(self, lab_id: uuid.UUID) -> Lab:
         lab = self.get(lab_id)
+        self._require_target_url(lab)
         with _exclusive():
             other = self._other_active_lab(lab)
             if other is not None:
@@ -123,8 +227,13 @@ class LabManager:
     def reset(self, lab_id: uuid.UUID) -> Lab:
         lab = self.get(lab_id)
         with _exclusive():
-            if lab.status != LabStatus.running.value:
+            # A degraded lab may be reset: that is how it is brought back.
+            if lab.status not in (LabStatus.running.value, LabStatus.degraded.value):
                 raise ApiError(409, "lab_not_running", f"Lab '{lab.name}' is {lab.status}; start it before a reset.")
+            self._require_target_url(lab)
+            refuse_while_run_active(
+                self.session, lab.id, "Lab reset", "a reset recreates ShopCloud and would break that run"
+            )
             previous = lab.status
             client = self._client(lab)
             try:
@@ -140,6 +249,17 @@ class LabManager:
             mark_reverted(self.session, lab_id=lab.id, trigger="lab.reset", actor=self.actor)
             self._finish(lab, "lab.reset", LabStatus.running, previous)
         return lab
+
+    # --- the target URL ---------------------------------------------------
+    def target_url_check(self, lab: Lab) -> TargetUrlCheck:
+        if self.guard is None:
+            return TargetUrlCheck(lab.target, "", True)
+        return self.guard.check(lab.target)
+
+    def _require_target_url(self, lab: Lab) -> None:
+        check = self.target_url_check(lab)
+        if not check.allowed:
+            raise ApiError(409, "target_url_refused", check.error)
 
     # --- internals --------------------------------------------------------
     def _client(self, lab: Lab) -> TargetClient:

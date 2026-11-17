@@ -49,7 +49,7 @@ from app.telemetry.normalize import RunContext  # noqa: E402
 from conftest import FakeAdapter, FakeTarget  # noqa: E402
 
 API = "/api/v1"
-TERMINAL = {"completed", "failed", "cleaned_up"}
+TERMINAL = {"completed", "incomplete", "failed", "cleaned_up"}
 FIXTURES = Path(__file__).parent / "fixtures"
 LAB_PROJECT = "cloudattacklab-lab"
 ROLE = {"cloudattacklab.role": "test-target"}
@@ -63,6 +63,7 @@ def compose_labels(project, service, **extra):
 class FakeContainerLab(FakeAdapter):
     """The fake lab plus a test container, a ShopCloud container and a platform container."""
 
+    services = ("shopcloud",)  # the test container (and Falco) come from self.containers
     project = LAB_PROJECT
 
     def __init__(self, *, falco=False):

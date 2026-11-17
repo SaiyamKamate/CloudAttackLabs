@@ -7,6 +7,7 @@ with the fake lab (the fixtures from test_runs_api).
 import json
 import re
 import sys
+import time
 import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -354,10 +355,11 @@ def run_client(file_engine, adapter_r, monkeypatch):
 
 
 def recent_records(records):
-    """Give the records times just before now, so they fall inside the run that starts next."""
-    base = now() - timedelta(seconds=1)
+    """Stamp the records from now on, 1 ms apart. Called while the fake script "runs",
+    so they fall inside the run (from its start until its script finished)."""
+    base = now()
     for i, record in enumerate(records):
-        record["timestamp"] = (base + timedelta(milliseconds=10 * i)).isoformat().replace("+00:00", "Z")
+        record["timestamp"] = (base + timedelta(milliseconds=i)).isoformat().replace("+00:00", "Z")
     return "\n".join(json.dumps(record) for record in records)
 
 
@@ -370,8 +372,13 @@ def run_scenario(client, adapter, monkeypatch, lab, scenario_id):
     else:
         summary = good_summary()
         records = [log_record("access_denied", 403, username="lab_restricted") for _ in range(8)]
-    runs.patch_script(monkeypatch, RunResult("completed", summary, None))
-    adapter.log_text = recent_records(records)
+    def fake_execute(script_path, base_url, parameters, timeout_seconds):
+        # Like the real script: ShopCloud logs each request while the script runs.
+        adapter.log_text = recent_records(records)
+        time.sleep(0.05)
+        return RunResult("completed", summary, None)
+
+    monkeypatch.setattr(runs.service_module.runner, "execute_script", fake_execute)
     response = runs.start_run(client, lab["id"], scenario_id)
     assert response.status_code == 201, response.text
     run = runs.wait_terminal(client, response.json()["id"])

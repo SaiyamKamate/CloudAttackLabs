@@ -10,6 +10,7 @@ export default function IncidentsPage({ openReport }) {
   const [incidents, setIncidents] = useState([])
   const [selected, setSelected] = useState(null) // the incident detail
   const [error, setError] = useState(null)
+  const [loaded, setLoaded] = useState(false) // false until the first answer (or error) arrives
 
   async function load() {
     try {
@@ -18,6 +19,8 @@ export default function IncidentsPage({ openReport }) {
       setError(null)
     } catch (err) {
       setError(err.message)
+    } finally {
+      setLoaded(true)
     }
   }
 
@@ -34,6 +37,16 @@ export default function IncidentsPage({ openReport }) {
     } catch (err) {
       setError(err.message)
     }
+  }
+
+  async function closeSelected() {
+    setError(null)
+    try {
+      await api.closeIncident(selected.id)
+    } catch (err) {
+      setError(err.message)
+    }
+    await refreshSelected()
   }
 
   // After a response step the risk score and the timeline have changed.
@@ -65,7 +78,8 @@ export default function IncidentsPage({ openReport }) {
               <td><button onClick={() => open(i.id)}>View</button></td>
             </tr>
           ))}
-          {incidents.length === 0 && <tr><td colSpan="5">No incidents yet.</td></tr>}
+          {!loaded && <tr><td colSpan="5">Loading…</td></tr>}
+          {loaded && incidents.length === 0 && <tr><td colSpan="5">{error ? 'Could not load incidents.' : 'No incidents yet.'}</td></tr>}
         </tbody>
       </table>
 
@@ -74,7 +88,8 @@ export default function IncidentsPage({ openReport }) {
           <h3>{selected.title}</h3>
           <p>
             Status: <b>{selected.status}</b>. Correlation key: <code>{selected.correlation_key ?? '—'}</code>{' '}
-            {selected.run_id && <button onClick={() => openReport(selected.run_id)}>View report</button>}
+            {selected.run_id && <button onClick={() => openReport(selected.run_id)}>View report</button>}{' '}
+            {selected.status === 'open' && <button onClick={closeSelected}>Close incident</button>}
           </p>
 
           <h4>Risk score: {score(selected.risk_score)}</h4>
@@ -82,7 +97,12 @@ export default function IncidentsPage({ openReport }) {
             ? <p style={{ whiteSpace: 'pre-line' }}>{selected.risk_explanation}</p>
             : <p><i>This incident was created before risk scoring existed, so it has no score.</i></p>}
 
-          <ResponsePanel key={selected.id} incidentId={selected.id} onChange={refreshSelected} />
+          <ResponsePanel
+            key={`${selected.id}-${selected.status}`}
+            incidentId={selected.id}
+            onChange={refreshSelected}
+            closed={selected.status === 'closed'}
+          />
 
           <h4>Linked alerts ({selected.alerts.length})</h4>
           <table border="1" cellPadding="6" style={TABLE}>

@@ -2,7 +2,9 @@
 
 A local-first security experimentation platform: start an isolated Docker lab, run a controlled attack scenario against ShopCloud, collect real logs, detect, investigate and verify a response.
 
-**Status:** Backend, lab control, the Scenario Engine, telemetry ingestion with the first detection, a basic dashboard, and one response action with approval and verification are implemented (steps 3–7 in `docs/api-contract.md`), plus, in step 8, the second application scenario, `unauthorized_resource_access`, in step 9 incident correlation, the incident timeline, a risk score and a run report, in step 10 reading ShopCloud's logs from Loki (`TELEMETRY_SOURCE=loki`), and in step 11 the container scenario `suspicious_container_activity` with Docker events, optional Falco (`FALCO_ENABLED=true`) and the `stop_container` response, and in step 12 the real ShopCloud (`shopcloud/`) as the lab target in place of the fake one. Not started: login/auth, the `isolate_container` action, Kubernetes and cloud adapters, Prometheus, PDF export and sharing of reports.
+**Status:** Backend, lab control, the Scenario Engine, telemetry ingestion with the first detection, a basic dashboard, and one response action with approval and verification are implemented (steps 3–7 in `docs/api-contract.md`), plus, in step 8, the second application scenario, `unauthorized_resource_access`, in step 9 incident correlation, the incident timeline, a risk score and a run report, in step 10 reading ShopCloud's logs from Loki (`TELEMETRY_SOURCE=loki`), and in step 11 the container scenario `suspicious_container_activity` with Docker events, optional Falco (`FALCO_ENABLED=true`) and the `stop_container` response, and in step 12 the real ShopCloud (`shopcloud/`) as the lab target in place of the fake one. Not started: login/auth, the `isolate_container` action, Kubernetes and cloud adapters, Prometheus, PDF export and sharing of reports. The fixes for the November 2026 audit (`docs/audit-2026-11.md`) are in.
+
+**Known limitations** (events matched to a run by time, every source IP is the Docker gateway, no login, local-only default credentials, Falco's requirements, Docker Compose only): see [`docs/known-limitations.md`](docs/known-limitations.md).
 
 What works now:
 
@@ -12,10 +14,15 @@ What works now:
 - Scenario Engine (`backend/app/scenario_engine`) and every "Scenarios and runs" endpoint: list/get scenarios, start a run, get a run, run cleanup.
   - Scenarios are loaded from `/scenarios` with the validating loader; an invalid file is skipped and logged, never run. The allowed targets come from the lab configuration, never the request.
   - Before a run, pre-flight checks the scenario's prerequisites (ShopCloud health, and that the named test account can log in). A run is refused with 409 if the lab is not running, the target is not the lab's target, or a check fails.
-  - The run executes the scenario's script from `scenarios/scripts/` as a separate process, bounded by `timeout_seconds`, with the target URL taken from the lab configuration (so a script can never be pointed outside the lab). Runs happen in the background; the API returns the run id at once. One active run per lab.
+  - The run executes the scenario's script from `scenarios/scripts/` as a separate process, bounded by `timeout_seconds`, with the target URL taken from the lab configuration. That URL (`SHOPCLOUD_URL`) is checked at startup and before every run, lab start and reset: only a loopback address on the port `lab/docker-compose.lab.yml` publishes (`http://127.0.0.1:8081`), or a container of the `cloudattacklab-lab` Compose project, is accepted. Anything else is refused with 409 `target_url_refused`, the backend logs an error at startup, the Lab page shows the problem, and no request (and no lab token) is sent to it. Runs happen in the background; the API returns the run id at once. One active run per lab.
   - Cleanup runs the scenario's named steps through ShopCloud's `/lab` endpoints, and also runs automatically if a run fails or times out.
   - A script that exits with a non-zero code fails the run; if it printed a JSON summary, the summary is kept on the failed run.
   - A scenario with no response action can name a post-run check in `execution.parameters` (`verification_check`). After the run the engine repeats that check once against the lab's ShopCloud and stores the result under `verification` in the run's `summary`.
+  - Run statuses. `pending` and `running` while it is active. When it ends:
+    - `completed`: the script finished, every `expected_telemetry` item of the scenario was collected for the run (for example at least 10 `application` `authentication_failure` events for `authentication_abuse`), and the script reported no request errors.
+    - `incomplete`: the script finished, but the evidence is not whole: an `expected_telemetry` item was not met, or the script's summary has `errors` > 0 (requests the target never answered). The run's `error` says why, for example "Run incomplete: expected at least 10 application authentication_failure event(s), collected 0", and the dashboard and the run report show it. Alerts that the collected events did raise are kept. Cleanup is not run automatically (run it from the dashboard).
+    - `failed`: the script failed, timed out or reported a failure (for example access that should have been refused was granted), or a telemetry source failed. Cleanup runs automatically.
+    - `cleaned_up`: cleanup was run for the run afterwards; its earlier `error` is kept.
 - The first scenario, `authentication_abuse`: sends 20 wrong-password logins for `lab_user` and reports how many got 401/429. Its script uses a deliberately wrong password and never a real one.
 - The second scenario, `unauthorized_resource_access` (guide section 5.3): logs in as `lab_restricted`, then requests `GET /api/orders` 8 times with that token. Every request must be refused with 403. The summary reports attempts sent, how many got 403 and how many got anything else. If any request returns 200 the summary says `"access_control_failed": true` and the run ends as `failed`. Its verification, `access_remains_denied`, makes one more request as `lab_restricted` after the run and records whether it was still denied. It has no response action; cleanup is `reset_target_state`.
 - The container scenario, `suspicious_container_activity` (guide section 5.2): runs one harmless, fixed command (`sh -c "id; : cloudattacklab-scenario-marker"`) inside the lab's test container, the way an intruder would start a shell in a running container. See "Container scenario and Falco" below.
@@ -25,11 +32,11 @@ What works now:
   - Detection rules are small validated YAML files in `/rules`. `repeated_failed_logins` fires when one source IP produces `threshold` failed logins within `window_seconds` (taken from the scenario's `detection`: 10 in 60s). One alert per run and source IP, with every contributing event linked through `alert_events`.
   - A rule's `group_by` is one field or a list of fields, and an optional `match` keeps only events with the listed values. Fields are `source_ip`, `username`, `resource`, or `raw.<name>` for a field of the original log record.
   - `repeated_access_denied` fires when one username gets `threshold` `authorization_denied` events on the same path within `window_seconds` (5 in 60s for the scenario). It counts only 403 denials for a logged-in user (`match: raw.status: 403`); a 401 with no token does not count. One alert per run, username and path.
-- Incidents (`backend/app/incidents`): `GET /incidents` lists them with status and risk score; `GET /incidents/{id}` returns one with its alerts, responses, risk score and timeline.
+- Incidents (`backend/app/incidents`): `GET /incidents` lists them with status and risk score; `GET /incidents/{id}` returns one with its alerts, responses, risk score and timeline. `POST /incidents/{id}/close` closes an incident (the Incidents page has a "Close incident" button); it is refused with 409 if the incident is already closed or one of its responses is still pending approval, and a closed incident takes no new response. Closing is audited (`incident.closed`) and shown at the end of the timeline.
   - Correlation. Only alerts of the same run can share an incident, so two scenarios run one after the other always give two incidents. Inside a run, two alerts are related when the events behind them share a resource and share either a source IP or a username. A new alert joins the oldest incident of its run that holds a related alert; otherwise it opens a new incident. Incidents are never merged or split afterwards. The rules are written at the top of `backend/app/incidents/service.py`. The incident's `correlation_key` records what opened it, for example `run:<run_id>|resource:shopcloud|ip:172.21.0.1`.
   - Evidence chain: incident -> alerts -> `alert_events` -> events -> each event's `raw_event_reference`.
   - Timeline. One time-ordered list mixing: scenario started, the events behind the alerts, each alert firing, scenario finished, every response step (requested, approved or rejected, executed, verified or failed, reverted) and cleanup. Each entry has `time`, `type`, `description` and `evidence` (an API path to the run, event, alert, response or audit rows, and for an event its `raw_event_reference`). It is built on request from the run, the events, the alerts and the audit log; nothing extra is stored.
-  - Risk score (`backend/app/incidents/risk.py`). A 0-100 heuristic stored on the incident with a plain-language explanation. It is the sum of: base points for the highest alert severity (info 10, low 25, medium 40, high 60, critical 80); 2 points per event over the detection threshold, at most 20; 5 points per additional correlated alert, at most 15; minus 20 when a response action was verified as working. The result is limited to 0-100. It is recomputed when an alert joins the incident and when a response is verified. No machine learning. It does not predict financial loss and is not a universal measure of risk; the explanation shown to the user says so.
+  - Risk score (`backend/app/incidents/risk.py`). A 0-100 heuristic stored on the incident with a plain-language explanation. It is the sum of: base points for the highest alert severity (info 10, low 25, medium 40, high 60, critical 80); 2 points per event over the detection threshold, at most 20; 5 points per additional correlated alert, at most 15; minus 20 while a response action that was verified as working is still applied. Once cleanup or a lab reset reverts that response, the 20 points no longer apply and the explanation says so ("... was verified as working, but it was reverted by cleanup:manual, so it no longer lowers the score"). The result is limited to 0-100. It is recomputed when an alert joins the incident, when a response is verified and when a response is reverted. No machine learning. It does not predict financial loss and is not a universal measure of risk; the explanation shown to the user says so.
 - Run report (`backend/app/reports`): `GET /runs/{run_id}/report` returns JSON with the lab, the scenario and the version that was run, parameters, start and finish times, the script's summary, expected telemetry next to what was collected, the alerts with their detection latency, the incidents with risk score, the responses with their verification result, the post-run verification and the cleanup status. Detection latency is the time from the event that crossed the threshold (the `threshold`-th event linked to the alert) to the alert being created; detection runs when the script ends, so it includes the rest of the run. JSON only: no PDF export and no sharing.
 - Response Manager (`backend/app/response_manager`) and every "Response actions" endpoint, plus `GET /audit`.
   - `POST /incidents/{id}/responses` creates a `response_actions` row with status `pending_approval`. The action and its parameters are read from the scenario's `response` section; the endpoints take no request body, so a caller cannot choose the action, its values or the target. One open response per incident.
@@ -44,11 +51,15 @@ What works now:
 Run the whole platform (PostgreSQL, backend, dashboard):
 
 ```bash
-cp .env.example .env                 # then change the values
+[ -f .env ] || cp .env.example .env  # creates .env only if you have none; then change the values
 docker compose up -d --build         # then open the dashboard at http://127.0.0.1:5173
 ```
 
-The backend API is on `127.0.0.1:8000`; the dashboard proxies `/api` to it. From the dashboard: create and Start the lab, Run `authentication_abuse`, watch it reach `completed`, then open Alerts to see the `repeated_failed_logins` alert and its 20 linked events. On that alert, click "Request response", then Approve: the status becomes `verified` with "2 of 7 follow-up logins were blocked with 429". Back on Scenarios, Cleanup turns the rate limit off and the response shows `reverted`. Then Run `unauthorized_resource_access`: it reaches `completed` with 8 of 8 requests refused and "Verification passed: access is still denied", and Alerts shows a second alert, `repeated_access_denied`, with its 8 linked events. Incidents now shows two incidents, one per run: the first with risk score 40 (60 before its response was verified) and the second with 46. Open one for its timeline, and use "View report" for the run report.
+If you already have a `.env`, keep it and copy over only the settings you need from `.env.example` (for the monitoring stack: `GF_SECURITY_ADMIN_PASSWORD`).
+
+The backend API is on `127.0.0.1:8000`; the dashboard proxies `/api` to it. From the dashboard: create and Start the lab, Run `authentication_abuse`, watch it reach `completed`, then open Alerts to see the `repeated_failed_logins` alert and its 20 linked events. On that alert, click "Request response", then Approve: the status becomes `verified` with "2 of 7 follow-up logins were blocked with 429". Back on Scenarios, Cleanup turns the rate limit off and the response shows `reverted`. Then Run `unauthorized_resource_access`: it reaches `completed` with 8 of 8 requests refused and "Verification passed: access is still denied", and Alerts shows a second alert, `repeated_access_denied`, with its 8 linked events. Incidents now shows two incidents, one per run: the first with risk score 60 (it was 40 while its verified response was applied; the explanation says the response was reverted by cleanup) and the second with 46. Open one for its timeline, and use "View report" for the run report.
+
+**Default credentials are for a local lab only.** The defaults in `.env.example`, `docker-compose.yml` and the backend (`LAB_CONTROL_TOKEN=lab-dev-token` or `change-me-lab-token`, `POSTGRES_PASSWORD=change-me-locally`, ShopCloud's test accounts `lab_user` / `lab_restricted`) are published in this repository. They are acceptable only because every port is bound to `127.0.0.1`. While the default lab token or database password is in use, the backend logs a warning at startup (`docker compose logs backend`, "Default credential in use: ..."). Grafana has no default: it needs `GF_SECURITY_ADMIN_PASSWORD` in `.env`. Set your own values in `.env`; change `POSTGRES_PASSWORD` before the database volume is first created (or remove the volume with `docker compose down -v`).
 
 Both the backend and the dashboard containers use host networking and the backend mounts the Docker socket, so this needs a Linux Docker Engine (native, or inside WSL 2). On Docker Desktop, enable host networking.
 
@@ -57,7 +68,7 @@ Both the backend and the dashboard containers use host networking and the backen
 The backend reads ShopCloud's logs from one of two sources, chosen with one setting in `.env`:
 
 - `TELEMETRY_SOURCE=docker` (the default): the lab container's logs through the Docker adapter. Works without the monitoring stack.
-- `TELEMETRY_SOURCE=loki`: Loki's HTTP API (`/loki/api/v1/query_range`) for `{service="shopcloud"}`, from the run's start to now, at `LOKI_URL` (default `http://127.0.0.1:3100`). Start the monitoring stack first: `docker compose -f monitoring/docker-compose.monitoring.yml up -d`.
+- `TELEMETRY_SOURCE=loki`: Loki's HTTP API (`/loki/api/v1/query_range`) for `{service="shopcloud"}`, from the run's start, at `LOKI_URL` (default `http://127.0.0.1:3100`). Start the monitoring stack first, from the project root: `docker compose --env-file .env -f monitoring/docker-compose.monitoring.yml up -d` (Grafana needs `GF_SECURITY_ADMIN_PASSWORD` from `.env`).
 
 ```bash
 TELEMETRY_SOURCE=loki docker compose up -d backend    # or set it in .env
@@ -129,7 +140,9 @@ Two notes for this repo's setup, both already configured in `frontend/vite.confi
 | Path | What it is |
 |---|---|
 | `docs/shopcloud-interface.md` | What ShopCloud must expose. Shared with whoever builds ShopCloud |
-| `docs/api-contract.md` | Planned backend API for the dashboard |
+| `docs/api-contract.md` | The backend API the dashboard uses, with each endpoint's status |
+| `docs/known-limitations.md` | What the lab does not do, or does only simply, and why |
+| `docs/audit-2026-11.md` | The independent audit of November 2026 (its findings are fixed) |
 | `backend/app/schemas/event.py` | Common event schema |
 | `backend/app/schemas/scenario.py` | Scenario format and the validating loader |
 | `backend/app/models.py` | Database tables (SQLAlchemy) |
@@ -152,11 +165,14 @@ Two notes for this repo's setup, both already configured in `frontend/vite.confi
 | `backend/app/telemetry/container.py` | Docker events and Falco alerts, normalized |
 | `rules/suspicious_container_process.yaml` | The container detection rule |
 | `lab/falco/` | Falco's Dockerfile (pinned version) and the lab's Falco rule |
-| `monitoring/` | Loki, Alloy and Grafana (`docker compose -f monitoring/docker-compose.monitoring.yml up -d`) |
+| `monitoring/` | Loki, Alloy and Grafana with the provisioned "CloudAttackLab - Lab activity" dashboard (failed logins, 403 denials, 429 rate-limit hits, container exec events, latest ShopCloud events). Start: `docker compose --env-file .env -f monitoring/docker-compose.monitoring.yml up -d`, then http://127.0.0.1:3000 (user `admin`, password `GF_SECURITY_ADMIN_PASSWORD`) |
 | `shopcloud/` | The real ShopCloud, the lab target (FastAPI, SQLite), with its tests in `shopcloud/tests` |
 | `mock_shopcloud/` | Fake ShopCloud that follows the interface (fast, in memory; not the lab target) |
 | `lab/docker-compose.lab.yml` | The isolated lab (ShopCloud, the test container, optional Falco) |
-| `docker-compose.yml` | Platform services (PostgreSQL for now) |
+| `docker-compose.yml` | Platform services: PostgreSQL, the backend and the dashboard |
+| `backend/app/lab_manager/target_guard.py` | The check that a lab target URL points into the lab |
+| `backend/app/startup.py` | Startup checks: lab target URLs, default credentials |
+| `frontend/` | The React dashboard (served by nginx in its container) |
 | `tools/check_shopcloud.py` | Checks any running ShopCloud against the interface |
 
 ## Try it
@@ -168,20 +184,34 @@ pip install -r backend/requirements.txt
 pytest backend/tests                                   # platform tests
 pytest shopcloud/tests                                 # ShopCloud's own tests
 
-docker compose -f lab/docker-compose.lab.yml up --build -d
-python tools/check_shopcloud.py http://127.0.0.1:8081  # should print 14/14
-docker compose -f lab/docker-compose.lab.yml logs shopcloud   # the JSON logs
+pytest -m integration                                  # starts the real lab (Docker); see the test files
+
+# The lab by hand, with the same .env as the platform (so ShopCloud gets your LAB_CONTROL_TOKEN):
+docker compose --env-file .env -f lab/docker-compose.lab.yml up --build -d
+python tools/check_shopcloud.py http://127.0.0.1:8081  # should print 14/14; reads LAB_CONTROL_TOKEN from .env
+docker compose --env-file .env -f lab/docker-compose.lab.yml logs shopcloud   # the JSON logs
 ```
 
 ## Build order
 
-1. Contracts and fake ShopCloud (this commit)
-2. Backend and lab control: FastAPI, PostgreSQL, Docker adapter
-3. Scenario Engine and the authentication-abuse script
-4. Log ingestion, normalization, first detection rule
-5. Basic dashboard, then the Week 3 checkpoint with the real ShopCloud
-6. Response and verification, scenario 3, incident timeline, Loki and Grafana, scenario 2 with Falco
+What exists now, in the order it was built (each step is a merged pull request):
+
+1. Contracts (`docs/`, `contracts/`, the event and scenario schemas) and the fake ShopCloud (`mock_shopcloud/`).
+2. Platform skeleton: FastAPI, PostgreSQL, Alembic migrations.
+3. Lab control: the Lab Manager and its Docker Compose adapter (create, start, stop, reset, details).
+4. Scenario Engine and `authentication_abuse`, with pre-flight checks, background runs and cleanup.
+5. Telemetry ingestion and normalization, and the first detection rule (`repeated_failed_logins`).
+6. The React dashboard.
+7. The response `temporary_rate_limit`, with approval, verification, revert and the audit log.
+8. The second scenario, `unauthorized_resource_access`, and `repeated_access_denied`.
+9. Incidents (correlation, timeline, risk score) and the run report.
+10. Loki as a telemetry source, and the monitoring stack (Loki, Alloy, Grafana).
+11. The container scenario `suspicious_container_activity`: Docker events, optional Falco, and `stop_container`.
+12. The real ShopCloud (`shopcloud/`) as the lab target.
+13. Fixes for the November 2026 audit: the lab target URL check, a working Grafana dashboard, one thing at a time during a run, `incomplete` runs, lab status checked against Docker, loading states, a tighter run time window, default-credential warnings, closing incidents and an honest risk score after a revert, and these docs.
+
+Not built: login/auth, `isolate_container`, Kubernetes and cloud adapters, Prometheus, PDF export and sharing of reports.
 
 ## Safety
 
-Scenarios run only against configured lab targets, with bounded parameters, mandatory approval for responses and mandatory cleanup. The scenario loader enforces these rules.
+Scenarios run only against configured lab targets whose URL is checked to be inside the lab, with bounded parameters, mandatory approval for responses and mandatory cleanup. The scenario loader and the backend enforce these rules. See [`docs/known-limitations.md`](docs/known-limitations.md) for what they do not cover.

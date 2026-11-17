@@ -30,7 +30,7 @@ export default function ReportPage({ runId, onClose }) {
   if (error) {
     return <section><p style={{ color: 'crimson' }}>Error: {error}</p><button onClick={onClose}>Back</button></section>
   }
-  if (!report) return <section><p>Loading the report…</p></section>
+  if (!report) return <section><p>Loading…</p></section>
 
   const { lab, scenario, run, telemetry, cleanup } = report
   const verification = report.post_run_verification
@@ -60,7 +60,7 @@ export default function ReportPage({ runId, onClose }) {
         ['Finished', fmt(run.finished_at)],
         ['Duration', run.duration_seconds === null ? '—' : `${run.duration_seconds} s`],
         ['Parameters', <code key="p">{JSON.stringify(run.parameters)}</code>],
-        ['Error', run.error ?? 'none'],
+        ['Error or reason it is not completed', run.error ?? 'none'],
       ]} />
 
       <h3>What the script reported</h3>
