@@ -109,7 +109,7 @@ def check_target_url(
     try:
         _check(url, compose_file=compose_file, service=service, adapter=adapter)
     except TargetUrlRefused as exc:
-        return TargetUrlCheck(target, url, False, f"Lab target '{target}' URL {url} is refused: {exc}")
+        return TargetUrlCheck(target, url, False, f"Lab target '{target}' URL {url} is refused: {exc}.")
     return TargetUrlCheck(target, url, True)
 
 
