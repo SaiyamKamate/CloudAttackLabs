@@ -269,3 +269,78 @@ def test_cleanup_unknown_run_is_404(client):
 
     response = client.post(f"{API}/runs/{uuid.uuid4()}/cleanup")
     assert response.status_code == 404
+
+
+# --- audit bug 3: one thing at a time ---------------------------------------
+@pytest.fixture
+def blocking_script(monkeypatch):
+    """A script that runs until the test releases it, so other requests overlap the run."""
+    import threading
+
+    gate, started = threading.Event(), threading.Event()
+    monkeypatch.setattr(service_module.runner, "execute_script", _blocking(gate, started))
+    yield gate, started
+    gate.set()
+
+
+def _finished_run(client, lab_id, monkeypatch):
+    patch_script(monkeypatch, RunResult("completed", fake_summary(), None))
+    run = start_run(client, lab_id).json()
+    return wait_terminal(client, run["id"])
+
+
+def test_cleanup_of_another_run_is_refused_while_a_run_is_active(client, adapter, target, monkeypatch):
+    import threading
+
+    lab = running_lab(client)
+    old = _finished_run(client, lab["id"], monkeypatch)  # an earlier, finished run
+    gate, started = threading.Event(), threading.Event()
+    monkeypatch.setattr(service_module.runner, "execute_script", _blocking(gate, started))
+
+    active = start_run(client, lab["id"]).json()
+    assert started.wait(5)
+    resets_before, limits_before = target.reset_calls, len(target.rate_limit_calls)
+
+    response = client.post(f"{API}/runs/{old['id']}/cleanup")
+
+    assert response.status_code == 409
+    body = response.json()
+    assert body["error"] == "run_in_progress"
+    assert active["id"] in body["detail"] and "Cleanup of run" in body["detail"]
+    # Nothing was done to the target.
+    assert target.reset_calls == resets_before and len(target.rate_limit_calls) == limits_before
+    # The lab says which run blocks it (the dashboard disables the buttons from this).
+    detail = client.get(f"{API}/labs/{lab['id']}").json()
+    assert detail["active_run"]["id"] == active["id"]
+
+    gate.set()
+    wait_terminal(client, active["id"])
+    assert client.post(f"{API}/runs/{old['id']}/cleanup").status_code == 200
+    assert client.get(f"{API}/labs/{lab['id']}").json()["active_run"] is None
+
+
+def test_lab_reset_is_refused_while_a_run_is_active(client, adapter, target, blocking_script):
+    gate, started = blocking_script
+    lab = running_lab(client)
+    active = start_run(client, lab["id"]).json()
+    assert started.wait(5)
+
+    response = client.post(f"{API}/labs/{lab['id']}/reset")
+
+    assert response.status_code == 409
+    assert response.json()["error"] == "run_in_progress"
+    assert "Lab reset is refused" in response.json()["detail"]
+    assert "reset" not in adapter.calls and target.reset_calls == 0
+
+    gate.set()
+    wait_terminal(client, active["id"])
+    assert client.post(f"{API}/labs/{lab['id']}/reset").status_code == 200
+
+
+def _blocking(gate, started):
+    def blocking_execute(script_path, base_url, parameters, timeout_seconds):
+        started.set()
+        gate.wait(timeout=10)
+        return RunResult("completed", fake_summary(), None)
+
+    return blocking_execute

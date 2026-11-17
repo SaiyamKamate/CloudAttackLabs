@@ -74,7 +74,19 @@ class FalcoStatusOut(BaseModel):
     healthy: bool           # enabled, running and its health check passes
 
 
+class ActiveRunOut(BaseModel):
+    """The lab's run that has not finished. While it exists, lab reset and cleanup
+    of other runs are refused (409 run_in_progress)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    scenario_id: str
+    status: str
+
+
 class LabDetail(LabOut):
+    active_run: Optional[ActiveRunOut]
     containers: list[ContainerOut]
     target_health: TargetHealthOut
     target_url: TargetUrlOut

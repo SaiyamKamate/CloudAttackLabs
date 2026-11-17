@@ -25,6 +25,7 @@ from ..response_manager.revert import mark_reverted
 from ..schemas.scenario import ScenarioDefinition
 from ..lab_manager.target import TargetClient, TargetError
 from ..lab_manager.target_guard import TargetGuard
+from ..lab_manager.service import refuse_while_run_active
 from ..config import FALCO_SERVICE
 from ..lab_manager.container import TargetRefused
 from ..telemetry.container import DockerEventSource, make_docker_event_normalizer, make_falco_normalizer
@@ -181,6 +182,12 @@ class ScenarioService:
         run = self.get_run(run_id)
         if run.status in ACTIVE_RUN:
             raise ApiError(409, "run_in_progress", f"Run {run_id} is {run.status}; wait for it to finish.")
+        # Cleanup resets the shared target (or recreates the test container): never
+        # while another run in the same lab is still using it.
+        refuse_while_run_active(
+            self.session, run.lab_id, f"Cleanup of run {run_id}",
+            "cleanup resets the lab's target and would break that run",
+        )
         scenario = self.engine.get(run.scenario_id)
         target = self.target_clients.get(scenario.target)
         if target is None and scenario.target not in self.settings.container_targets:

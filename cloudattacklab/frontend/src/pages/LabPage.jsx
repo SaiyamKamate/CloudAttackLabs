@@ -70,6 +70,7 @@ export default function LabPage() {
 
   const health = detail?.target_health
   const containers = detail?.containers ?? []
+  const activeRun = detail?.active_run ?? null
 
   return (
     <section>
@@ -116,9 +117,15 @@ export default function LabPage() {
       <p style={{ marginTop: '1rem' }}>
         <button onClick={start} disabled={busy}>Start</button>{' '}
         <button onClick={stop} disabled={busy}>Stop</button>{' '}
-        <button onClick={reset} disabled={busy}>Reset</button>{' '}
+        <button onClick={reset} disabled={busy || Boolean(activeRun)}>Reset</button>{' '}
         <button onClick={load} disabled={busy}>Refresh</button>
       </p>
+      {activeRun && (
+        <p><i>
+          Reset is disabled while run {activeRun.scenario_id} ({activeRun.status}) is in progress: a reset
+          recreates ShopCloud and would break that run. Refresh once it has finished.
+        </i></p>
+      )}
       {busy && <p>Working… (start, stop and reset can take a little while)</p>}
     </section>
   )

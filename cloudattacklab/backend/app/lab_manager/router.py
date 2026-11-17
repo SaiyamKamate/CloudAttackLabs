@@ -14,7 +14,7 @@ from ..telemetry.loki import LokiSource
 from ..telemetry.source import TelemetrySourceError
 from .api_schemas import FalcoStatusOut, LabCreate, LabDetail, LabOut, TargetUrlOut, TelemetryStatusOut
 from .docker_adapter import DockerComposeAdapter
-from .service import LabManager
+from .service import LabManager, active_run_in_lab
 from .target import HttpTargetClient, TargetClient
 from .target_guard import GuardedTargetClient, TargetGuard
 
@@ -94,6 +94,7 @@ def get_lab(
     url_check = manager.target_url_check(lab)
     return LabDetail(
         **LabOut.model_validate(lab).model_dump(),
+        active_run=active_run_in_lab(manager.session, lab.id),
         containers=containers,
         target_health=target_health,
         target_url=TargetUrlOut(url=url_check.url, allowed=url_check.allowed, error=url_check.error),

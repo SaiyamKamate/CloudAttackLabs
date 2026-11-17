@@ -16,13 +16,36 @@ from sqlalchemy.orm import Session
 
 from .. import audit
 from ..errors import ApiError
-from ..models import Lab, LabStatus
+from ..models import Lab, LabStatus, RunStatus, ScenarioRun
 from ..response_manager.revert import mark_reverted
 from .adapter import ContainerStatus, LabAdapter, LabAdapterError
 from .target import TargetClient, TargetError, TargetHealth
 from .target_guard import TargetGuard, TargetUrlCheck
 
 ACTIVE = (LabStatus.starting.value, LabStatus.running.value)
+# A scenario run that has not finished yet.
+ACTIVE_RUN = (RunStatus.pending.value, RunStatus.running.value)
+
+
+def active_run_in_lab(session: Session, lab_id: uuid.UUID) -> Optional[ScenarioRun]:
+    """The lab's run that has not finished yet, if any (there is at most one)."""
+    return session.scalars(
+        select(ScenarioRun)
+        .where(ScenarioRun.lab_id == lab_id, ScenarioRun.status.in_(ACTIVE_RUN))
+        .order_by(ScenarioRun.started_at)
+    ).first()
+
+
+def refuse_while_run_active(session: Session, lab_id: uuid.UUID, what: str, why: str) -> None:
+    """409 run_in_progress if a run is active in the lab. `what` is the refused operation."""
+    run = active_run_in_lab(session, lab_id)
+    if run is not None:
+        raise ApiError(
+            409,
+            "run_in_progress",
+            f"Run {run.id} ({run.scenario_id}) is {run.status} in this lab. {what} is refused until it "
+            f"finishes, because {why}.",
+        )
 
 # One start/stop/reset at a time (single backend process).
 _operation_lock = threading.Lock()
@@ -130,6 +153,9 @@ class LabManager:
             if lab.status != LabStatus.running.value:
                 raise ApiError(409, "lab_not_running", f"Lab '{lab.name}' is {lab.status}; start it before a reset.")
             self._require_target_url(lab)
+            refuse_while_run_active(
+                self.session, lab.id, "Lab reset", "a reset recreates ShopCloud and would break that run"
+            )
             previous = lab.status
             client = self._client(lab)
             try:
