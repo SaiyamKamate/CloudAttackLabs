@@ -1,0 +1,14 @@
+{
+  "telemetry": {
+    "source": "loki",
+    "loki_url": "http://127.0.0.1:3100",
+    "reachable": true,
+    "error": null
+  },
+  "falco": {
+    "enabled": true,
+    "state": "exited",
+    "health": null,
+    "healthy": false
+  }
+}

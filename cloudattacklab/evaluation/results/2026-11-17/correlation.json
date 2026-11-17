@@ -1,0 +1,3586 @@
+[
+  {
+    "phase": "correlation",
+    "telemetry_source": "docker",
+    "falco": false,
+    "index": 1,
+    "scenario_id": "authentication_abuse",
+    "reset": {
+      "operation": "reset",
+      "requested_at": "2026-11-17T13:36:15.663487+00:00",
+      "ok": true,
+      "error": null,
+      "api_returned_seconds": 8.192,
+      "ready_seconds": 8.305
+    },
+    "run_id": "e7919516-ddb0-4c9c-ab4a-25e11844dfa8",
+    "stats_samples": 55,
+    "wall_seconds": 22.722,
+    "status": "completed",
+    "error": null,
+    "scenario_version": "1.0.0",
+    "started_at": "2026-11-17T13:36:24.077781Z",
+    "finished_at": "2026-11-17T13:36:44.655410Z",
+    "report": {
+      "report_version": "1.0",
+      "generated_at": "2026-11-17T13:36:46.736470Z",
+      "lab": {
+        "id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+        "name": "evaluation",
+        "target": "shopcloud",
+        "environment": "docker",
+        "status": "running"
+      },
+      "scenario": {
+        "id": "authentication_abuse",
+        "version": "1.0.0",
+        "definition_available": true,
+        "name": "Repeated Failed Login Attempts",
+        "category": "authentication",
+        "description": "Sends a bounded number of invalid login attempts to the ShopCloud test login endpoint and checks that the repeated failures are detected.",
+        "target": "shopcloud",
+        "type": "application"
+      },
+      "run": {
+        "id": "e7919516-ddb0-4c9c-ab4a-25e11844dfa8",
+        "status": "completed",
+        "parameters": {
+          "username": "lab_user",
+          "attempts": 20,
+          "interval_seconds": 1
+        },
+        "started_at": "2026-11-17T13:36:24.077781Z",
+        "finished_at": "2026-11-17T13:36:44.655410Z",
+        "duration_seconds": 20.578,
+        "error": null
+      },
+      "script_summary": {
+        "scenario": "authentication_abuse",
+        "target": "http://127.0.0.1:8081",
+        "username": "lab_user",
+        "attempts_sent": 20,
+        "unauthorized_401": 20,
+        "rate_limited_429": 0,
+        "other": 0,
+        "errors": 0
+      },
+      "telemetry": {
+        "expected": [
+          {
+            "source": "application",
+            "event_type": "authentication_failure",
+            "expected_min_count": 10,
+            "collected_count": 21,
+            "met": true
+          }
+        ],
+        "all_expected_met": true,
+        "collected_total": 30,
+        "collected_by_type": [
+          {
+            "source": "application",
+            "event_type": "authentication_failure",
+            "count": 21
+          },
+          {
+            "source": "application",
+            "event_type": "authentication_success",
+            "count": 5
+          },
+          {
+            "source": "application",
+            "event_type": "other",
+            "count": 2
+          },
+          {
+            "source": "application",
+            "event_type": "resource_access",
+            "count": 2
+          }
+        ]
+      },
+      "detection": {
+        "rule": "repeated_failed_logins",
+        "threshold": 10,
+        "window_seconds": 60
+      },
+      "alerts": [
+        {
+          "id": "a56b8ccc-8f93-4199-9652-f28ac925bda6",
+          "rule_id": "repeated_failed_logins",
+          "severity": "medium",
+          "title": "Repeated failed logins from one source (source_ip=172.22.0.1)",
+          "description": "21 authentication_failure events from source_ip=172.22.0.1 within 20s (threshold 10 in 60s).",
+          "incident_id": "0e11a78a-b228-4388-bb01-d0dfff9fb696",
+          "event_count": 21,
+          "first_event_at": "2026-11-17T13:36:24.270000Z",
+          "last_event_at": "2026-11-17T13:36:44.527000Z",
+          "created_at": "2026-11-17T13:36:44.644969Z",
+          "threshold_crossed_at": "2026-11-17T13:36:33.835000Z",
+          "threshold_event_id": "bc3ba26d-76f4-479e-869f-a9f82076f55e",
+          "threshold_event_reference": "docker:shopcloud:7fdfedee-55f8-4fdf-bcdb-8537c5aa1fed",
+          "detection_latency_seconds": 10.81
+        }
+      ],
+      "incidents": [
+        {
+          "id": "0e11a78a-b228-4388-bb01-d0dfff9fb696",
+          "title": "Repeated Failed Login Attempts (authentication_abuse): source 172.22.0.1",
+          "status": "open",
+          "correlation_key": "run:e7919516-ddb0-4c9c-ab4a-25e11844dfa8|resource:shopcloud|ip:172.22.0.1",
+          "risk_score": 60,
+          "risk_explanation": "Risk score: 60 out of 100.\n+40: the highest alert severity is medium.\n+20: 11 event(s) over the detection threshold of 10 (2 points each, at most 20).\n+0: 0 additional correlated alert(s) (5 points each, at most 15).\nThis score is a simple rule of thumb for comparing incidents inside this lab. It does not predict financial loss and is not a universal measure of risk.",
+          "alert_ids": [
+            "a56b8ccc-8f93-4199-9652-f28ac925bda6"
+          ]
+        }
+      ],
+      "responses": [],
+      "post_run_verification": null,
+      "cleanup": {
+        "status": "not_run",
+        "runs": []
+      }
+    },
+    "alerts": [
+      {
+        "id": "a56b8ccc-8f93-4199-9652-f28ac925bda6",
+        "rule_id": "repeated_failed_logins",
+        "severity": "medium",
+        "title": "Repeated failed logins from one source (source_ip=172.22.0.1)",
+        "description": "21 authentication_failure events from source_ip=172.22.0.1 within 20s (threshold 10 in 60s).",
+        "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+        "run_id": "e7919516-ddb0-4c9c-ab4a-25e11844dfa8",
+        "incident_id": "0e11a78a-b228-4388-bb01-d0dfff9fb696",
+        "event_count": 21,
+        "first_event_at": "2026-11-17T13:36:24.270000Z",
+        "last_event_at": "2026-11-17T13:36:44.527000Z",
+        "created_at": "2026-11-17T13:36:44.644969Z",
+        "events": [
+          {
+            "event_id": "c08ae581-6d6c-4aa9-b0c3-0d71ee2860f9",
+            "timestamp": "2026-11-17T13:36:24.270000Z",
+            "source": "application",
+            "event_type": "authentication_failure",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Invalid username or password",
+            "raw_event_reference": "docker:shopcloud:2cc7f5a3-0c86-4666-84a2-286058427c13",
+            "schema_version": "1.0",
+            "scenario_id": "authentication_abuse",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "e7919516-ddb0-4c9c-ab4a-25e11844dfa8",
+            "username": "lab_user",
+            "container_id": "ef7d82e35ee0",
+            "rule_id": null,
+            "correlation_key": "run:e7919516-ddb0-4c9c-ab4a-25e11844dfa8|ip:172.22.0.1"
+          },
+          {
+            "event_id": "83735623-3c6b-443b-b235-f4962f77cb86",
+            "timestamp": "2026-11-17T13:36:25.346000Z",
+            "source": "application",
+            "event_type": "authentication_failure",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Invalid username or password",
+            "raw_event_reference": "docker:shopcloud:c5c473b8-699f-40a0-9b5a-6961b9ff0866",
+            "schema_version": "1.0",
+            "scenario_id": "authentication_abuse",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "e7919516-ddb0-4c9c-ab4a-25e11844dfa8",
+            "username": "lab_user",
+            "container_id": "ef7d82e35ee0",
+            "rule_id": null,
+            "correlation_key": "run:e7919516-ddb0-4c9c-ab4a-25e11844dfa8|ip:172.22.0.1"
+          },
+          {
+            "event_id": "831a8731-f4f3-4f4f-ab27-743eb0c1ebeb",
+            "timestamp": "2026-11-17T13:36:26.386000Z",
+            "source": "application",
+            "event_type": "authentication_failure",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Invalid username or password",
+            "raw_event_reference": "docker:shopcloud:8d98c603-97de-401a-a70d-d0e5477b8477",
+            "schema_version": "1.0",
+            "scenario_id": "authentication_abuse",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "e7919516-ddb0-4c9c-ab4a-25e11844dfa8",
+            "username": "lab_user",
+            "container_id": "ef7d82e35ee0",
+            "rule_id": null,
+            "correlation_key": "run:e7919516-ddb0-4c9c-ab4a-25e11844dfa8|ip:172.22.0.1"
+          },
+          {
+            "event_id": "37151670-5977-46c8-9fdc-a36d126ab87d",
+            "timestamp": "2026-11-17T13:36:27.466000Z",
+            "source": "application",
+            "event_type": "authentication_failure",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Invalid username or password",
+            "raw_event_reference": "docker:shopcloud:c34a694f-0f6f-46c6-b705-3b48bc1d8045",
+            "schema_version": "1.0",
+            "scenario_id": "authentication_abuse",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "e7919516-ddb0-4c9c-ab4a-25e11844dfa8",
+            "username": "lab_user",
+            "container_id": "ef7d82e35ee0",
+            "rule_id": null,
+            "correlation_key": "run:e7919516-ddb0-4c9c-ab4a-25e11844dfa8|ip:172.22.0.1"
+          },
+          {
+            "event_id": "b2812e8e-6d0f-458d-ba26-e53787fcba59",
+            "timestamp": "2026-11-17T13:36:28.531000Z",
+            "source": "application",
+            "event_type": "authentication_failure",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Invalid username or password",
+            "raw_event_reference": "docker:shopcloud:0e117345-fef8-4529-bc06-cb9ba6bc75c8",
+            "schema_version": "1.0",
+            "scenario_id": "authentication_abuse",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "e7919516-ddb0-4c9c-ab4a-25e11844dfa8",
+            "username": "lab_user",
+            "container_id": "ef7d82e35ee0",
+            "rule_id": null,
+            "correlation_key": "run:e7919516-ddb0-4c9c-ab4a-25e11844dfa8|ip:172.22.0.1"
+          },
+          {
+            "event_id": "b1a1790c-8911-4aa4-830f-a76b0e6b2b23",
+            "timestamp": "2026-11-17T13:36:29.652000Z",
+            "source": "application",
+            "event_type": "authentication_failure",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Invalid username or password",
+            "raw_event_reference": "docker:shopcloud:f93d656d-75ea-42fe-8f33-2176dc867819",
+            "schema_version": "1.0",
+            "scenario_id": "authentication_abuse",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "e7919516-ddb0-4c9c-ab4a-25e11844dfa8",
+            "username": "lab_user",
+            "container_id": "ef7d82e35ee0",
+            "rule_id": null,
+            "correlation_key": "run:e7919516-ddb0-4c9c-ab4a-25e11844dfa8|ip:172.22.0.1"
+          },
+          {
+            "event_id": "74f0e449-5cc9-46ab-ab1f-f9aa120402e8",
+            "timestamp": "2026-11-17T13:36:30.694000Z",
+            "source": "application",
+            "event_type": "authentication_failure",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Invalid username or password",
+            "raw_event_reference": "docker:shopcloud:4fbcb7b8-9d23-4c77-a88f-52d1c3144e5a",
+            "schema_version": "1.0",
+            "scenario_id": "authentication_abuse",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "e7919516-ddb0-4c9c-ab4a-25e11844dfa8",
+            "username": "lab_user",
+            "container_id": "ef7d82e35ee0",
+            "rule_id": null,
+            "correlation_key": "run:e7919516-ddb0-4c9c-ab4a-25e11844dfa8|ip:172.22.0.1"
+          },
+          {
+            "event_id": "d7dd9c5d-7e86-405c-b9f0-9440c6760766",
+            "timestamp": "2026-11-17T13:36:31.739000Z",
+            "source": "application",
+            "event_type": "authentication_failure",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Invalid username or password",
+            "raw_event_reference": "docker:shopcloud:1bd401d0-cd6a-4280-92ba-890b13a974c5",
+            "schema_version": "1.0",
+            "scenario_id": "authentication_abuse",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "e7919516-ddb0-4c9c-ab4a-25e11844dfa8",
+            "username": "lab_user",
+            "container_id": "ef7d82e35ee0",
+            "rule_id": null,
+            "correlation_key": "run:e7919516-ddb0-4c9c-ab4a-25e11844dfa8|ip:172.22.0.1"
+          },
+          {
+            "event_id": "27d27424-467b-4df5-a818-ad0a1a368600",
+            "timestamp": "2026-11-17T13:36:32.791000Z",
+            "source": "application",
+            "event_type": "authentication_failure",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Invalid username or password",
+            "raw_event_reference": "docker:shopcloud:80b31ded-8118-4166-8fa8-2abc837bb0ad",
+            "schema_version": "1.0",
+            "scenario_id": "authentication_abuse",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "e7919516-ddb0-4c9c-ab4a-25e11844dfa8",
+            "username": "lab_user",
+            "container_id": "ef7d82e35ee0",
+            "rule_id": null,
+            "correlation_key": "run:e7919516-ddb0-4c9c-ab4a-25e11844dfa8|ip:172.22.0.1"
+          },
+          {
+            "event_id": "bc3ba26d-76f4-479e-869f-a9f82076f55e",
+            "timestamp": "2026-11-17T13:36:33.835000Z",
+            "source": "application",
+            "event_type": "authentication_failure",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Invalid username or password",
+            "raw_event_reference": "docker:shopcloud:7fdfedee-55f8-4fdf-bcdb-8537c5aa1fed",
+            "schema_version": "1.0",
+            "scenario_id": "authentication_abuse",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "e7919516-ddb0-4c9c-ab4a-25e11844dfa8",
+            "username": "lab_user",
+            "container_id": "ef7d82e35ee0",
+            "rule_id": null,
+            "correlation_key": "run:e7919516-ddb0-4c9c-ab4a-25e11844dfa8|ip:172.22.0.1"
+          },
+          {
+            "event_id": "8ed9cdd2-3eb5-49ef-b369-d4ae69387bbd",
+            "timestamp": "2026-11-17T13:36:34.877000Z",
+            "source": "application",
+            "event_type": "authentication_failure",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Invalid username or password",
+            "raw_event_reference": "docker:shopcloud:6166f97e-fc7c-402e-8e84-c75f1d5f03c1",
+            "schema_version": "1.0",
+            "scenario_id": "authentication_abuse",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "e7919516-ddb0-4c9c-ab4a-25e11844dfa8",
+            "username": "lab_user",
+            "container_id": "ef7d82e35ee0",
+            "rule_id": null,
+            "correlation_key": "run:e7919516-ddb0-4c9c-ab4a-25e11844dfa8|ip:172.22.0.1"
+          },
+          {
+            "event_id": "c1f4535f-1414-45fa-a726-2612691ffa29",
+            "timestamp": "2026-11-17T13:36:35.933000Z",
+            "source": "application",
+            "event_type": "authentication_failure",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Invalid username or password",
+            "raw_event_reference": "docker:shopcloud:c8d49aed-223e-45df-b962-4cdc9c614d34",
+            "schema_version": "1.0",
+            "scenario_id": "authentication_abuse",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "e7919516-ddb0-4c9c-ab4a-25e11844dfa8",
+            "username": "lab_user",
+            "container_id": "ef7d82e35ee0",
+            "rule_id": null,
+            "correlation_key": "run:e7919516-ddb0-4c9c-ab4a-25e11844dfa8|ip:172.22.0.1"
+          },
+          {
+            "event_id": "222b6647-a4d3-46c6-9802-c64ed015c417",
+            "timestamp": "2026-11-17T13:36:36.244000Z",
+            "source": "application",
+            "event_type": "authentication_failure",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Invalid username or password",
+            "raw_event_reference": "docker:shopcloud:e2af859e-7f73-4a45-9292-d02bd71db3fa",
+            "schema_version": "1.0",
+            "scenario_id": "authentication_abuse",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "e7919516-ddb0-4c9c-ab4a-25e11844dfa8",
+            "username": "lab_restricted",
+            "container_id": "ef7d82e35ee0",
+            "rule_id": null,
+            "correlation_key": "run:e7919516-ddb0-4c9c-ab4a-25e11844dfa8|ip:172.22.0.1"
+          },
+          {
+            "event_id": "8ed25b4f-c1ed-422c-aaec-2456fe7dcb8c",
+            "timestamp": "2026-11-17T13:36:37.028000Z",
+            "source": "application",
+            "event_type": "authentication_failure",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Invalid username or password",
+            "raw_event_reference": "docker:shopcloud:d7eaca59-67dd-483b-81db-8264e6484eef",
+            "schema_version": "1.0",
+            "scenario_id": "authentication_abuse",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "e7919516-ddb0-4c9c-ab4a-25e11844dfa8",
+            "username": "lab_user",
+            "container_id": "ef7d82e35ee0",
+            "rule_id": null,
+            "correlation_key": "run:e7919516-ddb0-4c9c-ab4a-25e11844dfa8|ip:172.22.0.1"
+          },
+          {
+            "event_id": "9d83d02d-f74b-46b7-b097-a00fdfee2215",
+            "timestamp": "2026-11-17T13:36:38.070000Z",
+            "source": "application",
+            "event_type": "authentication_failure",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Invalid username or password",
+            "raw_event_reference": "docker:shopcloud:5dcebe7d-ebbe-4480-902f-0b143c8fcaf9",
+            "schema_version": "1.0",
+            "scenario_id": "authentication_abuse",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "e7919516-ddb0-4c9c-ab4a-25e11844dfa8",
+            "username": "lab_user",
+            "container_id": "ef7d82e35ee0",
+            "rule_id": null,
+            "correlation_key": "run:e7919516-ddb0-4c9c-ab4a-25e11844dfa8|ip:172.22.0.1"
+          },
+          {
+            "event_id": "dbb2bc7a-5966-427b-9dca-84531832a126",
+            "timestamp": "2026-11-17T13:36:39.112000Z",
+            "source": "application",
+            "event_type": "authentication_failure",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Invalid username or password",
+            "raw_event_reference": "docker:shopcloud:a3ee349b-d786-4553-8a8a-2b122cf65acc",
+            "schema_version": "1.0",
+            "scenario_id": "authentication_abuse",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "e7919516-ddb0-4c9c-ab4a-25e11844dfa8",
+            "username": "lab_user",
+            "container_id": "ef7d82e35ee0",
+            "rule_id": null,
+            "correlation_key": "run:e7919516-ddb0-4c9c-ab4a-25e11844dfa8|ip:172.22.0.1"
+          },
+          {
+            "event_id": "b98b1486-566c-4422-8127-f42eb65e9f0b",
+            "timestamp": "2026-11-17T13:36:40.244000Z",
+            "source": "application",
+            "event_type": "authentication_failure",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Invalid username or password",
+            "raw_event_reference": "docker:shopcloud:9dec7b75-6053-4191-828e-fea123865eb2",
+            "schema_version": "1.0",
+            "scenario_id": "authentication_abuse",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "e7919516-ddb0-4c9c-ab4a-25e11844dfa8",
+            "username": "lab_user",
+            "container_id": "ef7d82e35ee0",
+            "rule_id": null,
+            "correlation_key": "run:e7919516-ddb0-4c9c-ab4a-25e11844dfa8|ip:172.22.0.1"
+          },
+          {
+            "event_id": "7865689f-977d-4429-ae00-702f0f11a108",
+            "timestamp": "2026-11-17T13:36:41.285000Z",
+            "source": "application",
+            "event_type": "authentication_failure",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Invalid username or password",
+            "raw_event_reference": "docker:shopcloud:e3696799-e5bb-47a6-bb94-eec3d88e601a",
+            "schema_version": "1.0",
+            "scenario_id": "authentication_abuse",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "e7919516-ddb0-4c9c-ab4a-25e11844dfa8",
+            "username": "lab_user",
+            "container_id": "ef7d82e35ee0",
+            "rule_id": null,
+            "correlation_key": "run:e7919516-ddb0-4c9c-ab4a-25e11844dfa8|ip:172.22.0.1"
+          },
+          {
+            "event_id": "2075d2e7-262e-4776-b875-fc4395c5c4f3",
+            "timestamp": "2026-11-17T13:36:42.325000Z",
+            "source": "application",
+            "event_type": "authentication_failure",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Invalid username or password",
+            "raw_event_reference": "docker:shopcloud:0b197f6c-9435-4d15-8965-8dc693756e4e",
+            "schema_version": "1.0",
+            "scenario_id": "authentication_abuse",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "e7919516-ddb0-4c9c-ab4a-25e11844dfa8",
+            "username": "lab_user",
+            "container_id": "ef7d82e35ee0",
+            "rule_id": null,
+            "correlation_key": "run:e7919516-ddb0-4c9c-ab4a-25e11844dfa8|ip:172.22.0.1"
+          },
+          {
+            "event_id": "7d334252-2749-4eca-91f9-9ac7efbcc069",
+            "timestamp": "2026-11-17T13:36:43.428000Z",
+            "source": "application",
+            "event_type": "authentication_failure",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Invalid username or password",
+            "raw_event_reference": "docker:shopcloud:3a2b1cb5-253c-43cd-8e31-fa3d1a173985",
+            "schema_version": "1.0",
+            "scenario_id": "authentication_abuse",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "e7919516-ddb0-4c9c-ab4a-25e11844dfa8",
+            "username": "lab_user",
+            "container_id": "ef7d82e35ee0",
+            "rule_id": null,
+            "correlation_key": "run:e7919516-ddb0-4c9c-ab4a-25e11844dfa8|ip:172.22.0.1"
+          },
+          {
+            "event_id": "19f89d5a-6c1a-49fc-87d2-587e20218c2c",
+            "timestamp": "2026-11-17T13:36:44.527000Z",
+            "source": "application",
+            "event_type": "authentication_failure",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Invalid username or password",
+            "raw_event_reference": "docker:shopcloud:ba6d42be-5dfa-409e-aa33-bbf0989053f0",
+            "schema_version": "1.0",
+            "scenario_id": "authentication_abuse",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "e7919516-ddb0-4c9c-ab4a-25e11844dfa8",
+            "username": "lab_user",
+            "container_id": "ef7d82e35ee0",
+            "rule_id": null,
+            "correlation_key": "run:e7919516-ddb0-4c9c-ab4a-25e11844dfa8|ip:172.22.0.1"
+          }
+        ]
+      }
+    ],
+    "incidents": [
+      {
+        "id": "0e11a78a-b228-4388-bb01-d0dfff9fb696",
+        "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+        "run_id": "e7919516-ddb0-4c9c-ab4a-25e11844dfa8",
+        "title": "Repeated Failed Login Attempts (authentication_abuse): source 172.22.0.1",
+        "status": "open",
+        "created_at": "2026-11-17T13:36:44.649568Z",
+        "correlation_key": "run:e7919516-ddb0-4c9c-ab4a-25e11844dfa8|resource:shopcloud|ip:172.22.0.1",
+        "risk_score": 60,
+        "risk_explanation": "Risk score: 60 out of 100.\n+40: the highest alert severity is medium.\n+20: 11 event(s) over the detection threshold of 10 (2 points each, at most 20).\n+0: 0 additional correlated alert(s) (5 points each, at most 15).\nThis score is a simple rule of thumb for comparing incidents inside this lab. It does not predict financial loss and is not a universal measure of risk.",
+        "alerts": [
+          {
+            "id": "a56b8ccc-8f93-4199-9652-f28ac925bda6",
+            "rule_id": "repeated_failed_logins",
+            "severity": "medium",
+            "title": "Repeated failed logins from one source (source_ip=172.22.0.1)",
+            "description": "21 authentication_failure events from source_ip=172.22.0.1 within 20s (threshold 10 in 60s).",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "e7919516-ddb0-4c9c-ab4a-25e11844dfa8",
+            "incident_id": "0e11a78a-b228-4388-bb01-d0dfff9fb696",
+            "event_count": 21,
+            "first_event_at": "2026-11-17T13:36:24.270000Z",
+            "last_event_at": "2026-11-17T13:36:44.527000Z",
+            "created_at": "2026-11-17T13:36:44.644969Z"
+          }
+        ],
+        "responses": [],
+        "timeline_entries": 24
+      }
+    ],
+    "cleanup": {
+      "ok": true,
+      "run_status": "cleaned_up"
+    },
+    "checks": {
+      "has_alert": true,
+      "incident_count": 1,
+      "every_alert_in_an_incident": true,
+      "incidents_belong_to_run": true,
+      "incident_alerts_from_this_run": true,
+      "alert_events_from_this_run": true,
+      "events_from_other_runs": 0,
+      "benign_events_in_alerts": 1,
+      "benign_event_references": [
+        "docker:shopcloud:e2af859e-7f73-4a45-9292-d02bd71db3fa"
+      ],
+      "alert_event_count": 21
+    }
+  },
+  {
+    "phase": "correlation",
+    "telemetry_source": "docker",
+    "falco": false,
+    "index": 1,
+    "scenario_id": "unauthorized_resource_access",
+    "reset": {
+      "operation": "reset",
+      "requested_at": "2026-11-17T13:36:46.835911+00:00",
+      "ok": true,
+      "error": null,
+      "api_returned_seconds": 8.723,
+      "ready_seconds": 8.832
+    },
+    "run_id": "8fb885df-91c6-4ed1-88a7-e9ca32166bc3",
+    "stats_samples": 20,
+    "wall_seconds": 8.462,
+    "status": "completed",
+    "error": null,
+    "scenario_version": "1.0.0",
+    "started_at": "2026-11-17T13:36:55.789277Z",
+    "finished_at": "2026-11-17T13:37:03.255801Z",
+    "report": {
+      "report_version": "1.0",
+      "generated_at": "2026-11-17T13:37:04.173454Z",
+      "lab": {
+        "id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+        "name": "evaluation",
+        "target": "shopcloud",
+        "environment": "docker",
+        "status": "running"
+      },
+      "scenario": {
+        "id": "unauthorized_resource_access",
+        "version": "1.0.0",
+        "definition_available": true,
+        "name": "Unauthorized Resource Access",
+        "category": "authorization",
+        "description": "Logs in as the restricted test account and repeatedly requests a protected ShopCloud resource it is not allowed to read. Checks that every request is refused and that the repeated denials are detected.",
+        "target": "shopcloud",
+        "type": "application"
+      },
+      "run": {
+        "id": "8fb885df-91c6-4ed1-88a7-e9ca32166bc3",
+        "status": "completed",
+        "parameters": {
+          "username": "lab_restricted",
+          "attempts": 8,
+          "interval_seconds": 1,
+          "verification_check": "access_remains_denied"
+        },
+        "started_at": "2026-11-17T13:36:55.789277Z",
+        "finished_at": "2026-11-17T13:37:03.255801Z",
+        "duration_seconds": 7.467,
+        "error": null
+      },
+      "script_summary": {
+        "scenario": "unauthorized_resource_access",
+        "target": "http://127.0.0.1:8081",
+        "username": "lab_restricted",
+        "resource": "GET /api/orders",
+        "attempts_sent": 8,
+        "denied_403": 8,
+        "other": 0,
+        "granted_200": 0,
+        "errors": 0,
+        "access_control_failed": false,
+        "login_status": 200
+      },
+      "telemetry": {
+        "expected": [
+          {
+            "source": "application",
+            "event_type": "authorization_denied",
+            "expected_min_count": 5,
+            "collected_count": 8,
+            "met": true
+          }
+        ],
+        "all_expected_met": true,
+        "collected_total": 15,
+        "collected_by_type": [
+          {
+            "source": "application",
+            "event_type": "authentication_success",
+            "count": 4
+          },
+          {
+            "source": "application",
+            "event_type": "authorization_denied",
+            "count": 8
+          },
+          {
+            "source": "application",
+            "event_type": "other",
+            "count": 2
+          },
+          {
+            "source": "application",
+            "event_type": "resource_access",
+            "count": 1
+          }
+        ]
+      },
+      "detection": {
+        "rule": "repeated_access_denied",
+        "threshold": 5,
+        "window_seconds": 60
+      },
+      "alerts": [
+        {
+          "id": "ac732748-acff-4fd3-a32b-cafcab98e558",
+          "rule_id": "repeated_access_denied",
+          "severity": "medium",
+          "title": "Repeated access denied for one user (username=lab_restricted, raw.path=/api/orders)",
+          "description": "8 authorization_denied events from username=lab_restricted, raw.path=/api/orders within 7s (threshold 5 in 60s).",
+          "incident_id": "820937e6-47a8-410f-88d9-ed45c48c7b90",
+          "event_count": 8,
+          "first_event_at": "2026-11-17T13:36:56.003000Z",
+          "last_event_at": "2026-11-17T13:37:03.066000Z",
+          "created_at": "2026-11-17T13:37:03.180827Z",
+          "threshold_crossed_at": "2026-11-17T13:37:00.017000Z",
+          "threshold_event_id": "0d6f14c5-5bfb-4373-9e80-fd25a3872e41",
+          "threshold_event_reference": "docker:shopcloud:d85866b3-c32a-425b-aa41-56b57e800894",
+          "detection_latency_seconds": 3.164
+        }
+      ],
+      "incidents": [
+        {
+          "id": "820937e6-47a8-410f-88d9-ed45c48c7b90",
+          "title": "Unauthorized Resource Access (unauthorized_resource_access): source 172.22.0.1",
+          "status": "open",
+          "correlation_key": "run:8fb885df-91c6-4ed1-88a7-e9ca32166bc3|resource:shopcloud|ip:172.22.0.1",
+          "risk_score": 46,
+          "risk_explanation": "Risk score: 46 out of 100.\n+40: the highest alert severity is medium.\n+6: 3 event(s) over the detection threshold of 5 (2 points each, at most 20).\n+0: 0 additional correlated alert(s) (5 points each, at most 15).\nThis score is a simple rule of thumb for comparing incidents inside this lab. It does not predict financial loss and is not a universal measure of risk.",
+          "alert_ids": [
+            "ac732748-acff-4fd3-a32b-cafcab98e558"
+          ]
+        }
+      ],
+      "responses": [],
+      "post_run_verification": {
+        "check": "access_remains_denied",
+        "passed": true,
+        "still_denied": true,
+        "sent": {
+          "request": "GET /api/orders",
+          "username": "lab_restricted"
+        },
+        "received": {
+          "login_status": 200,
+          "status": 403
+        },
+        "error": null
+      },
+      "cleanup": {
+        "status": "not_run",
+        "runs": []
+      }
+    },
+    "alerts": [
+      {
+        "id": "ac732748-acff-4fd3-a32b-cafcab98e558",
+        "rule_id": "repeated_access_denied",
+        "severity": "medium",
+        "title": "Repeated access denied for one user (username=lab_restricted, raw.path=/api/orders)",
+        "description": "8 authorization_denied events from username=lab_restricted, raw.path=/api/orders within 7s (threshold 5 in 60s).",
+        "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+        "run_id": "8fb885df-91c6-4ed1-88a7-e9ca32166bc3",
+        "incident_id": "820937e6-47a8-410f-88d9-ed45c48c7b90",
+        "event_count": 8,
+        "first_event_at": "2026-11-17T13:36:56.003000Z",
+        "last_event_at": "2026-11-17T13:37:03.066000Z",
+        "created_at": "2026-11-17T13:37:03.180827Z",
+        "events": [
+          {
+            "event_id": "bd6e253f-74cc-4527-a908-af825253d1a3",
+            "timestamp": "2026-11-17T13:36:56.003000Z",
+            "source": "application",
+            "event_type": "authorization_denied",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Role is not allowed to read orders",
+            "raw_event_reference": "docker:shopcloud:ac4efa2b-b036-4212-bc41-f9a3544c3186",
+            "schema_version": "1.0",
+            "scenario_id": "unauthorized_resource_access",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "8fb885df-91c6-4ed1-88a7-e9ca32166bc3",
+            "username": "lab_restricted",
+            "container_id": "7382dcc3b40e",
+            "rule_id": null,
+            "correlation_key": "run:8fb885df-91c6-4ed1-88a7-e9ca32166bc3|ip:172.22.0.1"
+          },
+          {
+            "event_id": "22f478bb-2e36-4b4a-a968-a4b4e5170d38",
+            "timestamp": "2026-11-17T13:36:57.006000Z",
+            "source": "application",
+            "event_type": "authorization_denied",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Role is not allowed to read orders",
+            "raw_event_reference": "docker:shopcloud:3995a657-0cf4-431b-a706-7735af5ed966",
+            "schema_version": "1.0",
+            "scenario_id": "unauthorized_resource_access",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "8fb885df-91c6-4ed1-88a7-e9ca32166bc3",
+            "username": "lab_restricted",
+            "container_id": "7382dcc3b40e",
+            "rule_id": null,
+            "correlation_key": "run:8fb885df-91c6-4ed1-88a7-e9ca32166bc3|ip:172.22.0.1"
+          },
+          {
+            "event_id": "2f20aee8-781d-4cc1-a1db-a6281cbb7360",
+            "timestamp": "2026-11-17T13:36:58.009000Z",
+            "source": "application",
+            "event_type": "authorization_denied",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Role is not allowed to read orders",
+            "raw_event_reference": "docker:shopcloud:4faf4600-0094-487e-b0dc-70b4850e5ba9",
+            "schema_version": "1.0",
+            "scenario_id": "unauthorized_resource_access",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "8fb885df-91c6-4ed1-88a7-e9ca32166bc3",
+            "username": "lab_restricted",
+            "container_id": "7382dcc3b40e",
+            "rule_id": null,
+            "correlation_key": "run:8fb885df-91c6-4ed1-88a7-e9ca32166bc3|ip:172.22.0.1"
+          },
+          {
+            "event_id": "e68c1f84-a734-4989-a107-23d728e17749",
+            "timestamp": "2026-11-17T13:36:59.014000Z",
+            "source": "application",
+            "event_type": "authorization_denied",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Role is not allowed to read orders",
+            "raw_event_reference": "docker:shopcloud:58589477-3c10-4107-aaf5-3660beb4c2b4",
+            "schema_version": "1.0",
+            "scenario_id": "unauthorized_resource_access",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "8fb885df-91c6-4ed1-88a7-e9ca32166bc3",
+            "username": "lab_restricted",
+            "container_id": "7382dcc3b40e",
+            "rule_id": null,
+            "correlation_key": "run:8fb885df-91c6-4ed1-88a7-e9ca32166bc3|ip:172.22.0.1"
+          },
+          {
+            "event_id": "0d6f14c5-5bfb-4373-9e80-fd25a3872e41",
+            "timestamp": "2026-11-17T13:37:00.017000Z",
+            "source": "application",
+            "event_type": "authorization_denied",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Role is not allowed to read orders",
+            "raw_event_reference": "docker:shopcloud:d85866b3-c32a-425b-aa41-56b57e800894",
+            "schema_version": "1.0",
+            "scenario_id": "unauthorized_resource_access",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "8fb885df-91c6-4ed1-88a7-e9ca32166bc3",
+            "username": "lab_restricted",
+            "container_id": "7382dcc3b40e",
+            "rule_id": null,
+            "correlation_key": "run:8fb885df-91c6-4ed1-88a7-e9ca32166bc3|ip:172.22.0.1"
+          },
+          {
+            "event_id": "32f2abe0-ad7f-4437-a087-d4afdd42e5b2",
+            "timestamp": "2026-11-17T13:37:01.025000Z",
+            "source": "application",
+            "event_type": "authorization_denied",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Role is not allowed to read orders",
+            "raw_event_reference": "docker:shopcloud:439a6cc3-0101-41b2-9584-d2ccde4d7d9a",
+            "schema_version": "1.0",
+            "scenario_id": "unauthorized_resource_access",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "8fb885df-91c6-4ed1-88a7-e9ca32166bc3",
+            "username": "lab_restricted",
+            "container_id": "7382dcc3b40e",
+            "rule_id": null,
+            "correlation_key": "run:8fb885df-91c6-4ed1-88a7-e9ca32166bc3|ip:172.22.0.1"
+          },
+          {
+            "event_id": "78f44cfa-3466-4e9c-bce4-53ed8e9a7845",
+            "timestamp": "2026-11-17T13:37:02.058000Z",
+            "source": "application",
+            "event_type": "authorization_denied",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Role is not allowed to read orders",
+            "raw_event_reference": "docker:shopcloud:db51c483-bf3a-4321-8351-6bf7b7e0e6b9",
+            "schema_version": "1.0",
+            "scenario_id": "unauthorized_resource_access",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "8fb885df-91c6-4ed1-88a7-e9ca32166bc3",
+            "username": "lab_restricted",
+            "container_id": "7382dcc3b40e",
+            "rule_id": null,
+            "correlation_key": "run:8fb885df-91c6-4ed1-88a7-e9ca32166bc3|ip:172.22.0.1"
+          },
+          {
+            "event_id": "f7616e83-9115-4507-8a3e-69f93fdf48e0",
+            "timestamp": "2026-11-17T13:37:03.066000Z",
+            "source": "application",
+            "event_type": "authorization_denied",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Role is not allowed to read orders",
+            "raw_event_reference": "docker:shopcloud:98f7ad9a-ed39-4fc6-90b0-049fc6c3972e",
+            "schema_version": "1.0",
+            "scenario_id": "unauthorized_resource_access",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "8fb885df-91c6-4ed1-88a7-e9ca32166bc3",
+            "username": "lab_restricted",
+            "container_id": "7382dcc3b40e",
+            "rule_id": null,
+            "correlation_key": "run:8fb885df-91c6-4ed1-88a7-e9ca32166bc3|ip:172.22.0.1"
+          }
+        ]
+      }
+    ],
+    "incidents": [
+      {
+        "id": "820937e6-47a8-410f-88d9-ed45c48c7b90",
+        "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+        "run_id": "8fb885df-91c6-4ed1-88a7-e9ca32166bc3",
+        "title": "Unauthorized Resource Access (unauthorized_resource_access): source 172.22.0.1",
+        "status": "open",
+        "created_at": "2026-11-17T13:37:03.183939Z",
+        "correlation_key": "run:8fb885df-91c6-4ed1-88a7-e9ca32166bc3|resource:shopcloud|ip:172.22.0.1",
+        "risk_score": 46,
+        "risk_explanation": "Risk score: 46 out of 100.\n+40: the highest alert severity is medium.\n+6: 3 event(s) over the detection threshold of 5 (2 points each, at most 20).\n+0: 0 additional correlated alert(s) (5 points each, at most 15).\nThis score is a simple rule of thumb for comparing incidents inside this lab. It does not predict financial loss and is not a universal measure of risk.",
+        "alerts": [
+          {
+            "id": "ac732748-acff-4fd3-a32b-cafcab98e558",
+            "rule_id": "repeated_access_denied",
+            "severity": "medium",
+            "title": "Repeated access denied for one user (username=lab_restricted, raw.path=/api/orders)",
+            "description": "8 authorization_denied events from username=lab_restricted, raw.path=/api/orders within 7s (threshold 5 in 60s).",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "8fb885df-91c6-4ed1-88a7-e9ca32166bc3",
+            "incident_id": "820937e6-47a8-410f-88d9-ed45c48c7b90",
+            "event_count": 8,
+            "first_event_at": "2026-11-17T13:36:56.003000Z",
+            "last_event_at": "2026-11-17T13:37:03.066000Z",
+            "created_at": "2026-11-17T13:37:03.180827Z"
+          }
+        ],
+        "responses": [],
+        "timeline_entries": 11
+      }
+    ],
+    "cleanup": {
+      "ok": true,
+      "run_status": "cleaned_up"
+    },
+    "checks": {
+      "has_alert": true,
+      "incident_count": 1,
+      "every_alert_in_an_incident": true,
+      "incidents_belong_to_run": true,
+      "incident_alerts_from_this_run": true,
+      "alert_events_from_this_run": true,
+      "events_from_other_runs": 0,
+      "benign_events_in_alerts": 0,
+      "benign_event_references": [],
+      "alert_event_count": 8
+    }
+  },
+  {
+    "phase": "correlation",
+    "telemetry_source": "docker",
+    "falco": false,
+    "index": 1,
+    "scenario_id": "suspicious_container_activity",
+    "reset": {
+      "operation": "reset",
+      "requested_at": "2026-11-17T13:37:04.321470+00:00",
+      "ok": true,
+      "error": null,
+      "api_returned_seconds": 8.331,
+      "ready_seconds": 8.448
+    },
+    "run_id": "8f81a011-ffa8-43d0-963e-4f7a1231246b",
+    "stats_samples": 10,
+    "wall_seconds": 4.384,
+    "status": "completed",
+    "error": null,
+    "scenario_version": "1.0.0",
+    "started_at": "2026-11-17T13:37:12.942290Z",
+    "finished_at": "2026-11-17T13:37:15.520953Z",
+    "report": {
+      "report_version": "1.0",
+      "generated_at": "2026-11-17T13:37:17.180272Z",
+      "lab": {
+        "id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+        "name": "evaluation",
+        "target": "shopcloud",
+        "environment": "docker",
+        "status": "running"
+      },
+      "scenario": {
+        "id": "suspicious_container_activity",
+        "version": "1.0.0",
+        "definition_available": true,
+        "name": "Suspicious Container Activity",
+        "category": "container_runtime",
+        "description": "Runs one harmless, predefined command (a shell that prints `id` and exits) inside the lab's dedicated test container, the way an intruder would start a shell in a running container. Checks that the Docker exec event, and Falco's alert when Falco is on, are collected and detected.",
+        "target": "test_container",
+        "type": "container"
+      },
+      "run": {
+        "id": "8f81a011-ffa8-43d0-963e-4f7a1231246b",
+        "status": "completed",
+        "parameters": {},
+        "started_at": "2026-11-17T13:37:12.942290Z",
+        "finished_at": "2026-11-17T13:37:15.520953Z",
+        "duration_seconds": 2.579,
+        "error": null
+      },
+      "script_summary": {
+        "scenario": "suspicious_container_activity",
+        "target": "test_container",
+        "container": "test_container",
+        "command": "sh -c id; : cloudattacklab-scenario-marker",
+        "exit_code": 0,
+        "output": "uid=0(root) gid=0(root) groups=0(root),0(root),1(bin),2(daemon),3(sys),4(adm),6(disk),10(wheel),11(floppy),20(dialout),26(tape),27(video)"
+      },
+      "telemetry": {
+        "expected": [
+          {
+            "source": "docker",
+            "event_type": "suspicious_process",
+            "expected_min_count": 1,
+            "collected_count": 1,
+            "met": true
+          }
+        ],
+        "all_expected_met": true,
+        "collected_total": 1,
+        "collected_by_type": [
+          {
+            "source": "docker",
+            "event_type": "suspicious_process",
+            "count": 1
+          }
+        ]
+      },
+      "detection": {
+        "rule": "suspicious_container_process",
+        "threshold": 1,
+        "window_seconds": 60
+      },
+      "alerts": [
+        {
+          "id": "f7612e05-9f87-4e29-b57e-52c7f66808c4",
+          "rule_id": "suspicious_container_process",
+          "severity": "high",
+          "title": "Suspicious process in the test container (resource=test_container)",
+          "description": "1 suspicious_process events from resource=test_container within 0s (threshold 1 in 60s).",
+          "incident_id": "4562a899-8520-4930-9d1e-1e3b5f5a360b",
+          "event_count": 1,
+          "first_event_at": "2026-11-17T13:37:13.221187Z",
+          "last_event_at": "2026-11-17T13:37:13.221187Z",
+          "created_at": "2026-11-17T13:37:15.510959Z",
+          "threshold_crossed_at": "2026-11-17T13:37:13.221187Z",
+          "threshold_event_id": "6dd0b0cd-1b20-402a-9654-03e8b399f47d",
+          "threshold_event_reference": "docker:test_container:exec_start-1794922633221187124",
+          "detection_latency_seconds": 2.29
+        }
+      ],
+      "incidents": [
+        {
+          "id": "4562a899-8520-4930-9d1e-1e3b5f5a360b",
+          "title": "Suspicious Container Activity (suspicious_container_activity)",
+          "status": "open",
+          "correlation_key": "run:8f81a011-ffa8-43d0-963e-4f7a1231246b|resource:test_container",
+          "risk_score": 60,
+          "risk_explanation": "Risk score: 60 out of 100.\n+60: the highest alert severity is high.\n+0: 0 event(s) over the detection threshold of 1 (2 points each, at most 20).\n+0: 0 additional correlated alert(s) (5 points each, at most 15).\nThis score is a simple rule of thumb for comparing incidents inside this lab. It does not predict financial loss and is not a universal measure of risk.",
+          "alert_ids": [
+            "f7612e05-9f87-4e29-b57e-52c7f66808c4"
+          ]
+        }
+      ],
+      "responses": [],
+      "post_run_verification": null,
+      "cleanup": {
+        "status": "not_run",
+        "runs": []
+      }
+    },
+    "alerts": [
+      {
+        "id": "f7612e05-9f87-4e29-b57e-52c7f66808c4",
+        "rule_id": "suspicious_container_process",
+        "severity": "high",
+        "title": "Suspicious process in the test container (resource=test_container)",
+        "description": "1 suspicious_process events from resource=test_container within 0s (threshold 1 in 60s).",
+        "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+        "run_id": "8f81a011-ffa8-43d0-963e-4f7a1231246b",
+        "incident_id": "4562a899-8520-4930-9d1e-1e3b5f5a360b",
+        "event_count": 1,
+        "first_event_at": "2026-11-17T13:37:13.221187Z",
+        "last_event_at": "2026-11-17T13:37:13.221187Z",
+        "created_at": "2026-11-17T13:37:15.510959Z",
+        "events": [
+          {
+            "event_id": "6dd0b0cd-1b20-402a-9654-03e8b399f47d",
+            "timestamp": "2026-11-17T13:37:13.221187Z",
+            "source": "docker",
+            "event_type": "suspicious_process",
+            "severity": "medium",
+            "source_ip": null,
+            "resource": "test_container",
+            "message": "docker exec started a process in cloudattacklab-lab-test_container-1: sh -c id; : cloudattacklab-scenario-marker",
+            "raw_event_reference": "docker:test_container:exec_start-1794922633221187124",
+            "schema_version": "1.0",
+            "scenario_id": "suspicious_container_activity",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "8f81a011-ffa8-43d0-963e-4f7a1231246b",
+            "username": null,
+            "container_id": "77429545061b",
+            "rule_id": null,
+            "correlation_key": "run:8f81a011-ffa8-43d0-963e-4f7a1231246b|container:77429545061b"
+          }
+        ]
+      }
+    ],
+    "incidents": [
+      {
+        "id": "4562a899-8520-4930-9d1e-1e3b5f5a360b",
+        "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+        "run_id": "8f81a011-ffa8-43d0-963e-4f7a1231246b",
+        "title": "Suspicious Container Activity (suspicious_container_activity)",
+        "status": "open",
+        "created_at": "2026-11-17T13:37:15.513906Z",
+        "correlation_key": "run:8f81a011-ffa8-43d0-963e-4f7a1231246b|resource:test_container",
+        "risk_score": 60,
+        "risk_explanation": "Risk score: 60 out of 100.\n+60: the highest alert severity is high.\n+0: 0 event(s) over the detection threshold of 1 (2 points each, at most 20).\n+0: 0 additional correlated alert(s) (5 points each, at most 15).\nThis score is a simple rule of thumb for comparing incidents inside this lab. It does not predict financial loss and is not a universal measure of risk.",
+        "alerts": [
+          {
+            "id": "f7612e05-9f87-4e29-b57e-52c7f66808c4",
+            "rule_id": "suspicious_container_process",
+            "severity": "high",
+            "title": "Suspicious process in the test container (resource=test_container)",
+            "description": "1 suspicious_process events from resource=test_container within 0s (threshold 1 in 60s).",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "8f81a011-ffa8-43d0-963e-4f7a1231246b",
+            "incident_id": "4562a899-8520-4930-9d1e-1e3b5f5a360b",
+            "event_count": 1,
+            "first_event_at": "2026-11-17T13:37:13.221187Z",
+            "last_event_at": "2026-11-17T13:37:13.221187Z",
+            "created_at": "2026-11-17T13:37:15.510959Z"
+          }
+        ],
+        "responses": [],
+        "timeline_entries": 4
+      }
+    ],
+    "cleanup": {
+      "ok": true,
+      "run_status": "cleaned_up"
+    },
+    "checks": {
+      "has_alert": true,
+      "incident_count": 1,
+      "every_alert_in_an_incident": true,
+      "incidents_belong_to_run": true,
+      "incident_alerts_from_this_run": true,
+      "alert_events_from_this_run": true,
+      "events_from_other_runs": 0,
+      "benign_events_in_alerts": 0,
+      "benign_event_references": [],
+      "alert_event_count": 1
+    }
+  },
+  {
+    "phase": "correlation",
+    "telemetry_source": "docker",
+    "falco": false,
+    "index": 2,
+    "scenario_id": "authentication_abuse",
+    "reset": {
+      "operation": "reset",
+      "requested_at": "2026-11-17T13:37:18.556123+00:00",
+      "ok": true,
+      "error": null,
+      "api_returned_seconds": 8.111,
+      "ready_seconds": 8.23
+    },
+    "run_id": "51a40829-e67e-48f3-a1e9-d436381f5672",
+    "stats_samples": 55,
+    "wall_seconds": 22.688,
+    "status": "completed",
+    "error": null,
+    "scenario_version": "1.0.0",
+    "started_at": "2026-11-17T13:37:26.933251Z",
+    "finished_at": "2026-11-17T13:37:47.733293Z",
+    "report": {
+      "report_version": "1.0",
+      "generated_at": "2026-11-17T13:37:49.533061Z",
+      "lab": {
+        "id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+        "name": "evaluation",
+        "target": "shopcloud",
+        "environment": "docker",
+        "status": "running"
+      },
+      "scenario": {
+        "id": "authentication_abuse",
+        "version": "1.0.0",
+        "definition_available": true,
+        "name": "Repeated Failed Login Attempts",
+        "category": "authentication",
+        "description": "Sends a bounded number of invalid login attempts to the ShopCloud test login endpoint and checks that the repeated failures are detected.",
+        "target": "shopcloud",
+        "type": "application"
+      },
+      "run": {
+        "id": "51a40829-e67e-48f3-a1e9-d436381f5672",
+        "status": "completed",
+        "parameters": {
+          "username": "lab_user",
+          "attempts": 20,
+          "interval_seconds": 1
+        },
+        "started_at": "2026-11-17T13:37:26.933251Z",
+        "finished_at": "2026-11-17T13:37:47.733293Z",
+        "duration_seconds": 20.8,
+        "error": null
+      },
+      "script_summary": {
+        "scenario": "authentication_abuse",
+        "target": "http://127.0.0.1:8081",
+        "username": "lab_user",
+        "attempts_sent": 20,
+        "unauthorized_401": 20,
+        "rate_limited_429": 0,
+        "other": 0,
+        "errors": 0
+      },
+      "telemetry": {
+        "expected": [
+          {
+            "source": "application",
+            "event_type": "authentication_failure",
+            "expected_min_count": 10,
+            "collected_count": 21,
+            "met": true
+          }
+        ],
+        "all_expected_met": true,
+        "collected_total": 27,
+        "collected_by_type": [
+          {
+            "source": "application",
+            "event_type": "authentication_failure",
+            "count": 21
+          },
+          {
+            "source": "application",
+            "event_type": "authentication_success",
+            "count": 3
+          },
+          {
+            "source": "application",
+            "event_type": "other",
+            "count": 1
+          },
+          {
+            "source": "application",
+            "event_type": "resource_access",
+            "count": 2
+          }
+        ]
+      },
+      "detection": {
+        "rule": "repeated_failed_logins",
+        "threshold": 10,
+        "window_seconds": 60
+      },
+      "alerts": [
+        {
+          "id": "55e84421-c6dd-4e2d-9514-49549f10848c",
+          "rule_id": "repeated_failed_logins",
+          "severity": "medium",
+          "title": "Repeated failed logins from one source (source_ip=172.22.0.1)",
+          "description": "21 authentication_failure events from source_ip=172.22.0.1 within 20s (threshold 10 in 60s).",
+          "incident_id": "f118a541-99e6-4b4d-ac3b-9ddcf4428f1b",
+          "event_count": 21,
+          "first_event_at": "2026-11-17T13:37:27.146000Z",
+          "last_event_at": "2026-11-17T13:37:47.603000Z",
+          "created_at": "2026-11-17T13:37:47.724465Z",
+          "threshold_crossed_at": "2026-11-17T13:37:36.515000Z",
+          "threshold_event_id": "a4edcf67-7fad-43fe-aa33-81c8452194d8",
+          "threshold_event_reference": "docker:shopcloud:2976bd6d-42eb-44fc-b542-0065cdc060f6",
+          "detection_latency_seconds": 11.209
+        }
+      ],
+      "incidents": [
+        {
+          "id": "f118a541-99e6-4b4d-ac3b-9ddcf4428f1b",
+          "title": "Repeated Failed Login Attempts (authentication_abuse): source 172.22.0.1",
+          "status": "open",
+          "correlation_key": "run:51a40829-e67e-48f3-a1e9-d436381f5672|resource:shopcloud|ip:172.22.0.1",
+          "risk_score": 60,
+          "risk_explanation": "Risk score: 60 out of 100.\n+40: the highest alert severity is medium.\n+20: 11 event(s) over the detection threshold of 10 (2 points each, at most 20).\n+0: 0 additional correlated alert(s) (5 points each, at most 15).\nThis score is a simple rule of thumb for comparing incidents inside this lab. It does not predict financial loss and is not a universal measure of risk.",
+          "alert_ids": [
+            "55e84421-c6dd-4e2d-9514-49549f10848c"
+          ]
+        }
+      ],
+      "responses": [],
+      "post_run_verification": null,
+      "cleanup": {
+        "status": "not_run",
+        "runs": []
+      }
+    },
+    "alerts": [
+      {
+        "id": "55e84421-c6dd-4e2d-9514-49549f10848c",
+        "rule_id": "repeated_failed_logins",
+        "severity": "medium",
+        "title": "Repeated failed logins from one source (source_ip=172.22.0.1)",
+        "description": "21 authentication_failure events from source_ip=172.22.0.1 within 20s (threshold 10 in 60s).",
+        "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+        "run_id": "51a40829-e67e-48f3-a1e9-d436381f5672",
+        "incident_id": "f118a541-99e6-4b4d-ac3b-9ddcf4428f1b",
+        "event_count": 21,
+        "first_event_at": "2026-11-17T13:37:27.146000Z",
+        "last_event_at": "2026-11-17T13:37:47.603000Z",
+        "created_at": "2026-11-17T13:37:47.724465Z",
+        "events": [
+          {
+            "event_id": "f2158557-1632-49cb-a04a-e76bb3070b3b",
+            "timestamp": "2026-11-17T13:37:27.146000Z",
+            "source": "application",
+            "event_type": "authentication_failure",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Invalid username or password",
+            "raw_event_reference": "docker:shopcloud:3205a506-4f1f-459e-bd50-e543ea9234c8",
+            "schema_version": "1.0",
+            "scenario_id": "authentication_abuse",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "51a40829-e67e-48f3-a1e9-d436381f5672",
+            "username": "lab_user",
+            "container_id": "0b9b5da4cf2e",
+            "rule_id": null,
+            "correlation_key": "run:51a40829-e67e-48f3-a1e9-d436381f5672|ip:172.22.0.1"
+          },
+          {
+            "event_id": "bcc7992e-f289-4008-8ab6-48c477c283d5",
+            "timestamp": "2026-11-17T13:37:28.196000Z",
+            "source": "application",
+            "event_type": "authentication_failure",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Invalid username or password",
+            "raw_event_reference": "docker:shopcloud:9dfc69be-587b-4aa2-ad22-71278322657a",
+            "schema_version": "1.0",
+            "scenario_id": "authentication_abuse",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "51a40829-e67e-48f3-a1e9-d436381f5672",
+            "username": "lab_user",
+            "container_id": "0b9b5da4cf2e",
+            "rule_id": null,
+            "correlation_key": "run:51a40829-e67e-48f3-a1e9-d436381f5672|ip:172.22.0.1"
+          },
+          {
+            "event_id": "62ea233b-03ce-4d9f-90a4-44901a974a8e",
+            "timestamp": "2026-11-17T13:37:29.284000Z",
+            "source": "application",
+            "event_type": "authentication_failure",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Invalid username or password",
+            "raw_event_reference": "docker:shopcloud:e1340e96-e1ce-4097-963d-3aed39bce2df",
+            "schema_version": "1.0",
+            "scenario_id": "authentication_abuse",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "51a40829-e67e-48f3-a1e9-d436381f5672",
+            "username": "lab_user",
+            "container_id": "0b9b5da4cf2e",
+            "rule_id": null,
+            "correlation_key": "run:51a40829-e67e-48f3-a1e9-d436381f5672|ip:172.22.0.1"
+          },
+          {
+            "event_id": "18ee0834-3a5b-41a1-bcaf-c1581a6ac5c2",
+            "timestamp": "2026-11-17T13:37:30.323000Z",
+            "source": "application",
+            "event_type": "authentication_failure",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Invalid username or password",
+            "raw_event_reference": "docker:shopcloud:26619fa8-0306-4359-b7c1-bd9efc4b8ef5",
+            "schema_version": "1.0",
+            "scenario_id": "authentication_abuse",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "51a40829-e67e-48f3-a1e9-d436381f5672",
+            "username": "lab_user",
+            "container_id": "0b9b5da4cf2e",
+            "rule_id": null,
+            "correlation_key": "run:51a40829-e67e-48f3-a1e9-d436381f5672|ip:172.22.0.1"
+          },
+          {
+            "event_id": "3fab0cf6-dd1a-48a5-a8f1-00f3e3e1df9a",
+            "timestamp": "2026-11-17T13:37:31.504000Z",
+            "source": "application",
+            "event_type": "authentication_failure",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Invalid username or password",
+            "raw_event_reference": "docker:shopcloud:fb6b5237-6cf2-4563-bbec-53713c793380",
+            "schema_version": "1.0",
+            "scenario_id": "authentication_abuse",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "51a40829-e67e-48f3-a1e9-d436381f5672",
+            "username": "lab_user",
+            "container_id": "0b9b5da4cf2e",
+            "rule_id": null,
+            "correlation_key": "run:51a40829-e67e-48f3-a1e9-d436381f5672|ip:172.22.0.1"
+          },
+          {
+            "event_id": "64e0dc35-7cc6-449e-baf9-5a5de4d3698f",
+            "timestamp": "2026-11-17T13:37:32.546000Z",
+            "source": "application",
+            "event_type": "authentication_failure",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Invalid username or password",
+            "raw_event_reference": "docker:shopcloud:a3a29b9e-8d07-4b63-8c1a-57ef34e73393",
+            "schema_version": "1.0",
+            "scenario_id": "authentication_abuse",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "51a40829-e67e-48f3-a1e9-d436381f5672",
+            "username": "lab_user",
+            "container_id": "0b9b5da4cf2e",
+            "rule_id": null,
+            "correlation_key": "run:51a40829-e67e-48f3-a1e9-d436381f5672|ip:172.22.0.1"
+          },
+          {
+            "event_id": "f7205a77-a180-44d5-af98-f64999385c24",
+            "timestamp": "2026-11-17T13:37:33.595000Z",
+            "source": "application",
+            "event_type": "authentication_failure",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Invalid username or password",
+            "raw_event_reference": "docker:shopcloud:a979ff3e-e97d-4792-8aad-f9732b8b0708",
+            "schema_version": "1.0",
+            "scenario_id": "authentication_abuse",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "51a40829-e67e-48f3-a1e9-d436381f5672",
+            "username": "lab_user",
+            "container_id": "0b9b5da4cf2e",
+            "rule_id": null,
+            "correlation_key": "run:51a40829-e67e-48f3-a1e9-d436381f5672|ip:172.22.0.1"
+          },
+          {
+            "event_id": "c4af42de-915f-4924-919f-f2ef94254a05",
+            "timestamp": "2026-11-17T13:37:34.647000Z",
+            "source": "application",
+            "event_type": "authentication_failure",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Invalid username or password",
+            "raw_event_reference": "docker:shopcloud:bec35345-9016-4000-8886-71b06676b3aa",
+            "schema_version": "1.0",
+            "scenario_id": "authentication_abuse",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "51a40829-e67e-48f3-a1e9-d436381f5672",
+            "username": "lab_user",
+            "container_id": "0b9b5da4cf2e",
+            "rule_id": null,
+            "correlation_key": "run:51a40829-e67e-48f3-a1e9-d436381f5672|ip:172.22.0.1"
+          },
+          {
+            "event_id": "27cca152-d5b5-4cbf-99b1-8db41c14e3b4",
+            "timestamp": "2026-11-17T13:37:35.686000Z",
+            "source": "application",
+            "event_type": "authentication_failure",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Invalid username or password",
+            "raw_event_reference": "docker:shopcloud:26155cc0-d388-4b47-89ea-6fb9ba9dc47a",
+            "schema_version": "1.0",
+            "scenario_id": "authentication_abuse",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "51a40829-e67e-48f3-a1e9-d436381f5672",
+            "username": "lab_user",
+            "container_id": "0b9b5da4cf2e",
+            "rule_id": null,
+            "correlation_key": "run:51a40829-e67e-48f3-a1e9-d436381f5672|ip:172.22.0.1"
+          },
+          {
+            "event_id": "a4edcf67-7fad-43fe-aa33-81c8452194d8",
+            "timestamp": "2026-11-17T13:37:36.515000Z",
+            "source": "application",
+            "event_type": "authentication_failure",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Invalid username or password",
+            "raw_event_reference": "docker:shopcloud:2976bd6d-42eb-44fc-b542-0065cdc060f6",
+            "schema_version": "1.0",
+            "scenario_id": "authentication_abuse",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "51a40829-e67e-48f3-a1e9-d436381f5672",
+            "username": "lab_restricted",
+            "container_id": "0b9b5da4cf2e",
+            "rule_id": null,
+            "correlation_key": "run:51a40829-e67e-48f3-a1e9-d436381f5672|ip:172.22.0.1"
+          },
+          {
+            "event_id": "f06a17e6-5cc1-44f7-b8f8-057ff611d367",
+            "timestamp": "2026-11-17T13:37:36.732000Z",
+            "source": "application",
+            "event_type": "authentication_failure",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Invalid username or password",
+            "raw_event_reference": "docker:shopcloud:5547eeae-cedb-4676-a4c5-25a923e62aa4",
+            "schema_version": "1.0",
+            "scenario_id": "authentication_abuse",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "51a40829-e67e-48f3-a1e9-d436381f5672",
+            "username": "lab_user",
+            "container_id": "0b9b5da4cf2e",
+            "rule_id": null,
+            "correlation_key": "run:51a40829-e67e-48f3-a1e9-d436381f5672|ip:172.22.0.1"
+          },
+          {
+            "event_id": "c3b16ba3-70d6-4285-9278-31decd4326ec",
+            "timestamp": "2026-11-17T13:37:37.774000Z",
+            "source": "application",
+            "event_type": "authentication_failure",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Invalid username or password",
+            "raw_event_reference": "docker:shopcloud:42c90391-2a75-44c9-b47b-3fc332ff2b31",
+            "schema_version": "1.0",
+            "scenario_id": "authentication_abuse",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "51a40829-e67e-48f3-a1e9-d436381f5672",
+            "username": "lab_user",
+            "container_id": "0b9b5da4cf2e",
+            "rule_id": null,
+            "correlation_key": "run:51a40829-e67e-48f3-a1e9-d436381f5672|ip:172.22.0.1"
+          },
+          {
+            "event_id": "5034de4a-b962-40d8-9e29-3529c6eb7592",
+            "timestamp": "2026-11-17T13:37:38.883000Z",
+            "source": "application",
+            "event_type": "authentication_failure",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Invalid username or password",
+            "raw_event_reference": "docker:shopcloud:61329eff-f0b2-41dd-aa4e-e2618c514df1",
+            "schema_version": "1.0",
+            "scenario_id": "authentication_abuse",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "51a40829-e67e-48f3-a1e9-d436381f5672",
+            "username": "lab_user",
+            "container_id": "0b9b5da4cf2e",
+            "rule_id": null,
+            "correlation_key": "run:51a40829-e67e-48f3-a1e9-d436381f5672|ip:172.22.0.1"
+          },
+          {
+            "event_id": "b3d847b0-2834-4281-9bf8-0644d515d59c",
+            "timestamp": "2026-11-17T13:37:39.925000Z",
+            "source": "application",
+            "event_type": "authentication_failure",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Invalid username or password",
+            "raw_event_reference": "docker:shopcloud:aac2733c-96d3-4a25-a5c4-55f45c778569",
+            "schema_version": "1.0",
+            "scenario_id": "authentication_abuse",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "51a40829-e67e-48f3-a1e9-d436381f5672",
+            "username": "lab_user",
+            "container_id": "0b9b5da4cf2e",
+            "rule_id": null,
+            "correlation_key": "run:51a40829-e67e-48f3-a1e9-d436381f5672|ip:172.22.0.1"
+          },
+          {
+            "event_id": "701790a8-57ce-42e6-8867-19adfb45f88c",
+            "timestamp": "2026-11-17T13:37:40.984000Z",
+            "source": "application",
+            "event_type": "authentication_failure",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Invalid username or password",
+            "raw_event_reference": "docker:shopcloud:1b5b2dea-6f8d-4e09-81ad-6d4daeaf5a9f",
+            "schema_version": "1.0",
+            "scenario_id": "authentication_abuse",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "51a40829-e67e-48f3-a1e9-d436381f5672",
+            "username": "lab_user",
+            "container_id": "0b9b5da4cf2e",
+            "rule_id": null,
+            "correlation_key": "run:51a40829-e67e-48f3-a1e9-d436381f5672|ip:172.22.0.1"
+          },
+          {
+            "event_id": "f93dc66a-e4fb-4298-979f-991e1a407220",
+            "timestamp": "2026-11-17T13:37:42.111000Z",
+            "source": "application",
+            "event_type": "authentication_failure",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Invalid username or password",
+            "raw_event_reference": "docker:shopcloud:cdb123d0-1e0f-4e3a-89c4-422f8ed76a17",
+            "schema_version": "1.0",
+            "scenario_id": "authentication_abuse",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "51a40829-e67e-48f3-a1e9-d436381f5672",
+            "username": "lab_user",
+            "container_id": "0b9b5da4cf2e",
+            "rule_id": null,
+            "correlation_key": "run:51a40829-e67e-48f3-a1e9-d436381f5672|ip:172.22.0.1"
+          },
+          {
+            "event_id": "c97c0854-790d-46e4-b7de-552cc887b7a5",
+            "timestamp": "2026-11-17T13:37:43.321000Z",
+            "source": "application",
+            "event_type": "authentication_failure",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Invalid username or password",
+            "raw_event_reference": "docker:shopcloud:967e59fd-f882-4e61-bbcb-8c623a0e93ad",
+            "schema_version": "1.0",
+            "scenario_id": "authentication_abuse",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "51a40829-e67e-48f3-a1e9-d436381f5672",
+            "username": "lab_user",
+            "container_id": "0b9b5da4cf2e",
+            "rule_id": null,
+            "correlation_key": "run:51a40829-e67e-48f3-a1e9-d436381f5672|ip:172.22.0.1"
+          },
+          {
+            "event_id": "3443622a-db42-41e2-8b9f-ed054dabfa16",
+            "timestamp": "2026-11-17T13:37:44.386000Z",
+            "source": "application",
+            "event_type": "authentication_failure",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Invalid username or password",
+            "raw_event_reference": "docker:shopcloud:79c0fdd0-aee9-458c-aa29-f791a87d9577",
+            "schema_version": "1.0",
+            "scenario_id": "authentication_abuse",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "51a40829-e67e-48f3-a1e9-d436381f5672",
+            "username": "lab_user",
+            "container_id": "0b9b5da4cf2e",
+            "rule_id": null,
+            "correlation_key": "run:51a40829-e67e-48f3-a1e9-d436381f5672|ip:172.22.0.1"
+          },
+          {
+            "event_id": "055d7546-6bdd-4c1c-b664-dfb8cc61ebfc",
+            "timestamp": "2026-11-17T13:37:45.496000Z",
+            "source": "application",
+            "event_type": "authentication_failure",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Invalid username or password",
+            "raw_event_reference": "docker:shopcloud:05ee6f69-6e0b-4d72-a99d-6eb23c36be3d",
+            "schema_version": "1.0",
+            "scenario_id": "authentication_abuse",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "51a40829-e67e-48f3-a1e9-d436381f5672",
+            "username": "lab_user",
+            "container_id": "0b9b5da4cf2e",
+            "rule_id": null,
+            "correlation_key": "run:51a40829-e67e-48f3-a1e9-d436381f5672|ip:172.22.0.1"
+          },
+          {
+            "event_id": "f64d748b-a9f7-468b-be5f-323bdcdf0c03",
+            "timestamp": "2026-11-17T13:37:46.553000Z",
+            "source": "application",
+            "event_type": "authentication_failure",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Invalid username or password",
+            "raw_event_reference": "docker:shopcloud:b27a7ab2-2d28-4a64-a277-3b46e88ce13a",
+            "schema_version": "1.0",
+            "scenario_id": "authentication_abuse",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "51a40829-e67e-48f3-a1e9-d436381f5672",
+            "username": "lab_user",
+            "container_id": "0b9b5da4cf2e",
+            "rule_id": null,
+            "correlation_key": "run:51a40829-e67e-48f3-a1e9-d436381f5672|ip:172.22.0.1"
+          },
+          {
+            "event_id": "14fc6a4c-47f5-4533-808f-b6cdf3eeb933",
+            "timestamp": "2026-11-17T13:37:47.603000Z",
+            "source": "application",
+            "event_type": "authentication_failure",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Invalid username or password",
+            "raw_event_reference": "docker:shopcloud:480b911f-58bc-4896-a878-9671f70458fe",
+            "schema_version": "1.0",
+            "scenario_id": "authentication_abuse",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "51a40829-e67e-48f3-a1e9-d436381f5672",
+            "username": "lab_user",
+            "container_id": "0b9b5da4cf2e",
+            "rule_id": null,
+            "correlation_key": "run:51a40829-e67e-48f3-a1e9-d436381f5672|ip:172.22.0.1"
+          }
+        ]
+      }
+    ],
+    "incidents": [
+      {
+        "id": "f118a541-99e6-4b4d-ac3b-9ddcf4428f1b",
+        "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+        "run_id": "51a40829-e67e-48f3-a1e9-d436381f5672",
+        "title": "Repeated Failed Login Attempts (authentication_abuse): source 172.22.0.1",
+        "status": "open",
+        "created_at": "2026-11-17T13:37:47.728061Z",
+        "correlation_key": "run:51a40829-e67e-48f3-a1e9-d436381f5672|resource:shopcloud|ip:172.22.0.1",
+        "risk_score": 60,
+        "risk_explanation": "Risk score: 60 out of 100.\n+40: the highest alert severity is medium.\n+20: 11 event(s) over the detection threshold of 10 (2 points each, at most 20).\n+0: 0 additional correlated alert(s) (5 points each, at most 15).\nThis score is a simple rule of thumb for comparing incidents inside this lab. It does not predict financial loss and is not a universal measure of risk.",
+        "alerts": [
+          {
+            "id": "55e84421-c6dd-4e2d-9514-49549f10848c",
+            "rule_id": "repeated_failed_logins",
+            "severity": "medium",
+            "title": "Repeated failed logins from one source (source_ip=172.22.0.1)",
+            "description": "21 authentication_failure events from source_ip=172.22.0.1 within 20s (threshold 10 in 60s).",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "51a40829-e67e-48f3-a1e9-d436381f5672",
+            "incident_id": "f118a541-99e6-4b4d-ac3b-9ddcf4428f1b",
+            "event_count": 21,
+            "first_event_at": "2026-11-17T13:37:27.146000Z",
+            "last_event_at": "2026-11-17T13:37:47.603000Z",
+            "created_at": "2026-11-17T13:37:47.724465Z"
+          }
+        ],
+        "responses": [],
+        "timeline_entries": 24
+      }
+    ],
+    "cleanup": {
+      "ok": true,
+      "run_status": "cleaned_up"
+    },
+    "checks": {
+      "has_alert": true,
+      "incident_count": 1,
+      "every_alert_in_an_incident": true,
+      "incidents_belong_to_run": true,
+      "incident_alerts_from_this_run": true,
+      "alert_events_from_this_run": true,
+      "events_from_other_runs": 0,
+      "benign_events_in_alerts": 1,
+      "benign_event_references": [
+        "docker:shopcloud:2976bd6d-42eb-44fc-b542-0065cdc060f6"
+      ],
+      "alert_event_count": 21
+    }
+  },
+  {
+    "phase": "correlation",
+    "telemetry_source": "docker",
+    "falco": false,
+    "index": 2,
+    "scenario_id": "unauthorized_resource_access",
+    "reset": {
+      "operation": "reset",
+      "requested_at": "2026-11-17T13:37:49.634960+00:00",
+      "ok": true,
+      "error": null,
+      "api_returned_seconds": 8.469,
+      "ready_seconds": 8.581
+    },
+    "run_id": "21a6e213-7e78-404d-9c7d-70f5c1aa1328",
+    "stats_samples": 20,
+    "wall_seconds": 8.359,
+    "status": "completed",
+    "error": null,
+    "scenario_version": "1.0.0",
+    "started_at": "2026-11-17T13:37:58.324648Z",
+    "finished_at": "2026-11-17T13:38:05.752905Z",
+    "report": {
+      "report_version": "1.0",
+      "generated_at": "2026-11-17T13:38:06.666802Z",
+      "lab": {
+        "id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+        "name": "evaluation",
+        "target": "shopcloud",
+        "environment": "docker",
+        "status": "running"
+      },
+      "scenario": {
+        "id": "unauthorized_resource_access",
+        "version": "1.0.0",
+        "definition_available": true,
+        "name": "Unauthorized Resource Access",
+        "category": "authorization",
+        "description": "Logs in as the restricted test account and repeatedly requests a protected ShopCloud resource it is not allowed to read. Checks that every request is refused and that the repeated denials are detected.",
+        "target": "shopcloud",
+        "type": "application"
+      },
+      "run": {
+        "id": "21a6e213-7e78-404d-9c7d-70f5c1aa1328",
+        "status": "completed",
+        "parameters": {
+          "username": "lab_restricted",
+          "attempts": 8,
+          "interval_seconds": 1,
+          "verification_check": "access_remains_denied"
+        },
+        "started_at": "2026-11-17T13:37:58.324648Z",
+        "finished_at": "2026-11-17T13:38:05.752905Z",
+        "duration_seconds": 7.428,
+        "error": null
+      },
+      "script_summary": {
+        "scenario": "unauthorized_resource_access",
+        "target": "http://127.0.0.1:8081",
+        "username": "lab_restricted",
+        "resource": "GET /api/orders",
+        "attempts_sent": 8,
+        "denied_403": 8,
+        "other": 0,
+        "granted_200": 0,
+        "errors": 0,
+        "access_control_failed": false,
+        "login_status": 200
+      },
+      "telemetry": {
+        "expected": [
+          {
+            "source": "application",
+            "event_type": "authorization_denied",
+            "expected_min_count": 5,
+            "collected_count": 8,
+            "met": true
+          }
+        ],
+        "all_expected_met": true,
+        "collected_total": 10,
+        "collected_by_type": [
+          {
+            "source": "application",
+            "event_type": "authentication_success",
+            "count": 1
+          },
+          {
+            "source": "application",
+            "event_type": "authorization_denied",
+            "count": 8
+          },
+          {
+            "source": "application",
+            "event_type": "other",
+            "count": 1
+          }
+        ]
+      },
+      "detection": {
+        "rule": "repeated_access_denied",
+        "threshold": 5,
+        "window_seconds": 60
+      },
+      "alerts": [
+        {
+          "id": "937793e0-7021-43d2-ac4f-930baa677cfe",
+          "rule_id": "repeated_access_denied",
+          "severity": "medium",
+          "title": "Repeated access denied for one user (username=lab_restricted, raw.path=/api/orders)",
+          "description": "8 authorization_denied events from username=lab_restricted, raw.path=/api/orders within 7s (threshold 5 in 60s).",
+          "incident_id": "fcb356df-c747-4f35-9243-1d9cbbffa552",
+          "event_count": 8,
+          "first_event_at": "2026-11-17T13:37:58.530000Z",
+          "last_event_at": "2026-11-17T13:38:05.558000Z",
+          "created_at": "2026-11-17T13:38:05.679491Z",
+          "threshold_crossed_at": "2026-11-17T13:38:02.543000Z",
+          "threshold_event_id": "70c833db-4cee-4433-adc2-dad29f4ba3ef",
+          "threshold_event_reference": "docker:shopcloud:7fbe4abc-9fce-4940-9f6d-19b98404ca28",
+          "detection_latency_seconds": 3.136
+        }
+      ],
+      "incidents": [
+        {
+          "id": "fcb356df-c747-4f35-9243-1d9cbbffa552",
+          "title": "Unauthorized Resource Access (unauthorized_resource_access): source 172.22.0.1",
+          "status": "open",
+          "correlation_key": "run:21a6e213-7e78-404d-9c7d-70f5c1aa1328|resource:shopcloud|ip:172.22.0.1",
+          "risk_score": 46,
+          "risk_explanation": "Risk score: 46 out of 100.\n+40: the highest alert severity is medium.\n+6: 3 event(s) over the detection threshold of 5 (2 points each, at most 20).\n+0: 0 additional correlated alert(s) (5 points each, at most 15).\nThis score is a simple rule of thumb for comparing incidents inside this lab. It does not predict financial loss and is not a universal measure of risk.",
+          "alert_ids": [
+            "937793e0-7021-43d2-ac4f-930baa677cfe"
+          ]
+        }
+      ],
+      "responses": [],
+      "post_run_verification": {
+        "check": "access_remains_denied",
+        "passed": true,
+        "still_denied": true,
+        "sent": {
+          "request": "GET /api/orders",
+          "username": "lab_restricted"
+        },
+        "received": {
+          "login_status": 200,
+          "status": 403
+        },
+        "error": null
+      },
+      "cleanup": {
+        "status": "not_run",
+        "runs": []
+      }
+    },
+    "alerts": [
+      {
+        "id": "937793e0-7021-43d2-ac4f-930baa677cfe",
+        "rule_id": "repeated_access_denied",
+        "severity": "medium",
+        "title": "Repeated access denied for one user (username=lab_restricted, raw.path=/api/orders)",
+        "description": "8 authorization_denied events from username=lab_restricted, raw.path=/api/orders within 7s (threshold 5 in 60s).",
+        "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+        "run_id": "21a6e213-7e78-404d-9c7d-70f5c1aa1328",
+        "incident_id": "fcb356df-c747-4f35-9243-1d9cbbffa552",
+        "event_count": 8,
+        "first_event_at": "2026-11-17T13:37:58.530000Z",
+        "last_event_at": "2026-11-17T13:38:05.558000Z",
+        "created_at": "2026-11-17T13:38:05.679491Z",
+        "events": [
+          {
+            "event_id": "6d6993f1-43e4-4b76-9846-ce1111ef8365",
+            "timestamp": "2026-11-17T13:37:58.530000Z",
+            "source": "application",
+            "event_type": "authorization_denied",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Role is not allowed to read orders",
+            "raw_event_reference": "docker:shopcloud:27b25281-5b67-4d31-8df5-98b1f9ba2f8b",
+            "schema_version": "1.0",
+            "scenario_id": "unauthorized_resource_access",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "21a6e213-7e78-404d-9c7d-70f5c1aa1328",
+            "username": "lab_restricted",
+            "container_id": "55c7de7e3168",
+            "rule_id": null,
+            "correlation_key": "run:21a6e213-7e78-404d-9c7d-70f5c1aa1328|ip:172.22.0.1"
+          },
+          {
+            "event_id": "fd0cd72f-bc93-498e-98bf-70322f785b08",
+            "timestamp": "2026-11-17T13:37:59.533000Z",
+            "source": "application",
+            "event_type": "authorization_denied",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Role is not allowed to read orders",
+            "raw_event_reference": "docker:shopcloud:5802c1dc-b16f-4438-8686-bc194d7252f7",
+            "schema_version": "1.0",
+            "scenario_id": "unauthorized_resource_access",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "21a6e213-7e78-404d-9c7d-70f5c1aa1328",
+            "username": "lab_restricted",
+            "container_id": "55c7de7e3168",
+            "rule_id": null,
+            "correlation_key": "run:21a6e213-7e78-404d-9c7d-70f5c1aa1328|ip:172.22.0.1"
+          },
+          {
+            "event_id": "3e268d62-3e9e-4626-9513-7b1813953cb2",
+            "timestamp": "2026-11-17T13:38:00.536000Z",
+            "source": "application",
+            "event_type": "authorization_denied",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Role is not allowed to read orders",
+            "raw_event_reference": "docker:shopcloud:5226514e-a1df-4b12-b11b-181d92e8c579",
+            "schema_version": "1.0",
+            "scenario_id": "unauthorized_resource_access",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "21a6e213-7e78-404d-9c7d-70f5c1aa1328",
+            "username": "lab_restricted",
+            "container_id": "55c7de7e3168",
+            "rule_id": null,
+            "correlation_key": "run:21a6e213-7e78-404d-9c7d-70f5c1aa1328|ip:172.22.0.1"
+          },
+          {
+            "event_id": "a064be89-1a3e-4ae7-b98f-b41167e8b279",
+            "timestamp": "2026-11-17T13:38:01.540000Z",
+            "source": "application",
+            "event_type": "authorization_denied",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Role is not allowed to read orders",
+            "raw_event_reference": "docker:shopcloud:edc4e7f2-b1dc-488b-9fb3-d8b69bc55890",
+            "schema_version": "1.0",
+            "scenario_id": "unauthorized_resource_access",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "21a6e213-7e78-404d-9c7d-70f5c1aa1328",
+            "username": "lab_restricted",
+            "container_id": "55c7de7e3168",
+            "rule_id": null,
+            "correlation_key": "run:21a6e213-7e78-404d-9c7d-70f5c1aa1328|ip:172.22.0.1"
+          },
+          {
+            "event_id": "70c833db-4cee-4433-adc2-dad29f4ba3ef",
+            "timestamp": "2026-11-17T13:38:02.543000Z",
+            "source": "application",
+            "event_type": "authorization_denied",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Role is not allowed to read orders",
+            "raw_event_reference": "docker:shopcloud:7fbe4abc-9fce-4940-9f6d-19b98404ca28",
+            "schema_version": "1.0",
+            "scenario_id": "unauthorized_resource_access",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "21a6e213-7e78-404d-9c7d-70f5c1aa1328",
+            "username": "lab_restricted",
+            "container_id": "55c7de7e3168",
+            "rule_id": null,
+            "correlation_key": "run:21a6e213-7e78-404d-9c7d-70f5c1aa1328|ip:172.22.0.1"
+          },
+          {
+            "event_id": "8181e4da-239b-4da6-9c68-3f36fd255069",
+            "timestamp": "2026-11-17T13:38:03.546000Z",
+            "source": "application",
+            "event_type": "authorization_denied",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Role is not allowed to read orders",
+            "raw_event_reference": "docker:shopcloud:12db4f83-43cc-422d-995d-87a2730345e7",
+            "schema_version": "1.0",
+            "scenario_id": "unauthorized_resource_access",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "21a6e213-7e78-404d-9c7d-70f5c1aa1328",
+            "username": "lab_restricted",
+            "container_id": "55c7de7e3168",
+            "rule_id": null,
+            "correlation_key": "run:21a6e213-7e78-404d-9c7d-70f5c1aa1328|ip:172.22.0.1"
+          },
+          {
+            "event_id": "3257822b-1d5d-4444-bd98-2b01b278253b",
+            "timestamp": "2026-11-17T13:38:04.549000Z",
+            "source": "application",
+            "event_type": "authorization_denied",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Role is not allowed to read orders",
+            "raw_event_reference": "docker:shopcloud:0845a946-bf98-4125-89e1-a17f828f11ac",
+            "schema_version": "1.0",
+            "scenario_id": "unauthorized_resource_access",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "21a6e213-7e78-404d-9c7d-70f5c1aa1328",
+            "username": "lab_restricted",
+            "container_id": "55c7de7e3168",
+            "rule_id": null,
+            "correlation_key": "run:21a6e213-7e78-404d-9c7d-70f5c1aa1328|ip:172.22.0.1"
+          },
+          {
+            "event_id": "590417d5-9477-47d4-811e-8210332b579c",
+            "timestamp": "2026-11-17T13:38:05.558000Z",
+            "source": "application",
+            "event_type": "authorization_denied",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Role is not allowed to read orders",
+            "raw_event_reference": "docker:shopcloud:a123e3dd-fd9f-437b-a227-3dd786d2965d",
+            "schema_version": "1.0",
+            "scenario_id": "unauthorized_resource_access",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "21a6e213-7e78-404d-9c7d-70f5c1aa1328",
+            "username": "lab_restricted",
+            "container_id": "55c7de7e3168",
+            "rule_id": null,
+            "correlation_key": "run:21a6e213-7e78-404d-9c7d-70f5c1aa1328|ip:172.22.0.1"
+          }
+        ]
+      }
+    ],
+    "incidents": [
+      {
+        "id": "fcb356df-c747-4f35-9243-1d9cbbffa552",
+        "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+        "run_id": "21a6e213-7e78-404d-9c7d-70f5c1aa1328",
+        "title": "Unauthorized Resource Access (unauthorized_resource_access): source 172.22.0.1",
+        "status": "open",
+        "created_at": "2026-11-17T13:38:05.682475Z",
+        "correlation_key": "run:21a6e213-7e78-404d-9c7d-70f5c1aa1328|resource:shopcloud|ip:172.22.0.1",
+        "risk_score": 46,
+        "risk_explanation": "Risk score: 46 out of 100.\n+40: the highest alert severity is medium.\n+6: 3 event(s) over the detection threshold of 5 (2 points each, at most 20).\n+0: 0 additional correlated alert(s) (5 points each, at most 15).\nThis score is a simple rule of thumb for comparing incidents inside this lab. It does not predict financial loss and is not a universal measure of risk.",
+        "alerts": [
+          {
+            "id": "937793e0-7021-43d2-ac4f-930baa677cfe",
+            "rule_id": "repeated_access_denied",
+            "severity": "medium",
+            "title": "Repeated access denied for one user (username=lab_restricted, raw.path=/api/orders)",
+            "description": "8 authorization_denied events from username=lab_restricted, raw.path=/api/orders within 7s (threshold 5 in 60s).",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "21a6e213-7e78-404d-9c7d-70f5c1aa1328",
+            "incident_id": "fcb356df-c747-4f35-9243-1d9cbbffa552",
+            "event_count": 8,
+            "first_event_at": "2026-11-17T13:37:58.530000Z",
+            "last_event_at": "2026-11-17T13:38:05.558000Z",
+            "created_at": "2026-11-17T13:38:05.679491Z"
+          }
+        ],
+        "responses": [],
+        "timeline_entries": 11
+      }
+    ],
+    "cleanup": {
+      "ok": true,
+      "run_status": "cleaned_up"
+    },
+    "checks": {
+      "has_alert": true,
+      "incident_count": 1,
+      "every_alert_in_an_incident": true,
+      "incidents_belong_to_run": true,
+      "incident_alerts_from_this_run": true,
+      "alert_events_from_this_run": true,
+      "events_from_other_runs": 0,
+      "benign_events_in_alerts": 0,
+      "benign_event_references": [],
+      "alert_event_count": 8
+    }
+  },
+  {
+    "phase": "correlation",
+    "telemetry_source": "docker",
+    "falco": false,
+    "index": 2,
+    "scenario_id": "suspicious_container_activity",
+    "reset": {
+      "operation": "reset",
+      "requested_at": "2026-11-17T13:38:06.774188+00:00",
+      "ok": true,
+      "error": null,
+      "api_returned_seconds": 8.411,
+      "ready_seconds": 8.524
+    },
+    "run_id": "9679eda8-a489-492d-bcb9-eef67d697232",
+    "stats_samples": 10,
+    "wall_seconds": 4.422,
+    "status": "completed",
+    "error": null,
+    "scenario_version": "1.0.0",
+    "started_at": "2026-11-17T13:38:15.420512Z",
+    "finished_at": "2026-11-17T13:38:18.007057Z",
+    "report": {
+      "report_version": "1.0",
+      "generated_at": "2026-11-17T13:38:19.766986Z",
+      "lab": {
+        "id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+        "name": "evaluation",
+        "target": "shopcloud",
+        "environment": "docker",
+        "status": "running"
+      },
+      "scenario": {
+        "id": "suspicious_container_activity",
+        "version": "1.0.0",
+        "definition_available": true,
+        "name": "Suspicious Container Activity",
+        "category": "container_runtime",
+        "description": "Runs one harmless, predefined command (a shell that prints `id` and exits) inside the lab's dedicated test container, the way an intruder would start a shell in a running container. Checks that the Docker exec event, and Falco's alert when Falco is on, are collected and detected.",
+        "target": "test_container",
+        "type": "container"
+      },
+      "run": {
+        "id": "9679eda8-a489-492d-bcb9-eef67d697232",
+        "status": "completed",
+        "parameters": {},
+        "started_at": "2026-11-17T13:38:15.420512Z",
+        "finished_at": "2026-11-17T13:38:18.007057Z",
+        "duration_seconds": 2.587,
+        "error": null
+      },
+      "script_summary": {
+        "scenario": "suspicious_container_activity",
+        "target": "test_container",
+        "container": "test_container",
+        "command": "sh -c id; : cloudattacklab-scenario-marker",
+        "exit_code": 0,
+        "output": "uid=0(root) gid=0(root) groups=0(root),0(root),1(bin),2(daemon),3(sys),4(adm),6(disk),10(wheel),11(floppy),20(dialout),26(tape),27(video)"
+      },
+      "telemetry": {
+        "expected": [
+          {
+            "source": "docker",
+            "event_type": "suspicious_process",
+            "expected_min_count": 1,
+            "collected_count": 1,
+            "met": true
+          }
+        ],
+        "all_expected_met": true,
+        "collected_total": 1,
+        "collected_by_type": [
+          {
+            "source": "docker",
+            "event_type": "suspicious_process",
+            "count": 1
+          }
+        ]
+      },
+      "detection": {
+        "rule": "suspicious_container_process",
+        "threshold": 1,
+        "window_seconds": 60
+      },
+      "alerts": [
+        {
+          "id": "f2353465-4df6-4159-ba18-d63ba189f522",
+          "rule_id": "suspicious_container_process",
+          "severity": "high",
+          "title": "Suspicious process in the test container (resource=test_container)",
+          "description": "1 suspicious_process events from resource=test_container within 0s (threshold 1 in 60s).",
+          "incident_id": "42767af4-b6f7-4b02-9831-1373a2ded400",
+          "event_count": 1,
+          "first_event_at": "2026-11-17T13:38:15.727959Z",
+          "last_event_at": "2026-11-17T13:38:15.727959Z",
+          "created_at": "2026-11-17T13:38:17.993562Z",
+          "threshold_crossed_at": "2026-11-17T13:38:15.727959Z",
+          "threshold_event_id": "dac3e3c4-d592-40f4-8f7d-ab676743dc0f",
+          "threshold_event_reference": "docker:test_container:exec_start-1794922695727959386",
+          "detection_latency_seconds": 2.266
+        }
+      ],
+      "incidents": [
+        {
+          "id": "42767af4-b6f7-4b02-9831-1373a2ded400",
+          "title": "Suspicious Container Activity (suspicious_container_activity)",
+          "status": "open",
+          "correlation_key": "run:9679eda8-a489-492d-bcb9-eef67d697232|resource:test_container",
+          "risk_score": 60,
+          "risk_explanation": "Risk score: 60 out of 100.\n+60: the highest alert severity is high.\n+0: 0 event(s) over the detection threshold of 1 (2 points each, at most 20).\n+0: 0 additional correlated alert(s) (5 points each, at most 15).\nThis score is a simple rule of thumb for comparing incidents inside this lab. It does not predict financial loss and is not a universal measure of risk.",
+          "alert_ids": [
+            "f2353465-4df6-4159-ba18-d63ba189f522"
+          ]
+        }
+      ],
+      "responses": [],
+      "post_run_verification": null,
+      "cleanup": {
+        "status": "not_run",
+        "runs": []
+      }
+    },
+    "alerts": [
+      {
+        "id": "f2353465-4df6-4159-ba18-d63ba189f522",
+        "rule_id": "suspicious_container_process",
+        "severity": "high",
+        "title": "Suspicious process in the test container (resource=test_container)",
+        "description": "1 suspicious_process events from resource=test_container within 0s (threshold 1 in 60s).",
+        "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+        "run_id": "9679eda8-a489-492d-bcb9-eef67d697232",
+        "incident_id": "42767af4-b6f7-4b02-9831-1373a2ded400",
+        "event_count": 1,
+        "first_event_at": "2026-11-17T13:38:15.727959Z",
+        "last_event_at": "2026-11-17T13:38:15.727959Z",
+        "created_at": "2026-11-17T13:38:17.993562Z",
+        "events": [
+          {
+            "event_id": "dac3e3c4-d592-40f4-8f7d-ab676743dc0f",
+            "timestamp": "2026-11-17T13:38:15.727959Z",
+            "source": "docker",
+            "event_type": "suspicious_process",
+            "severity": "medium",
+            "source_ip": null,
+            "resource": "test_container",
+            "message": "docker exec started a process in cloudattacklab-lab-test_container-1: sh -c id; : cloudattacklab-scenario-marker",
+            "raw_event_reference": "docker:test_container:exec_start-1794922695727959386",
+            "schema_version": "1.0",
+            "scenario_id": "suspicious_container_activity",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "9679eda8-a489-492d-bcb9-eef67d697232",
+            "username": null,
+            "container_id": "d35df559159a",
+            "rule_id": null,
+            "correlation_key": "run:9679eda8-a489-492d-bcb9-eef67d697232|container:d35df559159a"
+          }
+        ]
+      }
+    ],
+    "incidents": [
+      {
+        "id": "42767af4-b6f7-4b02-9831-1373a2ded400",
+        "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+        "run_id": "9679eda8-a489-492d-bcb9-eef67d697232",
+        "title": "Suspicious Container Activity (suspicious_container_activity)",
+        "status": "open",
+        "created_at": "2026-11-17T13:38:17.997619Z",
+        "correlation_key": "run:9679eda8-a489-492d-bcb9-eef67d697232|resource:test_container",
+        "risk_score": 60,
+        "risk_explanation": "Risk score: 60 out of 100.\n+60: the highest alert severity is high.\n+0: 0 event(s) over the detection threshold of 1 (2 points each, at most 20).\n+0: 0 additional correlated alert(s) (5 points each, at most 15).\nThis score is a simple rule of thumb for comparing incidents inside this lab. It does not predict financial loss and is not a universal measure of risk.",
+        "alerts": [
+          {
+            "id": "f2353465-4df6-4159-ba18-d63ba189f522",
+            "rule_id": "suspicious_container_process",
+            "severity": "high",
+            "title": "Suspicious process in the test container (resource=test_container)",
+            "description": "1 suspicious_process events from resource=test_container within 0s (threshold 1 in 60s).",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "9679eda8-a489-492d-bcb9-eef67d697232",
+            "incident_id": "42767af4-b6f7-4b02-9831-1373a2ded400",
+            "event_count": 1,
+            "first_event_at": "2026-11-17T13:38:15.727959Z",
+            "last_event_at": "2026-11-17T13:38:15.727959Z",
+            "created_at": "2026-11-17T13:38:17.993562Z"
+          }
+        ],
+        "responses": [],
+        "timeline_entries": 4
+      }
+    ],
+    "cleanup": {
+      "ok": true,
+      "run_status": "cleaned_up"
+    },
+    "checks": {
+      "has_alert": true,
+      "incident_count": 1,
+      "every_alert_in_an_incident": true,
+      "incidents_belong_to_run": true,
+      "incident_alerts_from_this_run": true,
+      "alert_events_from_this_run": true,
+      "events_from_other_runs": 0,
+      "benign_events_in_alerts": 0,
+      "benign_event_references": [],
+      "alert_event_count": 1
+    }
+  },
+  {
+    "phase": "correlation",
+    "telemetry_source": "docker",
+    "falco": false,
+    "index": 3,
+    "scenario_id": "authentication_abuse",
+    "reset": {
+      "operation": "reset",
+      "requested_at": "2026-11-17T13:38:20.940582+00:00",
+      "ok": true,
+      "error": null,
+      "api_returned_seconds": 8.19,
+      "ready_seconds": 8.315
+    },
+    "run_id": "5b35bd5d-3859-4d54-9e3a-5232536a4f3c",
+    "stats_samples": 55,
+    "wall_seconds": 22.725,
+    "status": "completed",
+    "error": null,
+    "scenario_version": "1.0.0",
+    "started_at": "2026-11-17T13:38:29.393813Z",
+    "finished_at": "2026-11-17T13:38:50.087621Z",
+    "report": {
+      "report_version": "1.0",
+      "generated_at": "2026-11-17T13:38:52.038878Z",
+      "lab": {
+        "id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+        "name": "evaluation",
+        "target": "shopcloud",
+        "environment": "docker",
+        "status": "running"
+      },
+      "scenario": {
+        "id": "authentication_abuse",
+        "version": "1.0.0",
+        "definition_available": true,
+        "name": "Repeated Failed Login Attempts",
+        "category": "authentication",
+        "description": "Sends a bounded number of invalid login attempts to the ShopCloud test login endpoint and checks that the repeated failures are detected.",
+        "target": "shopcloud",
+        "type": "application"
+      },
+      "run": {
+        "id": "5b35bd5d-3859-4d54-9e3a-5232536a4f3c",
+        "status": "completed",
+        "parameters": {
+          "username": "lab_user",
+          "attempts": 20,
+          "interval_seconds": 1
+        },
+        "started_at": "2026-11-17T13:38:29.393813Z",
+        "finished_at": "2026-11-17T13:38:50.087621Z",
+        "duration_seconds": 20.694,
+        "error": null
+      },
+      "script_summary": {
+        "scenario": "authentication_abuse",
+        "target": "http://127.0.0.1:8081",
+        "username": "lab_user",
+        "attempts_sent": 20,
+        "unauthorized_401": 20,
+        "rate_limited_429": 0,
+        "other": 0,
+        "errors": 0
+      },
+      "telemetry": {
+        "expected": [
+          {
+            "source": "application",
+            "event_type": "authentication_failure",
+            "expected_min_count": 10,
+            "collected_count": 21,
+            "met": true
+          }
+        ],
+        "all_expected_met": true,
+        "collected_total": 30,
+        "collected_by_type": [
+          {
+            "source": "application",
+            "event_type": "authentication_failure",
+            "count": 21
+          },
+          {
+            "source": "application",
+            "event_type": "authentication_success",
+            "count": 4
+          },
+          {
+            "source": "application",
+            "event_type": "other",
+            "count": 3
+          },
+          {
+            "source": "application",
+            "event_type": "resource_access",
+            "count": 2
+          }
+        ]
+      },
+      "detection": {
+        "rule": "repeated_failed_logins",
+        "threshold": 10,
+        "window_seconds": 60
+      },
+      "alerts": [
+        {
+          "id": "aaa131a2-5f23-4e3c-826c-7910f7eb728e",
+          "rule_id": "repeated_failed_logins",
+          "severity": "medium",
+          "title": "Repeated failed logins from one source (source_ip=172.22.0.1)",
+          "description": "21 authentication_failure events from source_ip=172.22.0.1 within 20s (threshold 10 in 60s).",
+          "incident_id": "8fdcaefe-5f98-49ae-9a08-a1a0d8e8d48b",
+          "event_count": 21,
+          "first_event_at": "2026-11-17T13:38:29.613000Z",
+          "last_event_at": "2026-11-17T13:38:49.852000Z",
+          "created_at": "2026-11-17T13:38:50.057479Z",
+          "threshold_crossed_at": "2026-11-17T13:38:39.081000Z",
+          "threshold_event_id": "4d7e4891-279e-4c2b-a0c2-248bda0c877e",
+          "threshold_event_reference": "docker:shopcloud:434ca930-87df-42bc-b3e8-c980694e34b4",
+          "detection_latency_seconds": 10.976
+        }
+      ],
+      "incidents": [
+        {
+          "id": "8fdcaefe-5f98-49ae-9a08-a1a0d8e8d48b",
+          "title": "Repeated Failed Login Attempts (authentication_abuse): source 172.22.0.1",
+          "status": "open",
+          "correlation_key": "run:5b35bd5d-3859-4d54-9e3a-5232536a4f3c|resource:shopcloud|ip:172.22.0.1",
+          "risk_score": 60,
+          "risk_explanation": "Risk score: 60 out of 100.\n+40: the highest alert severity is medium.\n+20: 11 event(s) over the detection threshold of 10 (2 points each, at most 20).\n+0: 0 additional correlated alert(s) (5 points each, at most 15).\nThis score is a simple rule of thumb for comparing incidents inside this lab. It does not predict financial loss and is not a universal measure of risk.",
+          "alert_ids": [
+            "aaa131a2-5f23-4e3c-826c-7910f7eb728e"
+          ]
+        }
+      ],
+      "responses": [],
+      "post_run_verification": null,
+      "cleanup": {
+        "status": "not_run",
+        "runs": []
+      }
+    },
+    "alerts": [
+      {
+        "id": "aaa131a2-5f23-4e3c-826c-7910f7eb728e",
+        "rule_id": "repeated_failed_logins",
+        "severity": "medium",
+        "title": "Repeated failed logins from one source (source_ip=172.22.0.1)",
+        "description": "21 authentication_failure events from source_ip=172.22.0.1 within 20s (threshold 10 in 60s).",
+        "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+        "run_id": "5b35bd5d-3859-4d54-9e3a-5232536a4f3c",
+        "incident_id": "8fdcaefe-5f98-49ae-9a08-a1a0d8e8d48b",
+        "event_count": 21,
+        "first_event_at": "2026-11-17T13:38:29.613000Z",
+        "last_event_at": "2026-11-17T13:38:49.852000Z",
+        "created_at": "2026-11-17T13:38:50.057479Z",
+        "events": [
+          {
+            "event_id": "31ca83e7-527f-41a1-8336-401f7fab2ad4",
+            "timestamp": "2026-11-17T13:38:29.613000Z",
+            "source": "application",
+            "event_type": "authentication_failure",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Invalid username or password",
+            "raw_event_reference": "docker:shopcloud:21ba90d9-affe-4aa4-865a-1d07e744f09c",
+            "schema_version": "1.0",
+            "scenario_id": "authentication_abuse",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "5b35bd5d-3859-4d54-9e3a-5232536a4f3c",
+            "username": "lab_user",
+            "container_id": "0193cfa7d1ec",
+            "rule_id": null,
+            "correlation_key": "run:5b35bd5d-3859-4d54-9e3a-5232536a4f3c|ip:172.22.0.1"
+          },
+          {
+            "event_id": "65dc1504-1ddf-46f3-b16d-8fc16d3a8f6e",
+            "timestamp": "2026-11-17T13:38:30.658000Z",
+            "source": "application",
+            "event_type": "authentication_failure",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Invalid username or password",
+            "raw_event_reference": "docker:shopcloud:d8864fc8-63f1-4f3d-b122-245fa497accd",
+            "schema_version": "1.0",
+            "scenario_id": "authentication_abuse",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "5b35bd5d-3859-4d54-9e3a-5232536a4f3c",
+            "username": "lab_user",
+            "container_id": "0193cfa7d1ec",
+            "rule_id": null,
+            "correlation_key": "run:5b35bd5d-3859-4d54-9e3a-5232536a4f3c|ip:172.22.0.1"
+          },
+          {
+            "event_id": "d7b722a6-b170-4bf4-b5eb-e2e9b0c83cbd",
+            "timestamp": "2026-11-17T13:38:31.707000Z",
+            "source": "application",
+            "event_type": "authentication_failure",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Invalid username or password",
+            "raw_event_reference": "docker:shopcloud:91f21fa2-7b60-427c-ac12-6b67212dc901",
+            "schema_version": "1.0",
+            "scenario_id": "authentication_abuse",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "5b35bd5d-3859-4d54-9e3a-5232536a4f3c",
+            "username": "lab_user",
+            "container_id": "0193cfa7d1ec",
+            "rule_id": null,
+            "correlation_key": "run:5b35bd5d-3859-4d54-9e3a-5232536a4f3c|ip:172.22.0.1"
+          },
+          {
+            "event_id": "866ae0ff-16fa-4657-ab19-d3b82f514124",
+            "timestamp": "2026-11-17T13:38:32.754000Z",
+            "source": "application",
+            "event_type": "authentication_failure",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Invalid username or password",
+            "raw_event_reference": "docker:shopcloud:fa4b422f-2eef-48cb-bfb2-99930e9fc88a",
+            "schema_version": "1.0",
+            "scenario_id": "authentication_abuse",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "5b35bd5d-3859-4d54-9e3a-5232536a4f3c",
+            "username": "lab_user",
+            "container_id": "0193cfa7d1ec",
+            "rule_id": null,
+            "correlation_key": "run:5b35bd5d-3859-4d54-9e3a-5232536a4f3c|ip:172.22.0.1"
+          },
+          {
+            "event_id": "842c3450-1132-4426-a76c-8c7bb7709b3c",
+            "timestamp": "2026-11-17T13:38:33.851000Z",
+            "source": "application",
+            "event_type": "authentication_failure",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Invalid username or password",
+            "raw_event_reference": "docker:shopcloud:de5ba972-4b42-4227-b00f-afeb2ee34fb9",
+            "schema_version": "1.0",
+            "scenario_id": "authentication_abuse",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "5b35bd5d-3859-4d54-9e3a-5232536a4f3c",
+            "username": "lab_user",
+            "container_id": "0193cfa7d1ec",
+            "rule_id": null,
+            "correlation_key": "run:5b35bd5d-3859-4d54-9e3a-5232536a4f3c|ip:172.22.0.1"
+          },
+          {
+            "event_id": "d18c392d-9395-4b39-95a4-2b129bb6db74",
+            "timestamp": "2026-11-17T13:38:34.894000Z",
+            "source": "application",
+            "event_type": "authentication_failure",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Invalid username or password",
+            "raw_event_reference": "docker:shopcloud:6e3f29f2-477e-495b-9331-717e59d2da3a",
+            "schema_version": "1.0",
+            "scenario_id": "authentication_abuse",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "5b35bd5d-3859-4d54-9e3a-5232536a4f3c",
+            "username": "lab_user",
+            "container_id": "0193cfa7d1ec",
+            "rule_id": null,
+            "correlation_key": "run:5b35bd5d-3859-4d54-9e3a-5232536a4f3c|ip:172.22.0.1"
+          },
+          {
+            "event_id": "68994fbd-0dbc-4c61-b17f-00c5944fcd54",
+            "timestamp": "2026-11-17T13:38:35.938000Z",
+            "source": "application",
+            "event_type": "authentication_failure",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Invalid username or password",
+            "raw_event_reference": "docker:shopcloud:99ee6f6b-53e3-4d81-aa6a-da8d5d731b6d",
+            "schema_version": "1.0",
+            "scenario_id": "authentication_abuse",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "5b35bd5d-3859-4d54-9e3a-5232536a4f3c",
+            "username": "lab_user",
+            "container_id": "0193cfa7d1ec",
+            "rule_id": null,
+            "correlation_key": "run:5b35bd5d-3859-4d54-9e3a-5232536a4f3c|ip:172.22.0.1"
+          },
+          {
+            "event_id": "c85bf445-4464-4fdf-9da4-9fd434841ea0",
+            "timestamp": "2026-11-17T13:38:36.993000Z",
+            "source": "application",
+            "event_type": "authentication_failure",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Invalid username or password",
+            "raw_event_reference": "docker:shopcloud:b112db91-0159-4519-89ef-c960a7239f0f",
+            "schema_version": "1.0",
+            "scenario_id": "authentication_abuse",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "5b35bd5d-3859-4d54-9e3a-5232536a4f3c",
+            "username": "lab_user",
+            "container_id": "0193cfa7d1ec",
+            "rule_id": null,
+            "correlation_key": "run:5b35bd5d-3859-4d54-9e3a-5232536a4f3c|ip:172.22.0.1"
+          },
+          {
+            "event_id": "f70c61a1-a5cc-4bfa-94c3-095beca72b6b",
+            "timestamp": "2026-11-17T13:38:38.037000Z",
+            "source": "application",
+            "event_type": "authentication_failure",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Invalid username or password",
+            "raw_event_reference": "docker:shopcloud:9525f7e0-eb30-4edd-b300-2e5c667dfefa",
+            "schema_version": "1.0",
+            "scenario_id": "authentication_abuse",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "5b35bd5d-3859-4d54-9e3a-5232536a4f3c",
+            "username": "lab_user",
+            "container_id": "0193cfa7d1ec",
+            "rule_id": null,
+            "correlation_key": "run:5b35bd5d-3859-4d54-9e3a-5232536a4f3c|ip:172.22.0.1"
+          },
+          {
+            "event_id": "4d7e4891-279e-4c2b-a0c2-248bda0c877e",
+            "timestamp": "2026-11-17T13:38:39.081000Z",
+            "source": "application",
+            "event_type": "authentication_failure",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Invalid username or password",
+            "raw_event_reference": "docker:shopcloud:434ca930-87df-42bc-b3e8-c980694e34b4",
+            "schema_version": "1.0",
+            "scenario_id": "authentication_abuse",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "5b35bd5d-3859-4d54-9e3a-5232536a4f3c",
+            "username": "lab_user",
+            "container_id": "0193cfa7d1ec",
+            "rule_id": null,
+            "correlation_key": "run:5b35bd5d-3859-4d54-9e3a-5232536a4f3c|ip:172.22.0.1"
+          },
+          {
+            "event_id": "5d45eec5-e47f-49d4-9a04-00bcce73bfad",
+            "timestamp": "2026-11-17T13:38:40.125000Z",
+            "source": "application",
+            "event_type": "authentication_failure",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Invalid username or password",
+            "raw_event_reference": "docker:shopcloud:297babc8-9693-480e-8185-daf1b62ab470",
+            "schema_version": "1.0",
+            "scenario_id": "authentication_abuse",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "5b35bd5d-3859-4d54-9e3a-5232536a4f3c",
+            "username": "lab_user",
+            "container_id": "0193cfa7d1ec",
+            "rule_id": null,
+            "correlation_key": "run:5b35bd5d-3859-4d54-9e3a-5232536a4f3c|ip:172.22.0.1"
+          },
+          {
+            "event_id": "c199e94a-47ce-4a45-8095-4f2a14a67c84",
+            "timestamp": "2026-11-17T13:38:41.259000Z",
+            "source": "application",
+            "event_type": "authentication_failure",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Invalid username or password",
+            "raw_event_reference": "docker:shopcloud:710890cd-862b-4bb4-8ba1-c29537422f4a",
+            "schema_version": "1.0",
+            "scenario_id": "authentication_abuse",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "5b35bd5d-3859-4d54-9e3a-5232536a4f3c",
+            "username": "lab_user",
+            "container_id": "0193cfa7d1ec",
+            "rule_id": null,
+            "correlation_key": "run:5b35bd5d-3859-4d54-9e3a-5232536a4f3c|ip:172.22.0.1"
+          },
+          {
+            "event_id": "8ab238e9-084a-4d64-9ae4-793df50dd3d2",
+            "timestamp": "2026-11-17T13:38:41.955000Z",
+            "source": "application",
+            "event_type": "authentication_failure",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Invalid username or password",
+            "raw_event_reference": "docker:shopcloud:a78266e8-3ae0-4a84-a9a8-2956508af48e",
+            "schema_version": "1.0",
+            "scenario_id": "authentication_abuse",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "5b35bd5d-3859-4d54-9e3a-5232536a4f3c",
+            "username": "lab_restricted",
+            "container_id": "0193cfa7d1ec",
+            "rule_id": null,
+            "correlation_key": "run:5b35bd5d-3859-4d54-9e3a-5232536a4f3c|ip:172.22.0.1"
+          },
+          {
+            "event_id": "c0677ea0-ac99-4b74-a8b0-6ce05e62842a",
+            "timestamp": "2026-11-17T13:38:42.299000Z",
+            "source": "application",
+            "event_type": "authentication_failure",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Invalid username or password",
+            "raw_event_reference": "docker:shopcloud:c636eb4a-7c72-489d-830f-e96e3466661c",
+            "schema_version": "1.0",
+            "scenario_id": "authentication_abuse",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "5b35bd5d-3859-4d54-9e3a-5232536a4f3c",
+            "username": "lab_user",
+            "container_id": "0193cfa7d1ec",
+            "rule_id": null,
+            "correlation_key": "run:5b35bd5d-3859-4d54-9e3a-5232536a4f3c|ip:172.22.0.1"
+          },
+          {
+            "event_id": "58a30ace-655c-448e-bc92-119ece88da09",
+            "timestamp": "2026-11-17T13:38:43.344000Z",
+            "source": "application",
+            "event_type": "authentication_failure",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Invalid username or password",
+            "raw_event_reference": "docker:shopcloud:e08ba196-0e88-4743-ac78-7cde5ca50265",
+            "schema_version": "1.0",
+            "scenario_id": "authentication_abuse",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "5b35bd5d-3859-4d54-9e3a-5232536a4f3c",
+            "username": "lab_user",
+            "container_id": "0193cfa7d1ec",
+            "rule_id": null,
+            "correlation_key": "run:5b35bd5d-3859-4d54-9e3a-5232536a4f3c|ip:172.22.0.1"
+          },
+          {
+            "event_id": "470749ac-8bce-489f-a4de-3510fba1981f",
+            "timestamp": "2026-11-17T13:38:44.385000Z",
+            "source": "application",
+            "event_type": "authentication_failure",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Invalid username or password",
+            "raw_event_reference": "docker:shopcloud:597e8523-62b2-4cdd-a20b-2b209434a1af",
+            "schema_version": "1.0",
+            "scenario_id": "authentication_abuse",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "5b35bd5d-3859-4d54-9e3a-5232536a4f3c",
+            "username": "lab_user",
+            "container_id": "0193cfa7d1ec",
+            "rule_id": null,
+            "correlation_key": "run:5b35bd5d-3859-4d54-9e3a-5232536a4f3c|ip:172.22.0.1"
+          },
+          {
+            "event_id": "7268017d-d243-4317-8d69-c4c40cd8721f",
+            "timestamp": "2026-11-17T13:38:45.652000Z",
+            "source": "application",
+            "event_type": "authentication_failure",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Invalid username or password",
+            "raw_event_reference": "docker:shopcloud:05298f41-572e-4595-a9ef-9d023ca817c9",
+            "schema_version": "1.0",
+            "scenario_id": "authentication_abuse",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "5b35bd5d-3859-4d54-9e3a-5232536a4f3c",
+            "username": "lab_user",
+            "container_id": "0193cfa7d1ec",
+            "rule_id": null,
+            "correlation_key": "run:5b35bd5d-3859-4d54-9e3a-5232536a4f3c|ip:172.22.0.1"
+          },
+          {
+            "event_id": "bbb57137-1528-44e3-b613-77b9372498d8",
+            "timestamp": "2026-11-17T13:38:46.701000Z",
+            "source": "application",
+            "event_type": "authentication_failure",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Invalid username or password",
+            "raw_event_reference": "docker:shopcloud:bfc2aba1-71e6-4f87-ae2f-cfe37330db1b",
+            "schema_version": "1.0",
+            "scenario_id": "authentication_abuse",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "5b35bd5d-3859-4d54-9e3a-5232536a4f3c",
+            "username": "lab_user",
+            "container_id": "0193cfa7d1ec",
+            "rule_id": null,
+            "correlation_key": "run:5b35bd5d-3859-4d54-9e3a-5232536a4f3c|ip:172.22.0.1"
+          },
+          {
+            "event_id": "9c05e9ba-6c60-49e7-a36c-8603555958c5",
+            "timestamp": "2026-11-17T13:38:47.754000Z",
+            "source": "application",
+            "event_type": "authentication_failure",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Invalid username or password",
+            "raw_event_reference": "docker:shopcloud:5ea02d8a-1a72-46a3-bfbc-fed87a4f0d52",
+            "schema_version": "1.0",
+            "scenario_id": "authentication_abuse",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "5b35bd5d-3859-4d54-9e3a-5232536a4f3c",
+            "username": "lab_user",
+            "container_id": "0193cfa7d1ec",
+            "rule_id": null,
+            "correlation_key": "run:5b35bd5d-3859-4d54-9e3a-5232536a4f3c|ip:172.22.0.1"
+          },
+          {
+            "event_id": "aff7844c-b452-4366-bf10-c12dd4812fd2",
+            "timestamp": "2026-11-17T13:38:48.795000Z",
+            "source": "application",
+            "event_type": "authentication_failure",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Invalid username or password",
+            "raw_event_reference": "docker:shopcloud:f6a291ae-994c-43b3-9ed3-e19bea9ee1b5",
+            "schema_version": "1.0",
+            "scenario_id": "authentication_abuse",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "5b35bd5d-3859-4d54-9e3a-5232536a4f3c",
+            "username": "lab_user",
+            "container_id": "0193cfa7d1ec",
+            "rule_id": null,
+            "correlation_key": "run:5b35bd5d-3859-4d54-9e3a-5232536a4f3c|ip:172.22.0.1"
+          },
+          {
+            "event_id": "1b62094a-e9d7-4ce3-bba3-3546ce072c21",
+            "timestamp": "2026-11-17T13:38:49.852000Z",
+            "source": "application",
+            "event_type": "authentication_failure",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Invalid username or password",
+            "raw_event_reference": "docker:shopcloud:10dc384e-313c-4800-ac88-130f09c18487",
+            "schema_version": "1.0",
+            "scenario_id": "authentication_abuse",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "5b35bd5d-3859-4d54-9e3a-5232536a4f3c",
+            "username": "lab_user",
+            "container_id": "0193cfa7d1ec",
+            "rule_id": null,
+            "correlation_key": "run:5b35bd5d-3859-4d54-9e3a-5232536a4f3c|ip:172.22.0.1"
+          }
+        ]
+      }
+    ],
+    "incidents": [
+      {
+        "id": "8fdcaefe-5f98-49ae-9a08-a1a0d8e8d48b",
+        "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+        "run_id": "5b35bd5d-3859-4d54-9e3a-5232536a4f3c",
+        "title": "Repeated Failed Login Attempts (authentication_abuse): source 172.22.0.1",
+        "status": "open",
+        "created_at": "2026-11-17T13:38:50.077057Z",
+        "correlation_key": "run:5b35bd5d-3859-4d54-9e3a-5232536a4f3c|resource:shopcloud|ip:172.22.0.1",
+        "risk_score": 60,
+        "risk_explanation": "Risk score: 60 out of 100.\n+40: the highest alert severity is medium.\n+20: 11 event(s) over the detection threshold of 10 (2 points each, at most 20).\n+0: 0 additional correlated alert(s) (5 points each, at most 15).\nThis score is a simple rule of thumb for comparing incidents inside this lab. It does not predict financial loss and is not a universal measure of risk.",
+        "alerts": [
+          {
+            "id": "aaa131a2-5f23-4e3c-826c-7910f7eb728e",
+            "rule_id": "repeated_failed_logins",
+            "severity": "medium",
+            "title": "Repeated failed logins from one source (source_ip=172.22.0.1)",
+            "description": "21 authentication_failure events from source_ip=172.22.0.1 within 20s (threshold 10 in 60s).",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "5b35bd5d-3859-4d54-9e3a-5232536a4f3c",
+            "incident_id": "8fdcaefe-5f98-49ae-9a08-a1a0d8e8d48b",
+            "event_count": 21,
+            "first_event_at": "2026-11-17T13:38:29.613000Z",
+            "last_event_at": "2026-11-17T13:38:49.852000Z",
+            "created_at": "2026-11-17T13:38:50.057479Z"
+          }
+        ],
+        "responses": [],
+        "timeline_entries": 24
+      }
+    ],
+    "cleanup": {
+      "ok": true,
+      "run_status": "cleaned_up"
+    },
+    "checks": {
+      "has_alert": true,
+      "incident_count": 1,
+      "every_alert_in_an_incident": true,
+      "incidents_belong_to_run": true,
+      "incident_alerts_from_this_run": true,
+      "alert_events_from_this_run": true,
+      "events_from_other_runs": 0,
+      "benign_events_in_alerts": 1,
+      "benign_event_references": [
+        "docker:shopcloud:a78266e8-3ae0-4a84-a9a8-2956508af48e"
+      ],
+      "alert_event_count": 21
+    }
+  },
+  {
+    "phase": "correlation",
+    "telemetry_source": "docker",
+    "falco": false,
+    "index": 3,
+    "scenario_id": "unauthorized_resource_access",
+    "reset": {
+      "operation": "reset",
+      "requested_at": "2026-11-17T13:38:52.221951+00:00",
+      "ok": true,
+      "error": null,
+      "api_returned_seconds": 8.559,
+      "ready_seconds": 8.682
+    },
+    "run_id": "88db572c-e931-44e3-8903-626671699920",
+    "stats_samples": 20,
+    "wall_seconds": 8.42,
+    "status": "completed",
+    "error": null,
+    "scenario_version": "1.0.0",
+    "started_at": "2026-11-17T13:39:01.018802Z",
+    "finished_at": "2026-11-17T13:39:08.557985Z",
+    "report": {
+      "report_version": "1.0",
+      "generated_at": "2026-11-17T13:39:09.349776Z",
+      "lab": {
+        "id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+        "name": "evaluation",
+        "target": "shopcloud",
+        "environment": "docker",
+        "status": "running"
+      },
+      "scenario": {
+        "id": "unauthorized_resource_access",
+        "version": "1.0.0",
+        "definition_available": true,
+        "name": "Unauthorized Resource Access",
+        "category": "authorization",
+        "description": "Logs in as the restricted test account and repeatedly requests a protected ShopCloud resource it is not allowed to read. Checks that every request is refused and that the repeated denials are detected.",
+        "target": "shopcloud",
+        "type": "application"
+      },
+      "run": {
+        "id": "88db572c-e931-44e3-8903-626671699920",
+        "status": "completed",
+        "parameters": {
+          "username": "lab_restricted",
+          "attempts": 8,
+          "interval_seconds": 1,
+          "verification_check": "access_remains_denied"
+        },
+        "started_at": "2026-11-17T13:39:01.018802Z",
+        "finished_at": "2026-11-17T13:39:08.557985Z",
+        "duration_seconds": 7.539,
+        "error": null
+      },
+      "script_summary": {
+        "scenario": "unauthorized_resource_access",
+        "target": "http://127.0.0.1:8081",
+        "username": "lab_restricted",
+        "resource": "GET /api/orders",
+        "attempts_sent": 8,
+        "denied_403": 8,
+        "other": 0,
+        "granted_200": 0,
+        "errors": 0,
+        "access_control_failed": false,
+        "login_status": 200
+      },
+      "telemetry": {
+        "expected": [
+          {
+            "source": "application",
+            "event_type": "authorization_denied",
+            "expected_min_count": 5,
+            "collected_count": 8,
+            "met": true
+          }
+        ],
+        "all_expected_met": true,
+        "collected_total": 11,
+        "collected_by_type": [
+          {
+            "source": "application",
+            "event_type": "authentication_success",
+            "count": 1
+          },
+          {
+            "source": "application",
+            "event_type": "authorization_denied",
+            "count": 8
+          },
+          {
+            "source": "application",
+            "event_type": "other",
+            "count": 2
+          }
+        ]
+      },
+      "detection": {
+        "rule": "repeated_access_denied",
+        "threshold": 5,
+        "window_seconds": 60
+      },
+      "alerts": [
+        {
+          "id": "8a3f3833-5410-4a99-93de-ca5efe8e9083",
+          "rule_id": "repeated_access_denied",
+          "severity": "medium",
+          "title": "Repeated access denied for one user (username=lab_restricted, raw.path=/api/orders)",
+          "description": "8 authorization_denied events from username=lab_restricted, raw.path=/api/orders within 7s (threshold 5 in 60s).",
+          "incident_id": "0e883827-8098-4d9e-bbfc-f03f241763b2",
+          "event_count": 8,
+          "first_event_at": "2026-11-17T13:39:01.231000Z",
+          "last_event_at": "2026-11-17T13:39:08.278000Z",
+          "created_at": "2026-11-17T13:39:08.468226Z",
+          "threshold_crossed_at": "2026-11-17T13:39:05.247000Z",
+          "threshold_event_id": "e090f486-06d3-459f-9206-90687a6520ec",
+          "threshold_event_reference": "docker:shopcloud:ad41dca4-f6b1-45d0-9cb3-b4d44acde08d",
+          "detection_latency_seconds": 3.221
+        }
+      ],
+      "incidents": [
+        {
+          "id": "0e883827-8098-4d9e-bbfc-f03f241763b2",
+          "title": "Unauthorized Resource Access (unauthorized_resource_access): source 172.22.0.1",
+          "status": "open",
+          "correlation_key": "run:88db572c-e931-44e3-8903-626671699920|resource:shopcloud|ip:172.22.0.1",
+          "risk_score": 46,
+          "risk_explanation": "Risk score: 46 out of 100.\n+40: the highest alert severity is medium.\n+6: 3 event(s) over the detection threshold of 5 (2 points each, at most 20).\n+0: 0 additional correlated alert(s) (5 points each, at most 15).\nThis score is a simple rule of thumb for comparing incidents inside this lab. It does not predict financial loss and is not a universal measure of risk.",
+          "alert_ids": [
+            "8a3f3833-5410-4a99-93de-ca5efe8e9083"
+          ]
+        }
+      ],
+      "responses": [],
+      "post_run_verification": {
+        "check": "access_remains_denied",
+        "passed": true,
+        "still_denied": true,
+        "sent": {
+          "request": "GET /api/orders",
+          "username": "lab_restricted"
+        },
+        "received": {
+          "login_status": 200,
+          "status": 403
+        },
+        "error": null
+      },
+      "cleanup": {
+        "status": "not_run",
+        "runs": []
+      }
+    },
+    "alerts": [
+      {
+        "id": "8a3f3833-5410-4a99-93de-ca5efe8e9083",
+        "rule_id": "repeated_access_denied",
+        "severity": "medium",
+        "title": "Repeated access denied for one user (username=lab_restricted, raw.path=/api/orders)",
+        "description": "8 authorization_denied events from username=lab_restricted, raw.path=/api/orders within 7s (threshold 5 in 60s).",
+        "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+        "run_id": "88db572c-e931-44e3-8903-626671699920",
+        "incident_id": "0e883827-8098-4d9e-bbfc-f03f241763b2",
+        "event_count": 8,
+        "first_event_at": "2026-11-17T13:39:01.231000Z",
+        "last_event_at": "2026-11-17T13:39:08.278000Z",
+        "created_at": "2026-11-17T13:39:08.468226Z",
+        "events": [
+          {
+            "event_id": "fc3343ad-baaa-4722-94f7-6a916b082de3",
+            "timestamp": "2026-11-17T13:39:01.231000Z",
+            "source": "application",
+            "event_type": "authorization_denied",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Role is not allowed to read orders",
+            "raw_event_reference": "docker:shopcloud:7eafdb59-f235-4b6e-a55e-30c39faf406a",
+            "schema_version": "1.0",
+            "scenario_id": "unauthorized_resource_access",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "88db572c-e931-44e3-8903-626671699920",
+            "username": "lab_restricted",
+            "container_id": "a72ef0714d04",
+            "rule_id": null,
+            "correlation_key": "run:88db572c-e931-44e3-8903-626671699920|ip:172.22.0.1"
+          },
+          {
+            "event_id": "ba406967-b072-4d51-8aef-e6ce097a59b3",
+            "timestamp": "2026-11-17T13:39:02.236000Z",
+            "source": "application",
+            "event_type": "authorization_denied",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Role is not allowed to read orders",
+            "raw_event_reference": "docker:shopcloud:27c8572e-9af1-493d-b21c-055d1bb0f85d",
+            "schema_version": "1.0",
+            "scenario_id": "unauthorized_resource_access",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "88db572c-e931-44e3-8903-626671699920",
+            "username": "lab_restricted",
+            "container_id": "a72ef0714d04",
+            "rule_id": null,
+            "correlation_key": "run:88db572c-e931-44e3-8903-626671699920|ip:172.22.0.1"
+          },
+          {
+            "event_id": "553c4f40-162e-4d31-b6c9-6b529b0f53c8",
+            "timestamp": "2026-11-17T13:39:03.239000Z",
+            "source": "application",
+            "event_type": "authorization_denied",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Role is not allowed to read orders",
+            "raw_event_reference": "docker:shopcloud:065b020a-2ecf-4f7b-9d39-13cc9b05b80f",
+            "schema_version": "1.0",
+            "scenario_id": "unauthorized_resource_access",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "88db572c-e931-44e3-8903-626671699920",
+            "username": "lab_restricted",
+            "container_id": "a72ef0714d04",
+            "rule_id": null,
+            "correlation_key": "run:88db572c-e931-44e3-8903-626671699920|ip:172.22.0.1"
+          },
+          {
+            "event_id": "5113333a-ba29-4ca1-b257-3ab96f2822d9",
+            "timestamp": "2026-11-17T13:39:04.243000Z",
+            "source": "application",
+            "event_type": "authorization_denied",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Role is not allowed to read orders",
+            "raw_event_reference": "docker:shopcloud:32867e5b-dfdf-45fa-91e1-5986f5257521",
+            "schema_version": "1.0",
+            "scenario_id": "unauthorized_resource_access",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "88db572c-e931-44e3-8903-626671699920",
+            "username": "lab_restricted",
+            "container_id": "a72ef0714d04",
+            "rule_id": null,
+            "correlation_key": "run:88db572c-e931-44e3-8903-626671699920|ip:172.22.0.1"
+          },
+          {
+            "event_id": "e090f486-06d3-459f-9206-90687a6520ec",
+            "timestamp": "2026-11-17T13:39:05.247000Z",
+            "source": "application",
+            "event_type": "authorization_denied",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Role is not allowed to read orders",
+            "raw_event_reference": "docker:shopcloud:ad41dca4-f6b1-45d0-9cb3-b4d44acde08d",
+            "schema_version": "1.0",
+            "scenario_id": "unauthorized_resource_access",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "88db572c-e931-44e3-8903-626671699920",
+            "username": "lab_restricted",
+            "container_id": "a72ef0714d04",
+            "rule_id": null,
+            "correlation_key": "run:88db572c-e931-44e3-8903-626671699920|ip:172.22.0.1"
+          },
+          {
+            "event_id": "d1fd5c8e-1581-4773-b2bd-9519a8e722b6",
+            "timestamp": "2026-11-17T13:39:06.254000Z",
+            "source": "application",
+            "event_type": "authorization_denied",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Role is not allowed to read orders",
+            "raw_event_reference": "docker:shopcloud:869cebf0-0bc6-423b-a44b-7c7bc0bb8cf9",
+            "schema_version": "1.0",
+            "scenario_id": "unauthorized_resource_access",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "88db572c-e931-44e3-8903-626671699920",
+            "username": "lab_restricted",
+            "container_id": "a72ef0714d04",
+            "rule_id": null,
+            "correlation_key": "run:88db572c-e931-44e3-8903-626671699920|ip:172.22.0.1"
+          },
+          {
+            "event_id": "25c7966c-9e71-4fad-9414-ce17fdf63f01",
+            "timestamp": "2026-11-17T13:39:07.267000Z",
+            "source": "application",
+            "event_type": "authorization_denied",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Role is not allowed to read orders",
+            "raw_event_reference": "docker:shopcloud:ec359374-4334-4e62-a3cf-3faff9a0c905",
+            "schema_version": "1.0",
+            "scenario_id": "unauthorized_resource_access",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "88db572c-e931-44e3-8903-626671699920",
+            "username": "lab_restricted",
+            "container_id": "a72ef0714d04",
+            "rule_id": null,
+            "correlation_key": "run:88db572c-e931-44e3-8903-626671699920|ip:172.22.0.1"
+          },
+          {
+            "event_id": "5339acd9-1c0a-4292-a89b-d9182d452d33",
+            "timestamp": "2026-11-17T13:39:08.278000Z",
+            "source": "application",
+            "event_type": "authorization_denied",
+            "severity": "low",
+            "source_ip": "172.22.0.1",
+            "resource": "shopcloud",
+            "message": "Role is not allowed to read orders",
+            "raw_event_reference": "docker:shopcloud:5bf3c2a9-2f50-494a-911e-428d1131a147",
+            "schema_version": "1.0",
+            "scenario_id": "unauthorized_resource_access",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "88db572c-e931-44e3-8903-626671699920",
+            "username": "lab_restricted",
+            "container_id": "a72ef0714d04",
+            "rule_id": null,
+            "correlation_key": "run:88db572c-e931-44e3-8903-626671699920|ip:172.22.0.1"
+          }
+        ]
+      }
+    ],
+    "incidents": [
+      {
+        "id": "0e883827-8098-4d9e-bbfc-f03f241763b2",
+        "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+        "run_id": "88db572c-e931-44e3-8903-626671699920",
+        "title": "Unauthorized Resource Access (unauthorized_resource_access): source 172.22.0.1",
+        "status": "open",
+        "created_at": "2026-11-17T13:39:08.473091Z",
+        "correlation_key": "run:88db572c-e931-44e3-8903-626671699920|resource:shopcloud|ip:172.22.0.1",
+        "risk_score": 46,
+        "risk_explanation": "Risk score: 46 out of 100.\n+40: the highest alert severity is medium.\n+6: 3 event(s) over the detection threshold of 5 (2 points each, at most 20).\n+0: 0 additional correlated alert(s) (5 points each, at most 15).\nThis score is a simple rule of thumb for comparing incidents inside this lab. It does not predict financial loss and is not a universal measure of risk.",
+        "alerts": [
+          {
+            "id": "8a3f3833-5410-4a99-93de-ca5efe8e9083",
+            "rule_id": "repeated_access_denied",
+            "severity": "medium",
+            "title": "Repeated access denied for one user (username=lab_restricted, raw.path=/api/orders)",
+            "description": "8 authorization_denied events from username=lab_restricted, raw.path=/api/orders within 7s (threshold 5 in 60s).",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "88db572c-e931-44e3-8903-626671699920",
+            "incident_id": "0e883827-8098-4d9e-bbfc-f03f241763b2",
+            "event_count": 8,
+            "first_event_at": "2026-11-17T13:39:01.231000Z",
+            "last_event_at": "2026-11-17T13:39:08.278000Z",
+            "created_at": "2026-11-17T13:39:08.468226Z"
+          }
+        ],
+        "responses": [],
+        "timeline_entries": 11
+      }
+    ],
+    "cleanup": {
+      "ok": true,
+      "run_status": "cleaned_up"
+    },
+    "checks": {
+      "has_alert": true,
+      "incident_count": 1,
+      "every_alert_in_an_incident": true,
+      "incidents_belong_to_run": true,
+      "incident_alerts_from_this_run": true,
+      "alert_events_from_this_run": true,
+      "events_from_other_runs": 0,
+      "benign_events_in_alerts": 0,
+      "benign_event_references": [],
+      "alert_event_count": 8
+    }
+  },
+  {
+    "phase": "correlation",
+    "telemetry_source": "docker",
+    "falco": false,
+    "index": 3,
+    "scenario_id": "suspicious_container_activity",
+    "reset": {
+      "operation": "reset",
+      "requested_at": "2026-11-17T13:39:09.430245+00:00",
+      "ok": true,
+      "error": null,
+      "api_returned_seconds": 8.48,
+      "ready_seconds": 8.61
+    },
+    "run_id": "9de08007-ee1a-4bcd-96f8-f9bca6fe2462",
+    "stats_samples": 10,
+    "wall_seconds": 4.437,
+    "status": "completed",
+    "error": null,
+    "scenario_version": "1.0.0",
+    "started_at": "2026-11-17T13:39:18.189425Z",
+    "finished_at": "2026-11-17T13:39:20.874804Z",
+    "report": {
+      "report_version": "1.0",
+      "generated_at": "2026-11-17T13:39:22.566312Z",
+      "lab": {
+        "id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+        "name": "evaluation",
+        "target": "shopcloud",
+        "environment": "docker",
+        "status": "running"
+      },
+      "scenario": {
+        "id": "suspicious_container_activity",
+        "version": "1.0.0",
+        "definition_available": true,
+        "name": "Suspicious Container Activity",
+        "category": "container_runtime",
+        "description": "Runs one harmless, predefined command (a shell that prints `id` and exits) inside the lab's dedicated test container, the way an intruder would start a shell in a running container. Checks that the Docker exec event, and Falco's alert when Falco is on, are collected and detected.",
+        "target": "test_container",
+        "type": "container"
+      },
+      "run": {
+        "id": "9de08007-ee1a-4bcd-96f8-f9bca6fe2462",
+        "status": "completed",
+        "parameters": {},
+        "started_at": "2026-11-17T13:39:18.189425Z",
+        "finished_at": "2026-11-17T13:39:20.874804Z",
+        "duration_seconds": 2.685,
+        "error": null
+      },
+      "script_summary": {
+        "scenario": "suspicious_container_activity",
+        "target": "test_container",
+        "container": "test_container",
+        "command": "sh -c id; : cloudattacklab-scenario-marker",
+        "exit_code": 0,
+        "output": "uid=0(root) gid=0(root) groups=0(root),0(root),1(bin),2(daemon),3(sys),4(adm),6(disk),10(wheel),11(floppy),20(dialout),26(tape),27(video)"
+      },
+      "telemetry": {
+        "expected": [
+          {
+            "source": "docker",
+            "event_type": "suspicious_process",
+            "expected_min_count": 1,
+            "collected_count": 1,
+            "met": true
+          }
+        ],
+        "all_expected_met": true,
+        "collected_total": 1,
+        "collected_by_type": [
+          {
+            "source": "docker",
+            "event_type": "suspicious_process",
+            "count": 1
+          }
+        ]
+      },
+      "detection": {
+        "rule": "suspicious_container_process",
+        "threshold": 1,
+        "window_seconds": 60
+      },
+      "alerts": [
+        {
+          "id": "6dd1636a-290b-4669-832f-edf29360cd4c",
+          "rule_id": "suspicious_container_process",
+          "severity": "high",
+          "title": "Suspicious process in the test container (resource=test_container)",
+          "description": "1 suspicious_process events from resource=test_container within 0s (threshold 1 in 60s).",
+          "incident_id": "5bb9ba63-7fce-4f52-ae7f-1bdff0721ffd",
+          "event_count": 1,
+          "first_event_at": "2026-11-17T13:39:18.487631Z",
+          "last_event_at": "2026-11-17T13:39:18.487631Z",
+          "created_at": "2026-11-17T13:39:20.864486Z",
+          "threshold_crossed_at": "2026-11-17T13:39:18.487631Z",
+          "threshold_event_id": "ebf7c5f1-0e29-4883-9077-74f206038780",
+          "threshold_event_reference": "docker:test_container:exec_start-1794922758487631078",
+          "detection_latency_seconds": 2.377
+        }
+      ],
+      "incidents": [
+        {
+          "id": "5bb9ba63-7fce-4f52-ae7f-1bdff0721ffd",
+          "title": "Suspicious Container Activity (suspicious_container_activity)",
+          "status": "open",
+          "correlation_key": "run:9de08007-ee1a-4bcd-96f8-f9bca6fe2462|resource:test_container",
+          "risk_score": 60,
+          "risk_explanation": "Risk score: 60 out of 100.\n+60: the highest alert severity is high.\n+0: 0 event(s) over the detection threshold of 1 (2 points each, at most 20).\n+0: 0 additional correlated alert(s) (5 points each, at most 15).\nThis score is a simple rule of thumb for comparing incidents inside this lab. It does not predict financial loss and is not a universal measure of risk.",
+          "alert_ids": [
+            "6dd1636a-290b-4669-832f-edf29360cd4c"
+          ]
+        }
+      ],
+      "responses": [],
+      "post_run_verification": null,
+      "cleanup": {
+        "status": "not_run",
+        "runs": []
+      }
+    },
+    "alerts": [
+      {
+        "id": "6dd1636a-290b-4669-832f-edf29360cd4c",
+        "rule_id": "suspicious_container_process",
+        "severity": "high",
+        "title": "Suspicious process in the test container (resource=test_container)",
+        "description": "1 suspicious_process events from resource=test_container within 0s (threshold 1 in 60s).",
+        "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+        "run_id": "9de08007-ee1a-4bcd-96f8-f9bca6fe2462",
+        "incident_id": "5bb9ba63-7fce-4f52-ae7f-1bdff0721ffd",
+        "event_count": 1,
+        "first_event_at": "2026-11-17T13:39:18.487631Z",
+        "last_event_at": "2026-11-17T13:39:18.487631Z",
+        "created_at": "2026-11-17T13:39:20.864486Z",
+        "events": [
+          {
+            "event_id": "ebf7c5f1-0e29-4883-9077-74f206038780",
+            "timestamp": "2026-11-17T13:39:18.487631Z",
+            "source": "docker",
+            "event_type": "suspicious_process",
+            "severity": "medium",
+            "source_ip": null,
+            "resource": "test_container",
+            "message": "docker exec started a process in cloudattacklab-lab-test_container-1: sh -c id; : cloudattacklab-scenario-marker",
+            "raw_event_reference": "docker:test_container:exec_start-1794922758487631078",
+            "schema_version": "1.0",
+            "scenario_id": "suspicious_container_activity",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "9de08007-ee1a-4bcd-96f8-f9bca6fe2462",
+            "username": null,
+            "container_id": "878b6fe488b6",
+            "rule_id": null,
+            "correlation_key": "run:9de08007-ee1a-4bcd-96f8-f9bca6fe2462|container:878b6fe488b6"
+          }
+        ]
+      }
+    ],
+    "incidents": [
+      {
+        "id": "5bb9ba63-7fce-4f52-ae7f-1bdff0721ffd",
+        "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+        "run_id": "9de08007-ee1a-4bcd-96f8-f9bca6fe2462",
+        "title": "Suspicious Container Activity (suspicious_container_activity)",
+        "status": "open",
+        "created_at": "2026-11-17T13:39:20.867184Z",
+        "correlation_key": "run:9de08007-ee1a-4bcd-96f8-f9bca6fe2462|resource:test_container",
+        "risk_score": 60,
+        "risk_explanation": "Risk score: 60 out of 100.\n+60: the highest alert severity is high.\n+0: 0 event(s) over the detection threshold of 1 (2 points each, at most 20).\n+0: 0 additional correlated alert(s) (5 points each, at most 15).\nThis score is a simple rule of thumb for comparing incidents inside this lab. It does not predict financial loss and is not a universal measure of risk.",
+        "alerts": [
+          {
+            "id": "6dd1636a-290b-4669-832f-edf29360cd4c",
+            "rule_id": "suspicious_container_process",
+            "severity": "high",
+            "title": "Suspicious process in the test container (resource=test_container)",
+            "description": "1 suspicious_process events from resource=test_container within 0s (threshold 1 in 60s).",
+            "lab_id": "4d67393f-c674-443f-b1ba-dee973e1c32f",
+            "run_id": "9de08007-ee1a-4bcd-96f8-f9bca6fe2462",
+            "incident_id": "5bb9ba63-7fce-4f52-ae7f-1bdff0721ffd",
+            "event_count": 1,
+            "first_event_at": "2026-11-17T13:39:18.487631Z",
+            "last_event_at": "2026-11-17T13:39:18.487631Z",
+            "created_at": "2026-11-17T13:39:20.864486Z"
+          }
+        ],
+        "responses": [],
+        "timeline_entries": 4
+      }
+    ],
+    "cleanup": {
+      "ok": true,
+      "run_status": "cleaned_up"
+    },
+    "checks": {
+      "has_alert": true,
+      "incident_count": 1,
+      "every_alert_in_an_incident": true,
+      "incidents_belong_to_run": true,
+      "incident_alerts_from_this_run": true,
+      "alert_events_from_this_run": true,
+      "events_from_other_runs": 0,
+      "benign_events_in_alerts": 0,
+      "benign_event_references": [],
+      "alert_event_count": 1
+    }
+  },
+  {
+    "benign_counts": {
+      "browse": 31,
+      "login": 31,
+      "orders": 12,
+      "typo": 6,
+      "container_cmd": 5
+    }
+  }
+]

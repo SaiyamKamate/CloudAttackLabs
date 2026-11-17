@@ -1,0 +1,18 @@
+{
+  "docker_runs": 10,
+  "loki_runs": 5,
+  "benign_minutes": 10.0,
+  "correlation_rounds": 3,
+  "setup_trials": 3,
+  "scenarios": [
+    "authentication_abuse",
+    "unauthorized_resource_access",
+    "suspicious_container_activity"
+  ],
+  "seed": 1,
+  "api": "http://127.0.0.1:8000/api/v1",
+  "out": null,
+  "keep_running": false,
+  "summarize": null,
+  "finished_at": "2026-11-17T13:57:08.442044+00:00"
+}
