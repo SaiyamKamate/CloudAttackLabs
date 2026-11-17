@@ -1,0 +1,19 @@
+{
+  "docker_runs": 0,
+  "loki_runs": 0,
+  "mode": "benign_baseline",
+  "no_benign_baseline": false,
+  "correlation_rounds": 0,
+  "setup_trials": 1,
+  "scenarios": [
+    "authentication_abuse",
+    "unauthorized_resource_access",
+    "suspicious_container_activity"
+  ],
+  "seed": 1,
+  "api": "http://127.0.0.1:8000/api/v1",
+  "out": "evaluation/results/2026-11-17/benign_baseline",
+  "keep_running": false,
+  "summarize": null,
+  "finished_at": "2026-11-17T17:11:09.218394+00:00"
+}

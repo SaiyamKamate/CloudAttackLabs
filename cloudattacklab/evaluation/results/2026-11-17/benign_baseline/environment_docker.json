@@ -1,0 +1,14 @@
+{
+  "telemetry": {
+    "source": "docker",
+    "loki_url": null,
+    "reachable": null,
+    "error": null
+  },
+  "falco": {
+    "enabled": false,
+    "state": "exited",
+    "health": null,
+    "healthy": false
+  }
+}

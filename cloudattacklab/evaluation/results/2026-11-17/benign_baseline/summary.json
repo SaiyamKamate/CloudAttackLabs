@@ -1,0 +1,167 @@
+{
+  "execution": [],
+  "detection": [],
+  "latency": [],
+  "response": [],
+  "post_run_verification": [],
+  "lab_setup": [
+    {
+      "telemetry_source": "docker",
+      "operation": "start",
+      "falco": "False",
+      "ok": {
+        "ok": 1,
+        "total": 1,
+        "rate": 1.0
+      },
+      "n": 1,
+      "min": 11.105,
+      "median": 11.105,
+      "max": 11.105
+    }
+  ],
+  "resources": [
+    {
+      "telemetry_source": "docker",
+      "scenario_id": "benign_baseline",
+      "container": "backend-1",
+      "samples": 290,
+      "cpu_mean": 17.45,
+      "cpu_max": 42.18,
+      "mem_mean_mib": 201.2,
+      "mem_max_mib": 225.0
+    },
+    {
+      "telemetry_source": "docker",
+      "scenario_id": "benign_baseline",
+      "container": "frontend-1",
+      "samples": 290,
+      "cpu_mean": 0.57,
+      "cpu_max": 4.44,
+      "mem_mean_mib": 16.4,
+      "mem_max_mib": 18.4
+    },
+    {
+      "telemetry_source": "docker",
+      "scenario_id": "benign_baseline",
+      "container": "lab-shopcloud-1",
+      "samples": 290,
+      "cpu_mean": 9.04,
+      "cpu_max": 51.57,
+      "mem_mean_mib": 53.4,
+      "mem_max_mib": 66.1
+    },
+    {
+      "telemetry_source": "docker",
+      "scenario_id": "benign_baseline",
+      "container": "lab-test_container-1",
+      "samples": 290,
+      "cpu_mean": 0.04,
+      "cpu_max": 3.89,
+      "mem_mean_mib": 0.6,
+      "mem_max_mib": 2.0
+    },
+    {
+      "telemetry_source": "docker",
+      "scenario_id": "benign_baseline",
+      "container": "postgres-1",
+      "samples": 290,
+      "cpu_mean": 1.55,
+      "cpu_max": 7.49,
+      "mem_mean_mib": 43.6,
+      "mem_max_mib": 45.6
+    }
+  ],
+  "correlation": {
+    "runs": 0,
+    "own_incident_only": {
+      "ok": 0,
+      "total": 0,
+      "rate": null
+    },
+    "no_benign_merged": {
+      "ok": 0,
+      "total": 0,
+      "rate": null
+    },
+    "events_from_other_runs": 0,
+    "benign_events_in_alerts": 0,
+    "per_run": [],
+    "benign_counts": null
+  },
+  "benign_baseline": {
+    "run_id": "83f793d7-f656-4e31-8638-314c21d1b778",
+    "status": "completed",
+    "duration_seconds": 600,
+    "actions": {
+      "browse": 133,
+      "login": 114,
+      "orders": 60,
+      "failed_login": 9,
+      "container_cmd": 3,
+      "typo": 6,
+      "denied": 4
+    },
+    "http_errors": 0,
+    "events_stored": 329,
+    "events_by_type": {
+      "application other": 133,
+      "application authentication_success": 114,
+      "application resource_access": 60,
+      "application authentication_failure": 15,
+      "docker suspicious_process": 3,
+      "application authorization_denied": 4
+    },
+    "alerts": [
+      {
+        "rule_id": "suspicious_container_process",
+        "event_count": 1,
+        "title": "Suspicious process in the test container (resource=test_container)"
+      }
+    ],
+    "false_positives": {
+      "per_rule": [
+        {
+          "rule": "repeated_access_denied",
+          "threshold": 5,
+          "window_seconds": 60,
+          "benign_events": 4,
+          "groups": 1,
+          "peak_in_one_window": 4,
+          "alerts": 0,
+          "events_in_alerts": 0
+        },
+        {
+          "rule": "repeated_failed_logins",
+          "threshold": 10,
+          "window_seconds": 60,
+          "benign_events": 15,
+          "groups": 1,
+          "peak_in_one_window": 9,
+          "alerts": 0,
+          "events_in_alerts": 0
+        },
+        {
+          "rule": "suspicious_container_process",
+          "threshold": 1,
+          "window_seconds": 60,
+          "benign_events": 3,
+          "groups": 1,
+          "peak_in_one_window": 1,
+          "alerts": 1,
+          "events_in_alerts": 1
+        }
+      ],
+      "rules_exercised": 3,
+      "rules_alerted": 1,
+      "rate": {
+        "ok": 1,
+        "total": 3,
+        "rate": 0.333
+      },
+      "alerts": 1,
+      "incidents": 1,
+      "alerts_per_hour": 6.0
+    }
+  }
+}

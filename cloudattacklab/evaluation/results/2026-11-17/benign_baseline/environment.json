@@ -1,0 +1,130 @@
+{
+  "recorded_at": "2026-11-17T17:00:40.907846+00:00",
+  "git": {
+    "commit": "82292d2bdbd55fd6e054496d14eb2aa70810f100",
+    "branch": "evaluation-fixes",
+    "uncommitted_changes": false
+  },
+  "os": {
+    "system": "Linux",
+    "kernel": "6.18.33.2-microsoft-standard-WSL2",
+    "machine": "x86_64",
+    "distribution": "Ubuntu 26.04 LTS",
+    "windows_host": "Microsoft Windows [Version 10.0.26200.9974]",
+    "python": "3.14.4"
+  },
+  "docker": {
+    "server": "29.7.1",
+    "client": "29.7.1",
+    "compose": "5.3.1"
+  },
+  "cpu": {
+    "model": "12th Gen Intel(R) Core(TM) i7-12650H",
+    "logical_cpus_visible": 16
+  },
+  "memory": {
+    "total_mib_visible": 7792,
+    "note": "As seen by the Linux VM that runs Docker (WSL 2), not the Windows host total."
+  },
+  "scenarios": {
+    "authentication_abuse": {
+      "version": "1.0.0",
+      "detection": {
+        "rule": "repeated_failed_logins",
+        "threshold": 10,
+        "window_seconds": 60
+      },
+      "response": "temporary_rate_limit",
+      "expected_telemetry": [
+        {
+          "source": "application",
+          "event_type": "authentication_failure",
+          "min_count": 10
+        }
+      ],
+      "execution_parameters": {
+        "username": "lab_user",
+        "attempts": 20,
+        "interval_seconds": 1
+      }
+    },
+    "unauthorized_resource_access": {
+      "version": "1.0.0",
+      "detection": {
+        "rule": "repeated_access_denied",
+        "threshold": 5,
+        "window_seconds": 60
+      },
+      "response": null,
+      "expected_telemetry": [
+        {
+          "source": "application",
+          "event_type": "authorization_denied",
+          "min_count": 5
+        }
+      ],
+      "execution_parameters": {
+        "username": "lab_restricted",
+        "attempts": 8,
+        "interval_seconds": 1,
+        "verification_check": "access_remains_denied"
+      }
+    },
+    "suspicious_container_activity": {
+      "version": "1.0.0",
+      "detection": {
+        "rule": "suspicious_container_process",
+        "threshold": 1,
+        "window_seconds": 60
+      },
+      "response": "stop_container",
+      "expected_telemetry": [
+        {
+          "source": "docker",
+          "event_type": "suspicious_process",
+          "min_count": 1
+        }
+      ],
+      "execution_parameters": {}
+    }
+  },
+  "rules": {
+    "repeated_access_denied.yaml": {
+      "id": "repeated_access_denied",
+      "event_type": "authorization_denied",
+      "severity": "medium",
+      "default_threshold": "5",
+      "default_window_seconds": "60"
+    },
+    "repeated_failed_logins.yaml": {
+      "id": "repeated_failed_logins",
+      "event_type": "authentication_failure",
+      "severity": "medium",
+      "default_threshold": "10",
+      "default_window_seconds": "60"
+    },
+    "suspicious_container_process.yaml": {
+      "id": "suspicious_container_process",
+      "event_type": "suspicious_process",
+      "severity": "high",
+      "default_threshold": "1",
+      "default_window_seconds": "60"
+    }
+  },
+  "telemetry_source": {
+    "source": "docker",
+    "loki_url": null,
+    "reachable": null,
+    "error": null
+  },
+  "falco": {
+    "enabled": false,
+    "state": "exited",
+    "health": null,
+    "healthy": false
+  },
+  "loki_settle": {
+    "interval_seconds": "2 (default)",
+    "timeout_seconds": "20 (default)"
+  }
+}
