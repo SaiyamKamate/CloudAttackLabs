@@ -1,6 +1,8 @@
 # Platform services: PostgreSQL, the backend, and the dashboard.
 #   docker compose up -d --build        # then open http://127.0.0.1:5173
-# Settings come from .env (copy .env.example); the defaults below are for local use only.
+# Settings come from .env (copy .env.example). The defaults below are published in
+# this repository and are for a local lab on 127.0.0.1 only; the backend logs a
+# warning at startup while the default lab token or database password is in use.
 name: cloudattacklab
 
 services:
