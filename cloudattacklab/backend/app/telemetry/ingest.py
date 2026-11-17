@@ -22,7 +22,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..models import Event
-from ..schemas.event import NormalizedEvent
+from ..schemas.event import EventSource, EventType, NormalizedEvent
 from .normalize import RunContext, normalize
 from .source import TelemetrySource
 
@@ -96,6 +96,7 @@ class TelemetryIngestor:
         lines = self.source.collect(since=window_start)
         result.collected = len(lines)
         origin = getattr(self.source, "name", "docker")
+        stored_exec: list[dict] = []
 
         # Request ids already stored for this run, or for any event in this time
         # window (a neighbouring run, or another source), so none is stored twice.
@@ -132,9 +133,24 @@ class TelemetryIngestor:
             self.session.add(_event_row(event, record))
             seen.add(request_id)
             result.stored += 1
+            if event.event_type == EventType.suspicious_process and event.source == EventSource.docker:
+                stored_exec.append(
+                    {
+                        "event": "container_exec",
+                        "timestamp": event.timestamp.isoformat(),
+                        "container_id": event.container_id,
+                        "run_id": str(self.ctx.run_id),
+                        "raw_event_reference": event.raw_event_reference,
+                    }
+                )
 
         if result.stored:
             self.session.commit()
+            for event in stored_exec:
+                # One JSON line per container exec the backend collected, so the
+                # monitoring stack (Alloy -> Loki -> Grafana) can count them; Docker
+                # events themselves never reach Loki.
+                log.info(json.dumps(event))
         return result
 
 
