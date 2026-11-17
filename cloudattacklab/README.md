@@ -174,6 +174,7 @@ Two notes for this repo's setup, both already configured in `frontend/vite.confi
 | `backend/app/startup.py` | Startup checks: lab target URLs, default credentials |
 | `frontend/` | The React dashboard (served by nginx in its container) |
 | `tools/check_shopcloud.py` | Checks any running ShopCloud against the interface |
+| `tools/evaluate.py` | The repeatable evaluation (API only); results in `docs/evaluation-results.md` |
 
 ## Try it
 
@@ -211,6 +212,25 @@ What exists now, in the order it was built (each step is a merged pull request):
 13. Fixes for the November 2026 audit: the lab target URL check, a working Grafana dashboard, one thing at a time during a run, `incomplete` runs, lab status checked against Docker, loading states, a tighter run time window, default-credential warnings, closing incidents and an honest risk score after a revert, and these docs.
 
 Not built: login/auth, `isolate_container`, Kubernetes and cloud adapters, Prometheus, PDF export and sharing of reports.
+
+## How to repeat this evaluation
+
+`tools/evaluate.py` measures the platform through its API only (guide section 14: run success, detection rate, false positives, detection latency, correlation, response and verification, lab setup time, resource use). The results of 17 November 2026 are in [`docs/evaluation-results.md`](docs/evaluation-results.md).
+
+From the project root, where the `docker` CLI works (here: inside WSL), with the platform images built and nothing else using the lab:
+
+```bash
+python3 tools/evaluate.py                    # full plan, about 35 minutes
+```
+
+The defaults are 10 runs of each scenario with `TELEMETRY_SOURCE=docker`, 3 back-to-back correlation rounds with benign traffic (`tools/benign_traffic.py`), a 10-minute benign-only session, and 5 runs of each scenario with `TELEMETRY_SOURCE=loki` and Falco on. Every count is an option (`--docker-runs`, `--loki-runs`, `--correlation-rounds`, `--benign-minutes`, `--setup-trials`; `--help` lists them). The script switches the telemetry source by recreating the backend with environment variables, never by editing `.env`. It starts the monitoring stack for the Loki phase, and at the end stops the lab, puts the backend back on the `.env` settings and stops everything (`--keep-running` to skip that). The lab is reset before every run. Runs, alerts and incidents are added to your local database.
+
+Raw CSV and JSON go to `evaluation/results/<UTC date>/`, including `environment.json` (commit, OS, Docker, CPU, RAM, scenario versions, thresholds, telemetry source, Falco). Then:
+
+```bash
+python3 tools/evaluate.py --summarize evaluation/results/<date>          # the summary tables
+python3 tools/evaluation_charts.py evaluation/results/<date> docs/evaluation   # PNG charts (needs matplotlib)
+```
 
 ## Safety
 
