@@ -19,7 +19,7 @@ The backend is one FastAPI application (`backend/app/main.py`) with one Python p
 ## Containers and networks
 
 ```mermaid
-flowchart LR
+flowchart TB
     browser["Browser on this machine"]
 
     subgraph host["Host network (127.0.0.1)"]
