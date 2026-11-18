@@ -12,7 +12,12 @@ scripts/setup.sh            # add --monitoring for Loki, Alloy and Grafana
 
 then open <http://127.0.0.1:5173>. `scripts/setup.sh` does §4 to §7 below for you; the rest of this guide explains each of those steps and how to do them by hand.
 
-**How this guide was checked.** Every command in a grey box was run on the test machine described below on 17 November 2026, unless it is marked **Not run on the test machine**. Output shown is real output from that run, trimmed. On 18 November 2026 the project moved from a `cloudattacklab/` subfolder to the repository root, the monitoring stack became a Compose profile, and the `scripts/` were added. The commands changed by that update (`scripts/setup.sh`, `scripts/start.sh --monitoring`, `scripts/status.sh`, `scripts/stop.sh`, `docker compose --profile monitoring ...`) were run on the same machine that day, unless marked otherwise.
+**How this guide was checked.** Every command in a grey box was run on the test machine described below on 17 November 2026, unless it is marked **Not run on the test machine**. Output shown is real output from that run, trimmed. On 18 November 2026 the project moved from a `cloudattacklab/` subfolder to the repository root, the monitoring stack became a Compose profile, and the `scripts/` were added. The commands changed by that update were run on the same machine that day, in two ways:
+
+- **On the existing installation** (with its database): `scripts/setup.sh`, `scripts/start.sh --monitoring`, `scripts/status.sh`, `scripts/stop.sh`.
+- **On a fresh clone**, to check the steps a new user follows: the branch was cloned into the Ubuntu home folder (no `.env`, no `node_modules`), and only the two Compose project names were changed (`cloudattacklab` to `calfresh`, `cloudattacklab-lab` to `calfresh-lab`) so that it could not touch the existing installation. In that clone `scripts/setup.sh` created `.env` with random passwords, built and started everything, created and started a lab; a scenario ran to an alert and an incident; `scripts/start.sh --monitoring` brought up Loki, Alloy and Grafana (login with the generated password worked); `scripts/stop.sh`, `scripts/start.sh --lab` and a second `scripts/setup.sh` (which left `.env` unchanged) worked; and `scripts/reset.sh` refused without a terminal, cancelled on "no", and on "delete" removed that project's containers, networks, volume and images. The existing installation's volumes, images and containers were compared before and after and had not changed.
+
+What that fresh-clone check did **not** cover: installing WSL and Docker (§2; Docker was already installed); a machine that has never downloaded the base images (Docker's local cache was reused, so the first build was faster than on a new machine); cloning from GitHub (the branch was cloned from the local repository); and the real project names on an empty machine.
 
 ## 1. Requirements
 
@@ -326,20 +331,20 @@ scripts/start.sh --lab
 
 ## Uninstall completely
 
-**Not run on the test machine**, because these commands delete data that was still needed (the evaluation's runs, alerts and incidents in the database). Each command is a standard Docker Compose command; the project and volume names were checked against the compose files.
+**Not run on the test machine's installation**, because these commands delete data that was still needed (the evaluation's runs, alerts and incidents in the database). `scripts/reset.sh --images` was run on the renamed fresh clone described at the top of this guide, where it removed exactly that project's containers, networks, database volume and built images, and nothing else.
 
 ```bash
 scripts/reset.sh --images
 ```
 
-explains what it will delete and asks you to type `delete` (only its refusal without a terminal was run on the test machine). It removes every CloudAttackLab container and network, the database volume and, with `--images`, the images built by the project. It keeps `.env`. By hand, the same is:
+lists the containers and the volume it will delete, then asks you to type `delete`. It removes every CloudAttackLab container and network, the database volume and, with `--images`, the images built by the project. It keeps `.env`. By hand, the same is:
 
 ```bash
 docker compose -f lab/docker-compose.lab.yml --profile falco down -v --rmi local
 docker compose --profile monitoring down -v --rmi local
 ```
 
-- `-v` deletes volumes: `cloudattacklab_pgdata` holds every lab, run, event, alert, incident, response and audit row. It cannot be recovered.
+- `-v` deletes volumes: `cloudattacklab_pgdata` holds every lab, run, event, alert, incident, response and audit row. It cannot be recovered. It is the only volume either project has (PostgreSQL's data folder; no other image used here declares one), and every checkout of this repository on the same Docker host shares it, because they all use the project name `cloudattacklab`.
 - `--rmi local` deletes the images built from this repository (`cloudattacklab-backend`, `cloudattacklab-frontend`, the lab's ShopCloud and Falco images). Images pulled from Docker Hub (`postgres`, `alpine`, `grafana/*`) are kept; remove them with `docker image rm` if you want the disk space back.
 
 Check that nothing is left:

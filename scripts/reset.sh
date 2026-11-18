@@ -6,7 +6,7 @@
 #   scripts/reset.sh --yes       no question (for scripts)
 #   scripts/reset.sh --images    also remove the images built from this repository
 #
-# DELETED: the database volume (cloudattacklab_pgdata): every lab, run, event,
+# DELETED: the database volume (normally cloudattacklab_pgdata): every lab, run, event,
 #          alert, incident, response and audit record; the lab's containers
 #          (ShopCloud's own data); the monitoring containers and their logs.
 # KEPT:    your .env, the code, and (without --images) the built images.
