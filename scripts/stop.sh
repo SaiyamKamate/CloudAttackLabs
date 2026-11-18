@@ -49,7 +49,7 @@ else
   die "docker compose stop failed (the reason is just above)."
 fi
 
-left="$(docker ps --format '{{.Names}}' | grep -E '^cloudattacklab' || true)"
+left="$(docker ps --format '{{.Names}}' | grep -E "^(${PROJECT}|${LAB_PROJECT})-" || true)"
 if [ -n "$left" ]; then
   warn "Still running: $(echo "$left" | tr '\n' ' ')"
   exit 1

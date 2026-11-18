@@ -45,7 +45,7 @@ for entry in "${ports[@]}"; do
   port="${entry%%:*}"; service="${entry#*:}"
   port_in_use "$port" || continue
   if [ "$service" = shopcloud ]; then
-    ours="$(docker ps -q --filter label=com.docker.compose.project=cloudattacklab-lab --filter label=com.docker.compose.service=shopcloud)"
+    ours="$(docker ps -q --filter "label=com.docker.compose.project=$LAB_PROJECT" --filter label=com.docker.compose.service=shopcloud)"
   else
     ours="$(docker compose ps -q --status running "$service" 2>/dev/null)"
   fi

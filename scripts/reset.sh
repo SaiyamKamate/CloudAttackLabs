@@ -11,6 +11,15 @@
 #          (ShopCloud's own data); the monitoring containers and their logs.
 # KEPT:    your .env, the code, and (without --images) the built images.
 #
+# Exactly what it runs, scoped to this project's Compose project names:
+#   docker compose -f lab/docker-compose.lab.yml --profile falco down --remove-orphans
+#   docker compose --profile monitoring down -v --remove-orphans
+# (each with --rmi local when --images is given: only images built from this
+# repository; pulled images such as postgres or grafana are kept). No other
+# project's containers, volumes or images are touched. The database volume is
+# shared by every checkout of this repository on the same Docker host, because
+# they all use the same project name.
+#
 # Not what you want?
 #   - To stop everything and keep the data:      scripts/stop.sh
 #   - To put only the lab back to its baseline:  Reset on the dashboard's Lab page
@@ -18,7 +27,7 @@
 
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
-usage() { sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '2,27p' "$0" | sed 's/^# \{0,1\}//'; }
 
 ASSUME_YES=false
 RMI=()
@@ -35,16 +44,27 @@ check_prerequisites
 
 step "This deletes data"
 usage | sed -n '8,11p' | sed 's/^/    /'
-if db_volume_exists; then
-  info ""
-  info "Database volume found: $DB_VOLUME (created $(docker volume inspect -f '{{.CreatedAt}}' "$DB_VOLUME"))"
+info ""
+info "Compose projects: $PROJECT (platform, monitoring) and $LAB_PROJECT (lab)"
+containers="$(docker ps -a --format '{{.Names}}' \
+  --filter "label=com.docker.compose.project=$PROJECT" ; docker ps -a --format '{{.Names}}' \
+  --filter "label=com.docker.compose.project=$LAB_PROJECT")"
+if [ -n "$containers" ]; then
+  info "Containers to remove: $(echo "$containers" | tr '\n' ' ')"
+else
+  info "Containers to remove: none"
 fi
-[ "${#RMI[@]}" -eq 0 ] || info "With --images: the backend, frontend, ShopCloud and Falco images are removed too."
+if db_volume_exists; then
+  info "Volume to DELETE:     $DB_VOLUME (created $(docker volume inspect -f '{{.CreatedAt}}' "$DB_VOLUME"))"
+else
+  info "Volume to DELETE:     none ($DB_VOLUME does not exist)"
+fi
+[ "${#RMI[@]}" -eq 0 ] || info "With --images: the images built for $PROJECT and $LAB_PROJECT are removed too."
 
 if ! $ASSUME_YES; then
   [ -t 0 ] || die "Not a terminal, so nothing was deleted. Pass --yes to confirm without a question."
   printf '\n    Type %sdelete%s to continue, anything else to cancel: ' "$C_BOLD" "$C_OFF"
-  read -r answer
+  read -r answer || answer=""
   [ "$answer" = delete ] || { info "Cancelled. Nothing was changed."; exit 0; }
 fi
 

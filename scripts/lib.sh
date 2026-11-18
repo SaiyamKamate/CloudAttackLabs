@@ -7,7 +7,9 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 LAB_COMPOSE_FILE="lab/docker-compose.lab.yml"
-DB_VOLUME="cloudattacklab_pgdata"
+# Set by check_prerequisites from the compose files (their `name:`, or
+# COMPOSE_PROJECT_NAME if you set one), so the scripts never guess them.
+PROJECT=""; LAB_PROJECT=""; DB_VOLUME=""
 CORE_SERVICES=(postgres backend frontend)
 MONITORING_SERVICES=(loki alloy grafana)
 
@@ -75,6 +77,15 @@ check_prerequisites() {
   fi
   require_cmd curl "Install it with: sudo apt-get install -y curl"
   require_cmd python3 "Install it with: sudo apt-get install -y python3"
+  PROJECT="$(compose_project_name)" || die "docker compose cannot read docker-compose.yml (run 'docker compose config' to see why)."
+  LAB_PROJECT="$(compose_project_name -f "$LAB_COMPOSE_FILE")" || die "docker compose cannot read $LAB_COMPOSE_FILE."
+  DB_VOLUME="${PROJECT}_pgdata"
+}
+
+# The Compose project name of the platform (or, with -f FILE, of that file).
+compose_project_name() {
+  docker compose "$@" config --format json 2>/dev/null \
+    | python3 -c 'import json, sys; print(json.load(sys.stdin)["name"])'
 }
 
 require_env_file() {
