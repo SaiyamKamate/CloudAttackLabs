@@ -48,6 +48,9 @@ async function request(path, { method = 'GET', body } = {}) {
 }
 
 export const api = {
+  // Health: the backend answers and can reach its database.
+  getHealth: () => request('/health'),
+
   // Labs
   listLabs: () => request('/labs'),
   createLab: (name, target = 'shopcloud') => request('/labs', { method: 'POST', body: { name, target } }),
@@ -58,12 +61,16 @@ export const api = {
 
   // Scenarios and runs
   listScenarios: () => request('/scenarios'),
+  getScenario: (scenarioId) => request(`/scenarios/${scenarioId}`),
   startRun: (labId, scenarioId) => request(`/labs/${labId}/runs`, { method: 'POST', body: { scenario_id: scenarioId } }),
   getRun: (runId) => request(`/runs/${runId}`),
   cleanupRun: (runId) => request(`/runs/${runId}/cleanup`, { method: 'POST' }),
   getRunReport: (runId) => request(`/runs/${runId}/report`),
 
-  // Events and alerts
+  // Events and alerts. GET /events returns oldest first, at most 1000 per call;
+  // its filters are run_id, event_type, since and limit.
+  listEvents: (params = {}) => request('/events' + query(params)),
+  getEvent: (eventId) => request(`/events/${eventId}`),
   listAlerts: (params = {}) => request('/alerts' + query(params)),
   getAlert: (alertId) => request(`/alerts/${alertId}`),
 
@@ -75,6 +82,7 @@ export const api = {
   requestResponse: (incidentId) => request(`/incidents/${incidentId}/responses`, { method: 'POST' }),
   approveResponse: (responseId) => request(`/responses/${responseId}/approve`, { method: 'POST' }),
   rejectResponse: (responseId) => request(`/responses/${responseId}/reject`, { method: 'POST' }),
+  getResponse: (responseId) => request(`/responses/${responseId}`),
 
   // Audit
   listAudit: (params = {}) => request('/audit' + query(params)),
