@@ -1,171 +1,240 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
+import { Boxes, ExternalLink, Play, Plus, RefreshCw, RotateCcw, Server, Square } from 'lucide-react'
 import { api } from '../api.js'
+import { usePlatform, useUI } from '../lib/context.js'
+import { useAction } from '../lib/useAction.js'
+import { containerTone, isUnusedFalco, labStatusTone } from '../lib/describe.js'
+import { fmt, humanize, shortId } from '../lib/format.js'
+import { Callout, KeyValue, PageHeader, Panel } from '../components/ui/Layout.jsx'
+import { StatusBadge, StatusIndicator } from '../components/ui/Badges.jsx'
+import { EmptyState, ErrorState, LoadingState } from '../components/ui/States.jsx'
+import DataTable from '../components/ui/DataTable.jsx'
+import HealthStatusPanel from '../components/domain/HealthStatusPanel.jsx'
 
-// The lab's status and ShopCloud's health, with Start / Stop / Reset.
+const BUSY_TEXT = {
+  Start: 'Starting the lab. The backend answers once every lab container is healthy; this can take a minute.',
+  Stop: 'Stopping the lab containers…',
+  Reset: 'Resetting: recreating every lab container, resetting ShopCloud and reverting applied responses…',
+  'Create lab': 'Creating the lab record…',
+}
+
+// The selected lab's status and health, with Start / Stop / Reset.
 export default function LabPage() {
-  const [lab, setLab] = useState(null)       // the lab summary (first lab, if any)
-  const [detail, setDetail] = useState(null) // containers + target health
-  const [error, setError] = useState(null)
-  const [busy, setBusy] = useState(false)
-  const [loaded, setLoaded] = useState(false) // false until the first answer (or error) arrives
+  const { labs, labsError, refreshLabs, activeLab, selectLab, labDetail, labDetailError, refreshLabDetail, backend } = usePlatform()
+  const { confirm } = useUI()
+  const [busy, run] = useAction()
+  const [lastOp, setLastOp] = useState(null) // { action, at, ok, status, error }
+  const [newName, setNewName] = useState('')
+  const [creating, setCreating] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
 
-  async function load() {
-    try {
-      const labs = await api.listLabs()
-      setError(null)
-      if (labs.length === 0) {
-        setLab(null)
-        setDetail(null)
-        return
-      }
-      setLab(labs[0])
-      setDetail(await api.getLab(labs[0].id))
-    } catch (err) {
-      setError(err.message)
-    } finally {
-      setLoaded(true)
+  async function operate(label, call) {
+    const outcome = await run(label, call, { success: (lab) => [`${label} succeeded`, `Lab ${lab.name} is now ${lab.status}.`] })
+    setLastOp({ action: label, at: new Date().toISOString(), ok: outcome.ok, status: outcome.result?.status, error: outcome.error?.message, code: outcome.error?.code })
+    await refreshLabs()
+    await refreshLabDetail()
+  }
+
+  async function refresh() {
+    setRefreshing(true)
+    await refreshLabs()
+    await refreshLabDetail()
+    setRefreshing(false)
+  }
+
+  async function createLab(event) {
+    event.preventDefault()
+    const name = newName.trim() || 'default'
+    const outcome = await run('Create lab', () => api.createLab(name), { success: (lab) => [`Lab ${lab.name} created`, 'Start it to bring up ShopCloud.'] })
+    if (outcome.ok) {
+      selectLab(outcome.result.id)
+      setNewName('')
+      setCreating(false)
+      await refreshLabs()
     }
   }
 
-  useEffect(() => {
-    // Fetch on mount. State is set after the await, not synchronously.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    load()
-  }, [])
-
-  async function act(fn) {
-    setBusy(true)
-    setError(null)
-    try {
-      await fn()
-      await load()
-    } catch (err) {
-      setError(err.message)
-    } finally {
-      setBusy(false)
-    }
+  async function stop() {
+    const ok = await confirm({
+      title: `Stop lab “${activeLab.name}”?`,
+      message: 'The lab containers (ShopCloud and the test container) are stopped. Runs cannot start until the lab is started again.',
+      confirmLabel: 'Stop lab',
+      danger: true,
+    })
+    if (ok) operate('Stop', () => api.stopLab(activeLab.id))
   }
 
-  const createLab = () => act(() => api.createLab('default'))
-  const start = () => act(() => api.startLab(lab.id))
-  const stop = () => act(() => api.stopLab(lab.id))
-  const reset = () => act(() => api.resetLab(lab.id))
+  async function reset() {
+    const ok = await confirm({
+      title: `Reset lab “${activeLab.name}”?`,
+      message: 'Every lab container is recreated, ShopCloud’s state is reset through /lab/reset, and applied response actions are reverted. Incidents and reports are kept.',
+      confirmLabel: 'Reset lab',
+      danger: true,
+    })
+    if (ok) operate('Reset', () => api.resetLab(activeLab.id))
+  }
 
-  if (!loaded) {
+  const createForm = (
+    <form onSubmit={createLab} className="row">
+      <input className="input" placeholder="Lab name (default)" value={newName} onChange={(e) => setNewName(e.target.value)} maxLength={100} aria-label="Lab name" />
+      <button className="btn btn-primary" type="submit" disabled={Boolean(busy)}><Plus size={14} /> Create lab</button>
+      {labs?.length > 0 && <button type="button" className="btn btn-ghost" onClick={() => setCreating(false)}>Cancel</button>}
+    </form>
+  )
+
+  if (!labs && !labsError) return <><PageHeader title="Labs & Environments" /><Panel><LoadingState /></Panel></>
+  if (!labs && labsError) {
+    return <><PageHeader title="Labs & Environments" /><Panel><ErrorState message={labsError} onRetry={refresh} /></Panel></>
+  }
+  if (labs.length === 0) {
     return (
-      <section>
-        <h2>Lab</h2>
-        <p>Loading…</p>
-      </section>
+      <>
+        <PageHeader title="Labs & Environments" subtitle="A lab is the isolated Docker environment (ShopCloud and a test container) that scenarios run against." />
+        <Panel>
+          <EmptyState icon={Server} title="No lab yet" message="Create a lab, then start it. Starting brings up ShopCloud and the lab's test container on 127.0.0.1." action={createForm} />
+        </Panel>
+      </>
     )
   }
 
-  if (error && !lab) {
-    return (
-      <section>
-        <h2>Lab</h2>
-        <p style={{ color: 'crimson' }}>Error: {error}</p>
-        <button onClick={load}>Retry</button>
-      </section>
-    )
-  }
-
-  if (!lab) {
-    return (
-      <section>
-        <h2>Lab</h2>
-        <p>No lab yet.</p>
-        <button onClick={createLab} disabled={busy}>Create lab</button>
-      </section>
-    )
-  }
-
-  const health = detail?.target_health
-  const containers = detail?.containers ?? []
+  const detail = labDetail
+  const status = detail?.status ?? activeLab.status
   const activeRun = detail?.active_run ?? null
+  const targetAllowed = detail?.target_url?.allowed
+  const containers = detail?.containers ?? []
 
   return (
-    <section>
-      <h2>Lab</h2>
-      {error && <p style={{ color: 'crimson' }}>Error: {error}</p>}
-      {detail?.target_url && !detail.target_url.allowed && (
-        <p style={{ color: 'crimson', border: '1px solid crimson', padding: '0.5rem' }}>
-          <b>Target URL refused.</b> {detail.target_url.error} Runs, start and reset are refused until
-          SHOPCLOUD_URL in .env points at the lab (for example http://127.0.0.1:8081) and the backend is restarted.
-        </p>
-      )}
+    <>
+      <PageHeader
+        title="Labs & Environments"
+        subtitle="Lifecycle and health of the selected lab environment. Every value is read live from the backend."
+        actions={
+          <>
+            <button className="btn" onClick={refresh} disabled={refreshing || Boolean(busy)}>
+              <RefreshCw size={14} className={refreshing ? 'spin' : ''} /> Refresh status
+            </button>
+            <button className="btn" onClick={() => setCreating((c) => !c)}><Plus size={14} /> New lab</button>
+          </>
+        }
+      />
 
-      <table>
-        <tbody>
-          <tr><th align="left">Name</th><td>{lab.name}</td></tr>
-          <tr>
-            <th align="left">Status</th>
-            <td>
-              <b>{detail?.status ?? lab.status}</b>
-              {detail?.status_detail && (
-                <div style={{ color: ['degraded', 'stopped'].includes(detail.status) ? 'crimson' : undefined }}>
-                  {detail.status_detail}
-                </div>
+      <div className="stack">
+        {creating && <Panel title="Create a lab">{createForm}</Panel>}
+
+        {detail?.target_url && !targetAllowed && (
+          <Callout tone="crit" title="Target URL refused">
+            {detail.target_url.error} Runs, start and reset are refused until SHOPCLOUD_URL in .env points at the lab
+            (for example http://127.0.0.1:8081) and the backend is restarted.
+          </Callout>
+        )}
+        {labDetailError && <Callout tone="crit" title="Could not read the lab">{labDetailError}</Callout>}
+
+        <Panel
+          title={activeLab.name}
+          icon={Server}
+          meta={<StatusBadge tone={labStatusTone(status)}>{status}</StatusBadge>}
+          actions={
+            <>
+              <button className="btn btn-primary" onClick={() => operate('Start', () => api.startLab(activeLab.id))} disabled={Boolean(busy)}>
+                <Play size={14} /> Start
+              </button>
+              <button className="btn btn-danger" onClick={stop} disabled={Boolean(busy)}><Square size={13} /> Stop</button>
+              <button
+                className="btn btn-danger"
+                onClick={reset}
+                disabled={Boolean(busy) || Boolean(activeRun)}
+                title={activeRun ? 'Disabled while a run is in progress' : undefined}
+              >
+                <RotateCcw size={14} /> Reset
+              </button>
+              {targetAllowed && detail?.target_url?.url && ['running', 'degraded'].includes(status) && (
+                <a className="btn" href={detail.target_url.url} target="_blank" rel="noreferrer"><ExternalLink size={14} /> Open ShopCloud</a>
               )}
-            </td>
-          </tr>
-          <tr>
-            <th align="left">Containers</th>
-            <td>
-              {containers.length === 0 ? '—' : containers.map((c) => (
-                <div key={c.service}>{`${c.service}: ${c.state} (${c.health ?? 'no health check'})`}</div>
-              ))}
-            </td>
-          </tr>
-          <tr>
-            <th align="left">ShopCloud URL</th>
-            <td>{detail?.target_url ? `${detail.target_url.url} (${detail.target_url.allowed ? 'inside the lab' : 'REFUSED'})` : '—'}</td>
-          </tr>
-          <tr>
-            <th align="left">ShopCloud health</th>
-            <td>{health ? (health.healthy ? 'healthy' : health.reachable ? `unhealthy (HTTP ${health.status_code})` : `unreachable: ${health.error}`) : '—'}</td>
-          </tr>
-          <tr>
-            <th align="left">Falco</th>
-            <td>{falcoText(detail?.falco)}</td>
-          </tr>
-          <tr>
-            <th align="left">Telemetry source</th>
-            <td>{telemetryText(detail?.telemetry)}</td>
-          </tr>
-        </tbody>
-      </table>
+            </>
+          }
+        >
+          {busy && (
+            <div className="stack-sm" style={{ marginBottom: 14 }}>
+              <div className="progress" />
+              <div className="small muted">{BUSY_TEXT[busy] || `${busy}…`}</div>
+            </div>
+          )}
+          {activeRun && (
+            <div style={{ marginBottom: 14 }}>
+              <Callout tone="info" title={`Run in progress: ${activeRun.scenario_id} (${activeRun.status})`}>
+                Reset is disabled while this run is in progress: a reset recreates ShopCloud and would break that run. Refresh once it has finished.
+              </Callout>
+            </div>
+          )}
+          {detail?.status_detail && (
+            <div style={{ marginBottom: 14 }}>
+              <Callout tone={['degraded', 'stopped', 'error'].includes(status) ? 'warn' : 'info'}>{detail.status_detail}</Callout>
+            </div>
+          )}
+          <div className="grid grid-2">
+            <KeyValue rows={[
+              ['Environment', activeLab.environment],
+              ['Target', activeLab.target],
+              ['Lab ID', <code key="id">{activeLab.id}</code>],
+            ]} />
+            <KeyValue rows={[
+              ['Created', fmt(activeLab.created_at)],
+              ['Last updated', fmt(detail?.updated_at ?? activeLab.updated_at)],
+              ['ShopCloud URL', detail?.target_url ? <span key="u" className="mono">{detail.target_url.url}</span> : '—'],
+            ]} />
+          </div>
+        </Panel>
 
-      <p style={{ marginTop: '1rem' }}>
-        <button onClick={start} disabled={busy}>Start</button>{' '}
-        <button onClick={stop} disabled={busy}>Stop</button>{' '}
-        <button onClick={reset} disabled={busy || Boolean(activeRun)}>Reset</button>{' '}
-        <button onClick={load} disabled={busy}>Refresh</button>
-      </p>
-      {activeRun && (
-        <p><i>
-          Reset is disabled while run {activeRun.scenario_id} ({activeRun.status}) is in progress: a reset
-          recreates ShopCloud and would break that run. Refresh once it has finished.
-        </i></p>
-      )}
-      {busy && <p>Working… (start, stop and reset can take a little while)</p>}
-    </section>
+        {lastOp && (
+          <Callout tone={lastOp.ok ? 'ok' : 'crit'} title={`Last operation: ${lastOp.action} ${lastOp.ok ? 'succeeded' : 'failed'} at ${fmt(lastOp.at)}`}>
+            {lastOp.ok ? `The backend returned the lab with status “${lastOp.status}”.` : `${lastOp.error}${lastOp.code ? ` (${lastOp.code})` : ''}`}
+          </Callout>
+        )}
+
+        <Panel title="Health" flush meta={detail ? undefined : 'loading…'}>
+          <HealthStatusPanel lab={activeLab} detail={detail} backend={backend} />
+        </Panel>
+
+        <Panel title="Containers" icon={Boxes} flush meta={`${containers.length}`}>
+          <DataTable
+            rowKey={(c) => c.service}
+            rows={containers}
+            loading={!detail && !labDetailError}
+            empty={<EmptyState compact title="No containers" message="Start the lab to create its containers." />}
+            columns={[
+              { key: 'service', header: 'Service', render: (c) => <span className="cell-title">{c.service}</span>, sortValue: (c) => c.service },
+              { key: 'name', header: 'Container', render: (c) => <span className="mono small">{c.name ?? '—'}</span> },
+              { key: 'container_id', header: 'ID', render: (c) => <span className="mono small">{c.container_id ? String(c.container_id).slice(0, 12) : '—'}</span> },
+              { key: 'state', header: 'State', render: (c) => humanize(c.state), sortValue: (c) => c.state },
+              {
+                key: 'health',
+                header: 'Health',
+                render: (c) => isUnusedFalco(c, detail?.falco)
+                  ? <StatusIndicator tone="neutral" label="not used (FALCO_ENABLED=false)" />
+                  : <StatusIndicator tone={containerTone(c)} label={c.health ?? 'no health check'} />,
+              },
+            ]}
+          />
+        </Panel>
+
+        <Panel title="All labs" flush meta={`${labs.length}`}>
+          <DataTable
+            rowKey={(l) => l.id}
+            rows={labs}
+            selectedKey={activeLab.id}
+            onRowClick={(l) => selectLab(l.id)}
+            columns={[
+              { key: 'name', header: 'Name', render: (l) => <span className="cell-title">{l.name}</span>, sortValue: (l) => l.name },
+              { key: 'status', header: 'Stored status', render: (l) => <StatusIndicator tone={labStatusTone(l.status)} label={humanize(l.status)} /> },
+              { key: 'environment', header: 'Environment' },
+              { key: 'target', header: 'Target' },
+              { key: 'id', header: 'ID', render: (l) => <span className="mono small">{shortId(l.id)}</span> },
+              { key: 'created_at', header: 'Created', render: (l) => fmt(l.created_at), sortValue: (l) => l.created_at },
+            ]}
+            footer="Select a lab to make it the active lab. A lab's status is checked against Docker when it is selected."
+          />
+        </Panel>
+      </div>
+    </>
   )
-}
-
-// FALCO_ENABLED and the Falco container's state.
-function falcoText(falco) {
-  if (!falco) return '—'
-  if (!falco.enabled) return 'off (FALCO_ENABLED=false): container scenarios use Docker events only'
-  if (falco.healthy) return 'on and healthy'
-  const state = falco.state ? `${falco.state}${falco.health ? `, ${falco.health}` : ''}` : 'no Falco container; start or reset the lab'
-  return <span style={{ color: 'crimson' }}>on but NOT healthy ({state})</span>
-}
-
-// TELEMETRY_SOURCE as the backend reports it, with Loki's reachability.
-function telemetryText(telemetry) {
-  if (!telemetry) return '—'
-  if (telemetry.source !== 'loki') return `${telemetry.source} (the lab container's logs)`
-  if (telemetry.reachable) return `loki at ${telemetry.loki_url} (reachable)`
-  return <span style={{ color: 'crimson' }}>loki at {telemetry.loki_url}: NOT reachable. {telemetry.error}</span>
 }
