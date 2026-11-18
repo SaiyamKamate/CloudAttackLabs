@@ -11,7 +11,7 @@ Outside the API it does only what an operator would do around it:
   the process environment (never in .env), to switch the telemetry source.
   The backend reports the active source and Falco on GET /labs/{id}, and the
   script checks that before measuring.
-- `docker compose ... monitoring ... up -d` for the Loki phase.
+- `docker compose --profile monitoring up -d loki alloy grafana` for the Loki phase.
 - `docker stats` to sample CPU and memory, and `docker version` / `git`
   for the environment record.
 - benign traffic (tools/benign_traffic.py): ShopCloud requests on its
@@ -152,9 +152,12 @@ def configure_backend(api: Api, telemetry_source: Optional[str], falco: Optional
     api.wait_healthy()
 
 
+MONITORING_SERVICES = ["loki", "alloy", "grafana"]
+
+
 def monitoring(up: bool) -> None:
-    args = ["docker", "compose", "--env-file", ".env", "-f", "monitoring/docker-compose.monitoring.yml"]
-    sh(args + (["up", "-d"] if up else ["stop"]))
+    args = ["docker", "compose", "--profile", "monitoring"]
+    sh(args + (["up", "-d", *MONITORING_SERVICES] if up else ["stop", *MONITORING_SERVICES]))
 
 
 # --- environment record ------------------------------------------------------
@@ -973,8 +976,7 @@ def main() -> None:
                 configure_backend(evaluation.api, None, None)  # back to what .env says
             except Exception as exc:  # noqa: BLE001
                 log(f"restoring backend: {exc}")
-            sh(["docker", "compose", "--env-file", ".env", "-f", "monitoring/docker-compose.monitoring.yml", "stop"],
-               check=False)
+            sh(["docker", "compose", "--profile", "monitoring", "stop", *MONITORING_SERVICES], check=False)
             sh(["docker", "compose", "stop"], check=False)
     print_tables(summarize(out))
 
