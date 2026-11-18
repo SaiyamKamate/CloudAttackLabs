@@ -1,104 +1,113 @@
-import { useEffect, useState } from 'react'
+import { useMemo, useState } from 'react'
+import { RefreshCw, Search, ShieldAlert } from 'lucide-react'
 import { api } from '../api.js'
-import ResponsePanel from './ResponsePanel.jsx'
+import { useApi } from '../lib/hooks.js'
+import { countBy } from '../lib/data.js'
+import { fmt, shortId } from '../lib/format.js'
+import { href, navigate } from '../lib/router.js'
+import { MetricCard, PageHeader, Panel } from '../components/ui/Layout.jsx'
+import { SeverityBadge } from '../components/ui/Badges.jsx'
+import { EmptyState, ErrorState } from '../components/ui/States.jsx'
+import DataTable from '../components/ui/DataTable.jsx'
+import AlertDetailDrawer from '../components/domain/AlertDetailDrawer.jsx'
 
-// A table of alerts; clicking one shows the events that caused it.
-export default function AlertsPage() {
-  const [alerts, setAlerts] = useState([])
-  const [selected, setSelected] = useState(null) // the alert detail (with events)
-  const [error, setError] = useState(null)
-  const [loaded, setLoaded] = useState(false) // false until the first answer (or error) arrives
+const SEVERITIES = ['critical', 'high', 'medium', 'low', 'info']
+const SEV_RANK = { info: 0, low: 1, medium: 2, high: 3, critical: 4 }
 
-  async function load() {
-    try {
-      const data = await api.listAlerts()
-      setAlerts(data)
-      setError(null)
-    } catch (err) {
-      setError(err.message)
-    } finally {
-      setLoaded(true)
-    }
-  }
+// Every alert the detection engine raised (GET /alerts), filterable, with an
+// investigation drawer per alert.
+export default function AlertsPage({ selectedId }) {
+  const alerts = useApi(() => api.listAlerts(), [])
+  const [search, setSearch] = useState('')
+  const [severity, setSeverity] = useState('')
+  const [rule, setRule] = useState('')
+  const [linked, setLinked] = useState('')
 
-  useEffect(() => {
-    // Fetch on mount. State is set after the await, not synchronously.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    load()
-  }, [])
+  const all = useMemo(() => alerts.data ?? [], [alerts.data])
+  const rules = useMemo(() => [...new Set(all.map((a) => a.rule_id))].sort(), [all])
+  const bySeverity = countBy(all, (a) => a.severity)
 
-  async function open(alertId) {
-    setError(null)
-    try {
-      setSelected(await api.getAlert(alertId))
-    } catch (err) {
-      setError(err.message)
-    }
-  }
+  const rows = useMemo(() => {
+    const term = search.trim().toLowerCase()
+    return all.filter((a) =>
+      (!severity || a.severity === severity) &&
+      (!rule || a.rule_id === rule) &&
+      (!linked || (linked === 'linked' ? a.incident_id : !a.incident_id)) &&
+      (!term || [a.title, a.rule_id, a.description, a.id, a.run_id].some((v) => v && String(v).toLowerCase().includes(term))),
+    )
+  }, [all, search, severity, rule, linked])
 
   return (
-    <section>
-      <h2>Alerts</h2>
-      {error && <p style={{ color: 'crimson' }}>Error: {error}</p>}
-      <button onClick={load}>Refresh</button>
+    <>
+      <PageHeader
+        title="Detection & Alerts"
+        subtitle="Alerts raised by the detection rules from collected telemetry. Open one to see the events that triggered it."
+        actions={<button className="btn" onClick={alerts.reload} disabled={alerts.refreshing}><RefreshCw size={14} className={alerts.refreshing ? 'spin' : ''} /> Refresh</button>}
+      />
 
-      <table border="1" cellPadding="6" style={{ borderCollapse: 'collapse', marginTop: '0.5rem' }}>
-        <thead>
-          <tr>
-            <th align="left">Rule</th><th align="left">Severity</th><th align="right">Events</th>
-            <th align="left">First event</th><th align="left">Last event</th><th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {alerts.map((a) => (
-            <tr key={a.id}>
-              <td>{a.rule_id}</td>
-              <td>{a.severity}</td>
-              <td align="right">{a.event_count}</td>
-              <td>{fmt(a.first_event_at)}</td>
-              <td>{fmt(a.last_event_at)}</td>
-              <td><button onClick={() => open(a.id)}>View events</button></td>
-            </tr>
-          ))}
-          {!loaded && <tr><td colSpan="6">Loading…</td></tr>}
-          {loaded && alerts.length === 0 && <tr><td colSpan="6">{error ? 'Could not load alerts.' : 'No alerts yet.'}</td></tr>}
-        </tbody>
-      </table>
+      <div className="grid grid-4" style={{ marginBottom: 16 }}>
+        <MetricCard label="Total alerts" icon={ShieldAlert} value={alerts.data ? all.length : '…'} sub={`${rules.length} rule${rules.length === 1 ? '' : 's'} fired`} />
+        {['high', 'medium', 'low'].map((s) => (
+          <MetricCard key={s} label={`${s[0].toUpperCase()}${s.slice(1)} severity`} value={alerts.data ? bySeverity[s] || 0 : '…'} accent={s === 'high' ? 'high' : undefined} onClick={() => setSeverity(severity === s ? '' : s)} sub={severity === s ? 'filter on — click to clear' : 'click to filter'} />
+        ))}
+      </div>
 
-      {selected && (
-        <div style={{ marginTop: '1rem' }}>
-          <h3>{selected.title}</h3>
-          <p>{selected.description}</p>
-          {selected.incident_id && <ResponsePanel key={selected.incident_id} incidentId={selected.incident_id} />}
-          <p>{selected.events.length} linked event(s):</p>
-          <table border="1" cellPadding="6" style={{ borderCollapse: 'collapse' }}>
-            <thead>
-              <tr>
-                <th align="left">Time</th><th align="left">Source</th><th align="left">Type</th>
-                <th align="left">Source IP / container</th><th align="left">Falco rule</th>
-                <th align="left">Evidence (raw_event_reference)</th>
-              </tr>
-            </thead>
-            <tbody>
-              {selected.events.map((e) => (
-                <tr key={e.event_id}>
-                  <td>{fmt(e.timestamp)}</td>
-                  <td>{e.source}</td>
-                  <td>{e.event_type}</td>
-                  <td>{e.source_ip ?? (e.container_id ? `container ${e.container_id}` : '—')}</td>
-                  <td>{e.rule_id ?? '—'}</td>
-                  <td><code>{e.raw_event_reference}</code></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      <Panel flush>
+        <div className="filters">
+          <div className="search">
+            <Search size={14} />
+            <input className="input" placeholder="Search title, rule, description, ID…" value={search} onChange={(e) => setSearch(e.target.value)} aria-label="Search alerts" />
+          </div>
+          <select className="select" value={severity} onChange={(e) => setSeverity(e.target.value)} aria-label="Severity">
+            <option value="">All severities</option>
+            {SEVERITIES.map((s) => <option key={s} value={s}>{s}</option>)}
+          </select>
+          <select className="select" value={rule} onChange={(e) => setRule(e.target.value)} aria-label="Rule">
+            <option value="">All rules</option>
+            {rules.map((r) => <option key={r} value={r}>{r}</option>)}
+          </select>
+          <select className="select" value={linked} onChange={(e) => setLinked(e.target.value)} aria-label="Incident link">
+            <option value="">With or without incident</option>
+            <option value="linked">Linked to an incident</option>
+            <option value="unlinked">No incident</option>
+          </select>
+          <span className="filter-count">{rows.length} of {all.length}</span>
         </div>
-      )}
-    </section>
-  )
-}
+        {alerts.error && !alerts.data ? <ErrorState message={alerts.error} onRetry={alerts.reload} /> : (
+          <DataTable
+            loading={alerts.loading}
+            rows={rows}
+            rowKey={(a) => a.id}
+            selectedKey={selectedId}
+            onRowClick={(a) => navigate('alerts', a.id)}
+            initialSort={{ key: 'created_at', dir: 'desc' }}
+            empty={<EmptyState compact title={all.length ? 'No alerts match the filters' : 'No alerts yet'} message={all.length ? undefined : 'Run a scenario to generate telemetry and detections.'} />}
+            columns={[
+              { key: 'severity', header: 'Severity', render: (a) => <SeverityBadge severity={a.severity} />, sortValue: (a) => SEV_RANK[a.severity] ?? -1 },
+              {
+                key: 'title',
+                header: 'Alert',
+                wrap: true,
+                render: (a) => <><div className="cell-title">{a.title}</div><div className="cell-sub mono">{a.rule_id}</div></>,
+                sortValue: (a) => a.title,
+              },
+              { key: 'event_count', header: 'Events', num: true, sortValue: (a) => a.event_count },
+              { key: 'first', header: 'First event', render: (a) => <span className="nowrap">{fmt(a.first_event_at)}</span>, sortValue: (a) => a.first_event_at },
+              { key: 'last', header: 'Last event', render: (a) => <span className="nowrap">{fmt(a.last_event_at)}</span>, sortValue: (a) => a.last_event_at },
+              {
+                key: 'incident',
+                header: 'Related incident',
+                render: (a) => a.incident_id
+                  ? <a href={href('incidents', a.incident_id)} onClick={(e) => e.stopPropagation()} className="mono small">{shortId(a.incident_id)}</a>
+                  : <span className="dim">—</span>,
+              },
+              { key: 'created_at', header: 'Raised', render: (a) => <span className="nowrap">{fmt(a.created_at)}</span>, sortValue: (a) => a.created_at },
+            ]}
+          />
+        )}
+      </Panel>
 
-function fmt(value) {
-  if (!value) return '—'
-  return new Date(value).toLocaleString()
+      {selectedId && <AlertDetailDrawer alertId={selectedId} onClose={() => navigate('alerts')} />}
+    </>
+  )
 }
