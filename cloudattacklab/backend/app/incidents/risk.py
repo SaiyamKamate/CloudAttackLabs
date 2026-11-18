@@ -161,15 +161,22 @@ def _reverted_by(session: Session, response: ResponseAction) -> str:
 
 
 def scenario_threshold(session: Session, incident: Incident) -> Optional[int]:
-    """The detection threshold of the scenario behind the incident's run, if it can be read."""
+    """The detection threshold the incident's alerts were raised with, if it can be read.
+
+    The scenario's own threshold; for an observation run, the threshold its
+    first alert's rule was checked with.
+    """
     run = session.get(ScenarioRun, incident.run_id) if incident.run_id else None
     if run is None:
         return None
+    from ..detection.checks import threshold_for
     from ..errors import ApiError
     from ..scenario_engine.router import get_scenario_engine  # late: avoids an import cycle
 
     try:
-        return get_scenario_engine().get(run.scenario_id).detection.threshold
+        scenario = get_scenario_engine().get(run.scenario_id)
     except ApiError:
         return None
 
+    first = min(incident.alerts, key=lambda alert: str(alert.id), default=None)
+    return threshold_for(scenario, run.parameters, first.rule_id if first is not None else None)

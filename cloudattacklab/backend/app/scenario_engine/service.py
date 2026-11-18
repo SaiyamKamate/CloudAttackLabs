@@ -2,12 +2,20 @@
 
 One active run per lab. Runs happen on a background thread; the API returns the
 run id straight away. Cleanup also runs automatically if a run fails or times out.
+
+An observation run (scenario type `observation`) runs no script and sends
+nothing to the lab. For its duration it collects the same telemetry an attack
+run would (the target's logs, the test container's Docker events and, with
+FALCO_ENABLED, Falco's alerts) through the same ingest code, then checks it
+against every detection rule. It measures what traffic sent from outside the
+platform (normal use) would raise.
 """
 from __future__ import annotations
 
 import dataclasses
 import logging
 import threading
+import time
 import uuid
 from collections import Counter
 from dataclasses import dataclass
@@ -19,6 +27,7 @@ from sqlalchemy.orm import Session
 
 from .. import audit
 from ..config import Settings
+from ..detection.checks import OBSERVATION, PARAMETER as CHECKS_PARAMETER, as_parameter, observation_checks
 from ..detection.engine import DetectionEngine
 from ..errors import ApiError
 from ..lab_manager.adapter import LabAdapter, LabAdapterError
@@ -67,6 +76,7 @@ class Feed:
     hint: str = (             # added to the error when a required source returned nothing
         "Check that the monitoring stack's Alloy is running and shipping the lab container's logs."
     )
+    container_id: Optional[str] = None  # the container this feed is about, if not the run's own
 
 
 class ScenarioService:
@@ -115,6 +125,7 @@ class ScenarioService:
 
         # Refuse (409) if the lab is not running or the target is not one of the lab's targets.
         is_container = scenario.type == "container"
+        is_observation = scenario.type == OBSERVATION
         if is_container:
             # Every Docker lab has the configured container targets (the test container).
             if scenario.target not in self.settings.container_targets:
@@ -137,8 +148,18 @@ class ScenarioService:
 
         target = None if is_container else self.target_clients[lab.target]
         base_url = None if is_container else self.settings.lab_targets[lab.target]
-        # Confirm the script exists before accepting the run.
-        script_path = runner.resolve_script(self.settings.scenario_scripts_dir, scenario.execution.script)
+        # Confirm the script exists before accepting the run (an observation has none).
+        script_path = (
+            None
+            if is_observation
+            else runner.resolve_script(self.settings.scenario_scripts_dir, scenario.execution.script)
+        )
+        parameters = dict(scenario.execution.parameters)
+        if is_observation:
+            # Fix, now, which rules the run is checked against and with what threshold.
+            parameters[CHECKS_PARAMETER] = as_parameter(
+                observation_checks(self.detection.rules(), self.engine.list())
+            )
 
         self._acquire(lab_id)  # one active run per lab (409 if busy)
         try:
@@ -157,7 +178,7 @@ class ScenarioService:
                 scenario_id=scenario.id,
                 scenario_version=scenario.version,
                 status=RunStatus.pending.value,
-                parameters=dict(scenario.execution.parameters),
+                parameters=parameters,
             )
             self.session.add(run)
             self.session.flush()
@@ -177,7 +198,7 @@ class ScenarioService:
 
         thread = threading.Thread(
             target=self._run_in_background,
-            args=(run_id, lab_id, scenario, base_url, str(script_path), scenario.target),
+            args=(run_id, lab_id, scenario, base_url, str(script_path) if script_path else None, scenario.target),
             name=f"run-{run_id}",
             daemon=True,
         )
@@ -211,7 +232,7 @@ class ScenarioService:
         lab_id: uuid.UUID,
         scenario: ScenarioDefinition,
         base_url: Optional[str],
-        script_path: str,
+        script_path: Optional[str],
         target_name: str,
     ) -> None:
         from pathlib import Path
@@ -255,7 +276,16 @@ class ScenarioService:
             )
             collector.start()
 
-            if is_container:
+            if scenario.type == OBSERVATION:
+                # No script: only watch the lab for the scenario's duration.
+                duration = int(scenario.execution.parameters["duration_seconds"])
+                time.sleep(duration)  # collection runs meanwhile in its own thread
+                result = runner.RunResult(
+                    outcome="completed",
+                    summary={"scenario": scenario.id, "observed_seconds": duration, "script": None},
+                    error=None,
+                )
+            elif is_container:
                 # In-process, with a handle that can only run the fixed marker command.
                 handle = runner.ContainerHandle(self.adapter, target_name, service)
                 result = runner.execute_container_script(Path(script_path), handle, scenario.execution.timeout_seconds)
@@ -358,6 +388,41 @@ class ScenarioService:
         and, with FALCO_ENABLED, Falco's alerts read from TELEMETRY_SOURCE (extra
         evidence: Falco having nothing to report is not an error).
         """
+        if scenario.type == OBSERVATION:
+            # Everything an attack run of any type would collect.
+            source = make_source(self.settings, self.adapter)
+            feeds = [
+                Feed(
+                    source,
+                    what=f"{self.settings.telemetry_service} log lines",
+                    settle=bool(getattr(source, "late_arriving", False)),
+                )
+            ]
+            for target, service in sorted(self.settings.container_targets.items()):
+                container_id = self._container_id(service)
+                feeds.append(
+                    Feed(
+                        DockerEventSource(self.adapter),
+                        what="docker events",
+                        normalizer=make_docker_event_normalizer(target),
+                        required=False,  # normal use may start no process at all
+                        settle=True,
+                        hint="Check that the backend can reach the Docker daemon.",
+                        container_id=container_id,
+                    )
+                )
+                if self.settings.falco_enabled:
+                    feeds.append(
+                        Feed(
+                            make_service_source(self.settings, self.adapter, FALCO_SERVICE),
+                            what="falco alerts",
+                            normalizer=make_falco_normalizer(target),
+                            required=False,
+                            settle=True,
+                            container_id=container_id,
+                        )
+                    )
+            return feeds
         if scenario.type != "container":
             source = make_source(self.settings, self.adapter)
             return [
@@ -433,6 +498,8 @@ class ScenarioService:
             errors.append((feed.source.name, f"{type(exc).__name__}: {exc}"))
 
     def _ingest_once(self, feed: Feed, ctx: RunContext) -> IngestResult:
+        if feed.container_id:
+            ctx = dataclasses.replace(ctx, container_id=feed.container_id)
         with Session(self._bind, expire_on_commit=False) as session:
             return TelemetryIngestor(
                 session,

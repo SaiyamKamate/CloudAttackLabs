@@ -421,7 +421,11 @@ def test_report_for_authentication_abuse_with_response_and_cleanup(run_client, a
     ]
     assert report["telemetry"]["all_expected_met"] is True and report["telemetry"]["collected_total"] == 20
 
-    assert report["detection"] == {"rule": "repeated_failed_logins", "threshold": 10, "window_seconds": 60}
+    assert report["detection"] == {
+        "rule": "repeated_failed_logins", "threshold": 10, "window_seconds": 60,
+        "rules": [{"rule": "repeated_failed_logins", "threshold": 10, "window_seconds": 60,
+                   "taken_from": "scenario authentication_abuse"}],
+    }
     [alert] = report["alerts"]
     assert alert["rule_id"] == "repeated_failed_logins" and alert["event_count"] == 20
     # Latency runs from the 10th event (the one that crossed the threshold) to the alert.

@@ -97,10 +97,18 @@
       "additionalProperties": false,
       "properties": {
         "script": {
-          "description": "File name only, inside the scenarios scripts folder.",
-          "pattern": "^[a-z][a-z0-9_]*\\.py$",
-          "title": "Script",
-          "type": "string"
+          "anyOf": [
+            {
+              "pattern": "^[a-z][a-z0-9_]*\\.py$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "File name only, inside the scenarios scripts folder. Required, except for an observation scenario, which has none.",
+          "title": "Script"
         },
         "timeout_seconds": {
           "default": 60,
@@ -130,9 +138,6 @@
           "type": "object"
         }
       },
-      "required": [
-        "script"
-      ],
       "title": "Execution",
       "type": "object"
     },
@@ -248,7 +253,8 @@
     "ScenarioType": {
       "enum": [
         "application",
-        "container"
+        "container",
+        "observation"
       ],
       "title": "ScenarioType",
       "type": "string"
@@ -344,7 +350,15 @@
       "type": "array"
     },
     "detection": {
-      "$ref": "#/$defs/Detection"
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Detection"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     },
     "response": {
       "anyOf": [
@@ -371,7 +385,6 @@
     "prerequisites",
     "execution",
     "expected_telemetry",
-    "detection",
     "cleanup"
   ],
   "title": "ScenarioDefinition",

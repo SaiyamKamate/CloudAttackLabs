@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Optional, Union
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 
 from .event import EventSource, EventType
 
@@ -29,6 +29,11 @@ class ScenarioError(Exception):
 class ScenarioType(str, Enum):
     application = "application"
     container = "container"
+    # Runs no script and sends nothing: it only collects the lab's telemetry for
+    # `execution.parameters.duration_seconds` and checks it against every
+    # detection rule. Used to measure what normal traffic, sent from outside the
+    # platform, would raise (false positives).
+    observation = "observation"
 
 
 class Capability(str, Enum):
@@ -63,7 +68,11 @@ class Prerequisite(_Strict):
 
 
 class Execution(_Strict):
-    script: str = Field(pattern=r"^[a-z][a-z0-9_]*\.py$", description="File name only, inside the scenarios scripts folder.")
+    script: Optional[str] = Field(
+        default=None,
+        pattern=r"^[a-z][a-z0-9_]*\.py$",
+        description="File name only, inside the scenarios scripts folder. Required, except for an observation scenario, which has none.",
+    )
     timeout_seconds: int = Field(default=60, ge=1, le=MAX_TIMEOUT_SECONDS)
     parameters: dict[str, Union[bool, int, float, str]] = Field(default_factory=dict)
 
@@ -135,9 +144,34 @@ class ScenarioDefinition(_Strict):
     prerequisites: list[Prerequisite] = Field(min_length=1)
     execution: Execution
     expected_telemetry: list[ExpectedEvent] = Field(min_length=1)
-    detection: Detection
+    # Required, except for an observation scenario: that one is checked against
+    # every rule, with the threshold of the scenario that uses each rule.
+    detection: Optional[Detection] = None
     response: Optional[Response] = None
     cleanup: Cleanup
+
+    @model_validator(mode="after")
+    def _type_rules(self) -> "ScenarioDefinition":
+        if self.type != ScenarioType.observation.value:
+            if self.execution.script is None:
+                raise ValueError("execution.script is required (only an observation scenario has no script)")
+            if self.detection is None:
+                raise ValueError("detection is required (only an observation scenario has none)")
+            return self
+        if self.execution.script is not None:
+            raise ValueError("an observation scenario runs no script: remove execution.script")
+        if self.detection is not None:
+            raise ValueError("an observation scenario is checked against every rule: remove detection")
+        if self.response is not None:
+            raise ValueError("an observation scenario has no response action")
+        duration = self.execution.parameters.get("duration_seconds")
+        if not (isinstance(duration, int) and not isinstance(duration, bool)
+                and 1 <= duration <= self.execution.timeout_seconds):
+            raise ValueError(
+                "an observation scenario needs execution.parameters.duration_seconds, "
+                "a whole number from 1 to execution.timeout_seconds"
+            )
+        return self
 
 
 def load_scenario(path: Union[str, Path], allowed_targets: set[str]) -> ScenarioDefinition:

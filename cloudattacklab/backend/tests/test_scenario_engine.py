@@ -24,7 +24,7 @@ def test_loads_the_shipped_scenario():
     engine = ScenarioEngine(ROOT / "scenarios", TARGETS)
     scenario = engine.get("authentication_abuse")
     assert scenario.target == "shopcloud"
-    assert [s.id for s in engine.list()] == ["authentication_abuse", "unauthorized_resource_access"]
+    assert [s.id for s in engine.list()] == ["authentication_abuse", "benign_baseline", "unauthorized_resource_access"]
 
 
 def _write(dir_path: Path, name: str, data: dict) -> None:

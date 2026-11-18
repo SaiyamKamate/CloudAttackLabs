@@ -92,10 +92,17 @@ export default function ReportPage({ runId, onClose }) {
       </p>
 
       <h3>Alerts and detection latency</h3>
-      {report.detection && (
+      {report.detection && report.detection.rule && (
         <p>
           Rule <code>{report.detection.rule}</code>: {report.detection.threshold} events within{' '}
           {report.detection.window_seconds} seconds.
+        </p>
+      )}
+      {report.detection && !report.detection.rule && (
+        <p>
+          Observation run, checked against every rule:{' '}
+          {(report.detection.rules || []).map((r) => `${r.rule} (${r.threshold} in ${r.window_seconds} s)`).join(', ')}.
+          Any alert here was raised by traffic the platform did not send.
         </p>
       )}
       {report.alerts.length === 0 ? <p>No alert was raised.</p> : (
@@ -103,7 +110,7 @@ export default function ReportPage({ runId, onClose }) {
           <thead>
             <tr>
               <th align="left">Rule</th><th align="left">Severity</th><th align="right">Events</th>
-              <th align="left">Threshold crossed</th><th align="left">Alert raised</th><th align="right">Latency</th>
+              <th align="left">Threshold crossed</th><th align="left">Alert raised</th><th align="right">Threshold → alert</th>
             </tr>
           </thead>
           <tbody>
@@ -119,8 +126,9 @@ export default function ReportPage({ runId, onClose }) {
       )}
       <p>
         <small>
-          Latency is the time from the event that crossed the threshold to the alert. Detection runs when the
-          scenario's script ends, so the latency includes the rest of the run.
+          "Threshold → alert" is the time from the event that crossed the threshold to the alert. Detection runs
+          once, when the scenario's script ends (or an observation ends), so it mostly measures how much of the run
+          was left after the threshold was crossed.
         </small>
       </p>
 

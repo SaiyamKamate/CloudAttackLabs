@@ -21,7 +21,8 @@ Run it where the `docker` CLI is (on this project: inside WSL), from the
 project root, with the platform built:
 
     python3 tools/evaluate.py                       # the full plan
-    python3 tools/evaluate.py --docker-runs 1 --loki-runs 1 --benign-minutes 1   # quick check
+    python3 tools/evaluate.py --mode benign_baseline   # only the benign baseline (about 12 min)
+    python3 tools/evaluate.py --docker-runs 1 --loki-runs 1 --no-benign-baseline   # quick check
     python3 tools/evaluate.py --summarize evaluation/results/2026-11-17
 
 Standard library only. Charts: tools/evaluation_charts.py (needs matplotlib).
@@ -46,7 +47,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from benign_traffic import SCENARIO_MARKER, BenignTraffic  # noqa: E402
+from benign_traffic import SCENARIO_MARKER, BenignTraffic, NearMissPlan  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 API = "http://127.0.0.1:8000/api/v1"
@@ -54,6 +55,7 @@ SCENARIOS = ("authentication_abuse", "unauthorized_resource_access", "suspicious
 RESPONSE_OF = {"authentication_abuse": "temporary_rate_limit", "suspicious_container_activity": "stop_container"}
 ACTIVE_RUN = ("pending", "running")
 LAB_NAME = "evaluation"
+BASELINE = "benign_baseline"
 
 
 def utcnow() -> datetime:
@@ -445,7 +447,8 @@ class Evaluation:
     def save(self) -> None:
         write_json(self.out / "runs.json", self.runs)
         write_json(self.out / "correlation.json", self.correlation)
-        write_json(self.out / "benign_session.json", self.benign)
+        if self.benign:
+            write_json(self.out / "benign_baseline.json", self.benign)
         write_csv(self.out / "runs.csv", [run_row(r) for r in self.runs])
         write_csv(self.out / "docker_stats.csv", self.stats)
         write_csv(self.out / "lab_setup.csv", self.lab_ops)
@@ -513,38 +516,144 @@ class Evaluation:
         self.correlation.append({"benign_counts": traffic.counts()})
         self.save()
 
-    def benign_session(self, minutes: float) -> None:
-        """Benign traffic only, no run active. Count what the platform raises."""
+    def benign_baseline(self) -> None:
+        """Normal traffic, near-misses included, during a `benign_baseline` observation run.
+
+        The platform collects, normalizes and stores the run's telemetry and
+        checks every detection rule over it, exactly as for a scenario run
+        (scenario type `observation`). Every alert it raises is a false positive.
+        """
+        lab_id = self.lab["id"]
+        definition = self.api.get(f"/scenarios/{BASELINE}")
+        duration = int(definition["execution"]["parameters"]["duration_seconds"])
+        record: dict[str, Any] = {"phase": "benign_baseline", "telemetry_source": "docker", "falco": False,
+                                  "scenario_id": BASELINE, "duration_seconds": duration}
+        record["reset"] = lab_operation(self.api, lab_id, "reset", False)
+        if not record["reset"]["ok"]:
+            raise RuntimeError(f"lab reset failed: {record['reset']['error']}")
         before = self._counts()
-        started = utcnow()
-        traffic = BenignTraffic(seed=self.args.seed)
-        log(f"benign session: {minutes} min of normal traffic, no scenario")
-        with StatsSampler({"phase": "benign", "telemetry_source": "docker", "falco": False,
-                           "scenario_id": "benign", "index": 1}) as sampler:
-            traffic.run_for(minutes * 60)
-        self.stats.extend({**s, "run_id": ""} for s in sampler.samples)
-        time.sleep(5)  # let anything that would react to it finish
+        run = self.api.post(f"/labs/{lab_id}/runs", {"scenario_id": BASELINE})
+        record["run_id"] = run["id"]
+        while run["status"] == "pending":
+            time.sleep(0.2)
+            run = self.api.get(f"/runs/{run['id']}")
+        started = parse_time(run["started_at"])
+        # Stop sending 15 s before the observation ends, so nothing falls on the edge.
+        traffic_seconds = duration - (utcnow() - started).total_seconds() - 15
+        traffic = BenignTraffic(seed=self.args.seed, typo_users=(), container_commands=False)
+        plan = NearMissPlan(traffic)
+        if plan.last_offset() + 10 > traffic_seconds:
+            raise RuntimeError(f"the near-miss plan ({plan.last_offset()} s) does not fit in {traffic_seconds:.0f} s")
+        log(f"benign baseline: run {run['id']}, {duration} s observation, near-miss plan of {plan.last_offset():.0f} s")
+        with StatsSampler({"phase": "benign_baseline", "telemetry_source": "docker", "falco": False,
+                           "scenario_id": BASELINE, "index": 1}) as sampler:
+            traffic.start(traffic_seconds)
+            plan.start()
+            run = wait_run(self.api, run["id"], timeout=duration + 300)
+            traffic.stop()
+        self.stats.extend({**s, "run_id": record["run_id"]} for s in sampler.samples)
+        traffic.write_csv(self.out / "benign_baseline_actions.csv")
+        record.update(status=run["status"], error=run["error"], started_at=run["started_at"],
+                      finished_at=run["finished_at"], parameters=run["parameters"])
+        record["report"] = self.api.get(f"/runs/{run['id']}/report")
+        record["alerts"] = alert_details(self.api, run["id"])
+        incidents = [self.api.get(f"/incidents/{i['id']}") for i in self.api.get(f"/incidents?run_id={run['id']}")]
+        record["incidents"] = [{k: v for k, v in i.items() if k != "timeline"} for i in incidents]
+        record["events"] = run_events(self.api, run["id"])
+        record["actions"] = traffic.counts()
+        record["http_errors"] = sum(1 for a in traffic.actions if a.status is None)
+        record["near_miss_plan"] = [{"offset_s": at, "kind": kind} for at, kind, _ in plan.schedule()]
         after = self._counts()
-        events = self.api.get(f"/events?since={started.isoformat().replace('+00:00', 'Z')}&limit=1000")
-        traffic.write_csv(self.out / "benign_actions.csv")
-        self.benign = {
-            "started_at": iso(started), "finished_at": iso(utcnow()), "minutes": minutes,
-            "actions": traffic.counts(),
-            "http_errors": sum(1 for a in traffic.actions if a.status is None),
-            "alerts_before": before["alerts"], "alerts_after": after["alerts"],
-            "new_alerts": after["alerts"] - before["alerts"],
-            "incidents_before": before["incidents"], "incidents_after": after["incidents"],
-            "new_incidents": after["incidents"] - before["incidents"],
-            "events_stored_since_start": len(events),
-            "runs_started_during_session": sum(
-                1 for row in self.api.get("/audit?object_type=scenario_run&action=run.start&limit=1000")
-                if parse_time(row["timestamp"]) >= started),
-        }
-        log(f"benign session: {self.benign['new_alerts']} new alerts, {len(events)} events stored")
+        record["alerts_outside_run"] = (after["alerts"] - before["alerts"]) - len(record["alerts"])
+        try:
+            self.api.post(f"/runs/{run['id']}/cleanup", timeout=300)
+            record["cleanup"] = {"ok": True}
+        except ApiError as exc:
+            record["cleanup"] = {"ok": False, "error": str(exc)[:300]}
+        for incident in incidents:
+            try:
+                self.api.post(f"/incidents/{incident['id']}/close")
+            except ApiError:
+                pass
+        record["false_positives"] = false_positive_table(record)
+        self.benign = record
+        fp = record["false_positives"]
+        log(f"benign baseline: {run['status']}, {len(record['events'])} events stored, "
+            f"{len(record['alerts'])} alert(s), false-positive rate {fp['rate']}")
         self.save()
 
     def _counts(self) -> dict:
         return {"alerts": len(self.api.get("/alerts")), "incidents": len(self.api.get("/incidents"))}
+
+
+def run_events(api: Api, run_id: str) -> list[dict]:
+    """Every stored event of a run (the API returns at most 1000 per call)."""
+    events: dict[str, dict] = {}
+    since = None
+    while True:
+        query = f"/events?run_id={run_id}&limit=1000" + (f"&since={since}" if since else "")
+        page = api.get(query.replace("+", "%2B"))
+        fresh = [e for e in page if e["event_id"] not in events]
+        events.update((e["event_id"], e) for e in page)
+        if len(page) < 1000 or not fresh:
+            return sorted(events.values(), key=lambda e: e["timestamp"])
+        since = page[-1]["timestamp"]
+
+
+# What each rule counts and groups by, as far as the event API shows it (rules/*.yaml).
+RULE_VIEW = {
+    "repeated_failed_logins": ("authentication_failure", lambda e: (e.get("source_ip"),)),
+    "repeated_access_denied": ("authorization_denied", lambda e: (e.get("username"), e.get("resource"))),
+    "suspicious_container_process": ("suspicious_process", lambda e: (e.get("resource"),)),
+}
+
+
+def peak_in_window(times: list[datetime], window_seconds: int) -> int:
+    """The most events that fall in any one window of `window_seconds`."""
+    times = sorted(times)
+    best = start = 0
+    for end in range(len(times)):
+        while (times[end] - times[start]).total_seconds() > window_seconds:
+            start += 1
+        best = max(best, end - start + 1)
+    return best
+
+
+def false_positive_table(record: dict) -> dict:
+    """Per rule: the benign events it saw, how close they came to its threshold, and its alerts.
+
+    False-positive rate: of the rules the benign traffic gave something to
+    count, the share that raised an alert. Every alert of a baseline run is a
+    false positive, because the platform sent nothing.
+    """
+    events = record.get("events") or []
+    alerts = record.get("alerts") or []
+    rules = ((record.get("report") or {}).get("detection") or {}).get("rules") or []
+    rows = []
+    for check in rules:
+        rule = check["rule"]
+        event_type, group = RULE_VIEW.get(rule, (None, None))
+        matching = [e for e in events if e["event_type"] == event_type]
+        groups: dict[tuple, list[datetime]] = {}
+        for event in matching:
+            groups.setdefault(group(event), []).append(parse_time(event["timestamp"]))
+        peak = max((peak_in_window(t, check["window_seconds"]) for t in groups.values()), default=0)
+        raised = [a for a in alerts if a["rule_id"] == rule]
+        rows.append({
+            "rule": rule, "threshold": check["threshold"], "window_seconds": check["window_seconds"],
+            "benign_events": len(matching), "groups": len(groups), "peak_in_one_window": peak,
+            "alerts": len(raised), "events_in_alerts": sum(a["event_count"] for a in raised),
+        })
+    exercised = [r for r in rows if r["benign_events"]]
+    alerted = [r for r in exercised if r["alerts"]]
+    minutes = (record.get("duration_seconds") or 0) / 60
+    return {
+        "per_rule": rows,
+        "rules_exercised": len(exercised), "rules_alerted": len(alerted),
+        "rate": _rate(len(alerted), len(exercised)),
+        "alerts": len(alerts), "incidents": len(record.get("incidents") or []),
+        "alerts_per_hour": round(len(alerts) * 60 / minutes, 1) if minutes else None,
+    }
 
 
 def correlation_checks(record: dict, all_run_ids: set) -> dict:
@@ -589,6 +698,12 @@ def run_row(record: dict) -> dict:
     rule = expected_rule(record)
     alerts = [a for a in report.get("alerts", []) if a["rule_id"] == rule]
     latency = alerts[0]["detection_latency_seconds"] if alerts else None
+    # Run finish: the last event in the run's alert, i.e. the script's last action.
+    # (The run's finished_at is set after detection, so it cannot be used.)
+    finish_to_alert = None
+    if alerts and alerts[0].get("last_event_at") and alerts[0].get("created_at"):
+        finish_to_alert = round((parse_time(alerts[0]["created_at"])
+                                 - parse_time(alerts[0]["last_event_at"])).total_seconds(), 3)
     response = record.get("response") or {}
     sources: dict[str, int] = {}
     for alert in record.get("alerts", []):
@@ -608,6 +723,7 @@ def run_row(record: dict) -> dict:
         "alert_event_count": alerts[0]["event_count"] if alerts else None,
         "alert_events_by_source": json.dumps(sources, sort_keys=True) if sources else "",
         "detection_latency_s": latency,
+        "finish_to_alert_s": finish_to_alert,
         "incidents": len(record.get("incidents", [])),
         "risk_score": (record.get("incidents") or [{}])[0].get("risk_score") if record.get("incidents") else None,
         "response_action": response.get("action"), "response_status": response.get("status"),
@@ -647,6 +763,7 @@ def summarize(out: Path) -> dict:
         summary["detection"].append({**key, **_rate(sum(r["expected_alert"] for r in group), len(group)),
                                      "alert_events_by_source": _count(r["alert_events_by_source"] for r in group)})
         summary["latency"].append({**key, **_stats([r["detection_latency_s"] for r in group])})
+        summary.setdefault("finish_to_alert", []).append({**key, **_stats([r["finish_to_alert_s"] for r in group])})
         responders = [r for r in group if r["response_action"]]
         if scenario_id in RESPONSE_OF:
             summary["response"].append({
@@ -695,6 +812,21 @@ def summarize(out: Path) -> dict:
     benign_path = out / "benign_session.json"
     if benign_path.exists():
         summary["benign"] = json.loads(benign_path.read_text())
+    baseline_path = out / "benign_baseline.json"
+    if baseline_path.exists():
+        baseline = json.loads(baseline_path.read_text())
+        if baseline.get("events") is not None:
+            baseline["false_positives"] = false_positive_table(baseline)
+            summary["benign_baseline"] = {
+                "run_id": baseline.get("run_id"), "status": baseline.get("status"),
+                "duration_seconds": baseline.get("duration_seconds"),
+                "actions": baseline.get("actions"), "http_errors": baseline.get("http_errors"),
+                "events_stored": len(baseline["events"]),
+                "events_by_type": _count(f"{e['source']} {e['event_type']}" for e in baseline["events"]),
+                "alerts": [{"rule_id": a["rule_id"], "event_count": a["event_count"], "title": a["title"]}
+                           for a in baseline.get("alerts") or []],
+                "false_positives": baseline["false_positives"],
+            }
     write_json(out / "summary.json", summary)
     return summary
 
@@ -728,8 +860,11 @@ def print_tables(summary: dict) -> str:
           [[e["telemetry_source"], e["scenario_id"], _pct(e), e["statuses"]] for e in summary["execution"]])
     table("Detection rate", ["Source", "Scenario", "Expected alert raised", "Alert events by source"],
           [[d["telemetry_source"], d["scenario_id"], _pct(d), d["alert_events_by_source"]] for d in summary["detection"]])
-    table("Detection latency (s)", ["Source", "Scenario", "n", "min", "median", "max"],
+    table("Time from threshold-crossing event to alert (s)", ["Source", "Scenario", "n", "min", "median", "max"],
           [[x["telemetry_source"], x["scenario_id"], x["n"], x["min"], x["median"], x["max"]] for x in summary["latency"]])
+    table("Time from run finish (last event) to alert (s)", ["Source", "Scenario", "n", "min", "median", "max"],
+          [[x["telemetry_source"], x["scenario_id"], x["n"], x["min"], x["median"], x["max"]]
+           for x in summary.get("finish_to_alert", [])])
     table("Response actions", ["Source", "Action", "Executed", "Verified", "Reverted by cleanup", "Approve→result s (median)"],
           [[r["telemetry_source"], r["action"], _pct(r["executed"]), _pct(r["verified"]), _pct(r["reverted_by_cleanup"]),
             r["seconds"]["median"]] for r in summary["response"]])
@@ -744,7 +879,17 @@ def print_tables(summary: dict) -> str:
               "No benign event merged", "Events from other runs", "Benign events in alerts"],
               [[c["runs"], _pct(c["own_incident_only"]), _pct(c["no_benign_merged"]), c["events_from_other_runs"],
                 c["benign_events_in_alerts"]]])
-    if summary.get("benign"):
+    if summary.get("benign_baseline"):
+        b = summary["benign_baseline"]
+        fp = b["false_positives"]
+        table(f"Benign baseline ({b['duration_seconds']} s observation, every rule checked)",
+              ["Status", "Actions", "Events stored", "Events by type", "Alerts", "Incidents", "False-positive rate"],
+              [[b["status"], b["actions"], b["events_stored"], b["events_by_type"], fp["alerts"], fp["incidents"],
+                _pct(fp["rate"])]])
+        table("Benign baseline per rule", ["Rule", "Threshold", "Benign events", "Peak in one window", "Alerts"],
+              [[r["rule"], f"{r['threshold']} in {r['window_seconds']} s", r["benign_events"],
+                r["peak_in_one_window"], r["alerts"]] for r in fp["per_rule"]])
+    elif summary.get("benign"):
         b = summary["benign"]
         table("Benign traffic only (no scenario running)", ["Minutes", "Actions", "New alerts", "New incidents", "Events stored"],
               [[b["minutes"], b["actions"], b["new_alerts"], b["new_incidents"], b["events_stored_since_start"]]])
@@ -776,7 +921,10 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Repeatable CloudAttackLab evaluation (API only).")
     parser.add_argument("--docker-runs", type=int, default=10, help="runs of each scenario with TELEMETRY_SOURCE=docker")
     parser.add_argument("--loki-runs", type=int, default=5, help="runs of each scenario with TELEMETRY_SOURCE=loki and Falco on")
-    parser.add_argument("--benign-minutes", type=float, default=10, help="length of the benign-only session")
+    parser.add_argument("--mode", choices=("full", "benign_baseline"), default="full",
+                        help="full: the whole plan; benign_baseline: only the benign baseline run")
+    parser.add_argument("--no-benign-baseline", action="store_true",
+                        help="skip the benign baseline (its length is set in scenarios/benign_baseline.yaml)")
     parser.add_argument("--correlation-rounds", type=int, default=3, help="back-to-back rounds of the three scenarios")
     parser.add_argument("--setup-trials", type=int, default=3, help="lab start measurements per phase")
     parser.add_argument("--scenarios", nargs="+", default=list(SCENARIOS))
@@ -798,15 +946,19 @@ def main() -> None:
     write_json(out / "plan.json", vars(args) | {"started_at": iso(utcnow())})
     log(f"results -> {out}")
 
+    if args.mode == "benign_baseline":
+        args.docker_runs = args.loki_runs = args.correlation_rounds = 0
+        args.setup_trials = 1
+        args.no_benign_baseline = False
     evaluation = Evaluation(args, out)
     try:
-        if args.docker_runs or args.correlation_rounds or args.benign_minutes:
+        if args.docker_runs or args.correlation_rounds or not args.no_benign_baseline:
             evaluation.setup_phase("docker", "docker", False)
             evaluation.scenario_runs("docker", "docker", False, args.docker_runs)
             if args.correlation_rounds:
                 evaluation.correlation_session(args.correlation_rounds)
-            if args.benign_minutes:
-                evaluation.benign_session(args.benign_minutes)
+            if not args.no_benign_baseline:
+                evaluation.benign_baseline()
         if args.loki_runs:
             evaluation.setup_phase("loki", "loki", True)
             evaluation.scenario_runs("loki", "loki", True, args.loki_runs)

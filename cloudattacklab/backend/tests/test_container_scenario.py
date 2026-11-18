@@ -247,10 +247,11 @@ def test_a_container_scenario_must_target_a_container_target(tmp_path):
     engine = ScenarioEngine(tmp_path, {"shopcloud", "test_container"}, {"test_container"})
     assert engine.list() == []  # skipped as invalid: a container scenario aimed at ShopCloud
 
-    # And the real files load: two application scenarios and this one.
+    # And the real files load: two application scenarios, the observation and this one.
     real = ScenarioEngine(ROOT / "scenarios", {"shopcloud", "test_container"}, {"test_container"})
     assert {s.id: s.type for s in real.list()} == {
         "authentication_abuse": "application",
+        "benign_baseline": "observation",
         "suspicious_container_activity": "container",
         "unauthorized_resource_access": "application",
     }

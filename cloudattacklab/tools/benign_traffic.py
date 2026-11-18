@@ -11,6 +11,18 @@ commands in the test container:
 - now and then one ordinary command in the test container (`date`, `ls /`,
   ...), never the scenario marker.
 
+For the benign baseline (`NearMissPlan`) the failures are not random but
+scheduled, so that each one stays just under a rule's threshold:
+
+- 9 wrong logins within 60 s (the failed-login rule fires at 10 in 60 s);
+- 4 access denials for `lab_restricted` on /api/orders (the rule fires at 5);
+- single wrong passwords, each more than 60 s from any other failure;
+- a few ordinary commands in the test container, without the scenario marker.
+
+Every client, benign or not, reaches ShopCloud from the Docker gateway
+address, so all failed logins count against one source IP: the plan keeps the
+burst and the single typos more than 60 s apart, or they would add up to 10.
+
 It talks to ShopCloud directly on its published port (like a browser) and to
 the test container with `docker exec` (like an operator). It never calls the
 platform API. Every action is logged with its time and result so the
@@ -59,7 +71,7 @@ TEST_TARGET_FILTER = ["--filter", "label=cloudattacklab.role=test-target",
 @dataclass
 class Action:
     time: str            # UTC ISO time the action started
-    kind: str            # browse | login | orders | typo | container_cmd
+    kind: str            # browse | login | orders | typo | container_cmd | failed_login | denied
     username: Optional[str]
     target: str          # path or command
     status: Optional[int]  # HTTP status or the command's exit code; None on a transport error
@@ -161,6 +173,17 @@ class BenignTraffic:
         except (OSError, subprocess.SubprocessError) as exc:
             self._log("container_cmd", None, " ".join(command), None, str(exc)[:200])
 
+    def failed_login(self, username: str = "lab_user") -> None:
+        """One wrong password, not followed by the right one (part of a near-miss burst)."""
+        self._login(username, TYPO_PASSWORD, kind="failed_login")
+
+    def denied_orders(self) -> None:
+        """lab_restricted asks for /api/orders, which it may not read (ShopCloud answers 403)."""
+        token = self._login("lab_restricted", ACCOUNTS["lab_restricted"])
+        if token:
+            status, _, error = self._http("GET", "/api/orders", token=token)
+            self._log("denied", "lab_restricted", "/api/orders", status, error)
+
     def step(self) -> None:
         now = time.monotonic()
         if self.typo_users and now - self._last_typo >= self.typo_gap_seconds and self.rng.random() < 0.3:
@@ -201,6 +224,64 @@ class BenignTraffic:
             writer.writeheader()
             for action in self.actions:
                 writer.writerow(asdict(action))
+
+
+@dataclass
+class NearMissPlan:
+    """A fixed schedule of near-miss actions, run in its own thread next to the
+    background traffic (which should then have no random typos or commands).
+
+    Offsets are seconds from `start()`. The default plan fits in 560 s:
+
+    - 30 s: 9 wrong logins as lab_user, 3 s apart (24 s; threshold is 10 in 60 s);
+    - 130 to 550 s: 6 single typos (wrong then right password), 84 s apart,
+      alternating lab_user and lab_restricted, the first 76 s after the burst;
+    - 180 s: 4 denied /api/orders requests as lab_restricted, 4 s apart (threshold 5);
+    - 90, 270, 450 s: one ordinary command in the test container.
+    """
+
+    traffic: BenignTraffic
+    burst_at: float = 30.0
+    burst_size: int = 9
+    burst_gap: float = 3.0
+    typo_times: tuple[float, ...] = (130.0, 214.0, 298.0, 382.0, 466.0, 550.0)
+    denied_at: float = 180.0
+    denied_count: int = 4
+    denied_gap: float = 4.0
+    command_times: tuple[float, ...] = (90.0, 270.0, 450.0)
+
+    def schedule(self) -> list[tuple[float, str, object]]:
+        t = self.traffic
+        items: list[tuple[float, str, object]] = []
+        items += [(self.burst_at + i * self.burst_gap, "failed_login", t.failed_login) for i in range(self.burst_size)]
+        users = ("lab_user", "lab_restricted")
+        for i, at in enumerate(self.typo_times):
+            items.append((at, "typo", lambda u=users[i % 2]: self._typo(u)))
+        items += [(self.denied_at + i * self.denied_gap, "denied", t.denied_orders) for i in range(self.denied_count)]
+        items += [(at, "container_cmd", t.container_command) for at in self.command_times]
+        return sorted(items, key=lambda item: item[0])
+
+    def _typo(self, user: str) -> None:
+        t = self.traffic
+        t._login(user, TYPO_PASSWORD, kind="typo")
+        time.sleep(t.rng.uniform(1.0, 3.0))
+        t._login(user, ACCOUNTS[user])
+
+    def last_offset(self) -> float:
+        return max(at for at, _, _ in self.schedule())
+
+    def run(self) -> None:
+        start = time.monotonic()
+        for at, _, action in self.schedule():
+            wait = start + at - time.monotonic()
+            if self.traffic._stop.wait(max(0.0, wait)):
+                return
+            action()
+
+    def start(self) -> threading.Thread:
+        thread = threading.Thread(target=self.run, daemon=True)
+        thread.start()
+        return thread
 
 
 def main() -> None:

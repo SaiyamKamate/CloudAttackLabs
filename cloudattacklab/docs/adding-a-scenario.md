@@ -30,6 +30,10 @@ The project guide (section 6.3) gives these **planning estimates** once the fram
 
 In this repository, "simple" means a scenario that only uses what already exists: an existing target (ShopCloud or the test container), event types ShopCloud already logs, existing pre-flight checks, cleanup steps and, if any, an existing response action. Anything else needs code in the backend (see [What needs code](#what-needs-code)).
 
+## Observation scenarios
+
+A scenario of type `observation` attacks nothing. Its run sends nothing to the lab: for `execution.parameters.duration_seconds` (1 to `timeout_seconds`) it collects the lab's telemetry the same way attack runs do, then checks every rule in `rules/`, each with the threshold and window of the scenario that uses it. It must have no `execution.script`, no `detection` and no `response`; it still needs `prerequisites`, `expected_telemetry` and `cleanup`. The shipped one, `scenarios/benign_baseline.yaml`, watches for 600 s while normal traffic is sent from outside, so every alert it raises is a false positive. There is no reason to write another unless you need a different length.
+
 ## Step 1: the scenario definition
 
 Create `scenarios/<id>.yaml`. The file name (without `.yaml`) must equal its `id`. The loader (`backend/app/schemas/scenario.py`) checks every field when the file is read. A file that fails any check is **skipped and logged**, never run; the dashboard simply does not list it. Unknown fields are refused.
@@ -45,14 +49,14 @@ Create `scenarios/<id>.yaml`. The file name (without `.yaml`) must equal its `id
 | `description` | yes | at least 10 characters | |
 | `version` | no | `X.Y.Z`, default `1.0.0`; recorded with every run | `1.0.0` |
 | `target` | yes | must be a configured lab target: `shopcloud`, or `test_container` for a container scenario | `shopcloud` |
-| `type` | yes | `application` or `container`. A `container` scenario must target `test_container`; an `application` one must not | `application` |
+| `type` | yes | `application`, `container` or `observation`. A `container` scenario must target `test_container`; the others must not. An `observation` scenario runs no script and only watches (see [Observation scenarios](#observation-scenarios)) | `application` |
 | `requires` | no | list of `login_endpoint`, `protected_resource`, `rate_limit_control`, `container_target`, `falco`. Descriptive: shown in the definition, not checked | `[login_endpoint, rate_limit_control]` |
 | `prerequisites` | yes, at least one | list of `{check, detail}`. See [Pre-flight checks](#pre-flight-checks) | `- check: http_health` |
-| `execution.script` | yes | a file name only (`^[a-z][a-z0-9_]*\.py$`), inside `scenarios/scripts/` | `authentication_abuse.py` |
+| `execution.script` | yes, except `observation` | a file name only (`^[a-z][a-z0-9_]*\.py$`), inside `scenarios/scripts/` | `authentication_abuse.py` |
 | `execution.timeout_seconds` | no | 1–600, default 60. The run fails if the script takes longer | `60` |
 | `execution.parameters` | no | flat map of `bool`, `int`, `float` or `str`. `attempts` must be 1–200; `interval_seconds` at least 0.1 | `{username: lab_user, attempts: 20, interval_seconds: 1}` |
 | `expected_telemetry` | yes, at least one | list of `{source, event_type, min_count}`. A run that collects fewer ends `incomplete` | `{source: application, event_type: authentication_failure, min_count: 10}` |
-| `detection.rule` | yes | the id of a file in `rules/` | `repeated_failed_logins` |
+| `detection.rule` | yes, except `observation` (which must have no `detection`) | the id of a file in `rules/` | `repeated_failed_logins` |
 | `detection.threshold` | yes | at least 1 | `10` |
 | `detection.window_seconds` | no | 1–3600, default 60 | `60` |
 | `response` | no | see [The response](#the-response-optional). Leave it out if there is no action with a measurable check | |

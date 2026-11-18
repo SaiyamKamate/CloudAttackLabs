@@ -22,6 +22,7 @@ Evidence chain: incident -> alerts -> alert_events -> events -> raw_event_refere
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Optional
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -57,12 +58,21 @@ def related(a: AlertContext, b: AlertContext) -> bool:
 
 
 def attach_alerts(
-    session: Session, run: ScenarioRun, scenario: ScenarioDefinition, alerts: list[Alert]
+    session: Session,
+    run: ScenarioRun,
+    scenario: ScenarioDefinition,
+    alerts: list[Alert],
+    *,
+    threshold: Optional[int] = None,
 ) -> list[Incident]:
     """Put each new alert into an incident and refresh those incidents' risk scores.
 
-    Returns the incidents that received an alert. The caller commits.
+    threshold: the detection threshold the alerts were raised with (default:
+    the scenario's own). Returns the incidents that received an alert. The
+    caller commits.
     """
+    if threshold is None and scenario.detection is not None:
+        threshold = scenario.detection.threshold
     if not alerts:
         return []
     incidents = list(
@@ -90,7 +100,7 @@ def attach_alerts(
 
     session.flush()
     for incident in touched:
-        refresh_risk(session, incident, scenario.detection.threshold)
+        refresh_risk(session, incident, threshold)
     return touched
 
 

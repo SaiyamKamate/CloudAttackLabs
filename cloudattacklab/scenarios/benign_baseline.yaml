@@ -1,0 +1,35 @@
+schema_version: "1.0"
+id: benign_baseline
+name: Benign Baseline (observe only)
+category: baseline
+description: >
+  Runs no attack. For ten minutes the platform only watches the lab, collecting
+  ShopCloud's logs and the test container's events exactly as an attack run
+  does, then checks them against every detection rule. Send normal traffic
+  (for example tools/benign_traffic.py) while it runs: every alert it raises is
+  a false positive.
+version: 1.0.0
+target: shopcloud
+type: observation
+
+prerequisites:
+  - check: http_health
+
+execution:
+  timeout_seconds: 600
+  parameters:
+    duration_seconds: 600
+
+# Normal use logs in, so a baseline that saw no successful login saw nothing.
+expected_telemetry:
+  - source: application
+    event_type: authentication_success
+    min_count: 1
+
+# No `detection`: every rule is checked, with the threshold and window of the
+# scenario that uses it. No `response`: nothing here is an attack.
+
+cleanup:
+  enabled: true
+  steps:
+    - reset_target_state

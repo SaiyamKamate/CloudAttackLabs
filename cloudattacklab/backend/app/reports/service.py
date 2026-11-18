@@ -13,6 +13,7 @@ from typing import Any, Optional
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from ..detection.checks import RuleCheck, run_checks
 from ..errors import ApiError
 from ..incidents.timeline import as_utc
 from ..models import Alert, AuditLog, Event, Incident, Lab, ScenarioRun
@@ -36,7 +37,8 @@ def build_report(session: Session, engine: ScenarioEngine, run: ScenarioRun) -> 
     responses = sorted(
         (response for incident in incidents for response in incident.responses), key=lambda r: r.requested_at
     )
-    threshold = scenario.detection.threshold if scenario else None
+    checks = run_checks(scenario, run.parameters) if scenario else []
+    thresholds = {check.rule: check.threshold for check in checks}
 
     return {
         "report_version": REPORT_VERSION,
@@ -71,14 +73,8 @@ def build_report(session: Session, engine: ScenarioEngine, run: ScenarioRun) -> 
         },
         "script_summary": summary or None,
         "telemetry": _telemetry(scenario, events),
-        "detection": None
-        if scenario is None
-        else {
-            "rule": scenario.detection.rule,
-            "threshold": scenario.detection.threshold,
-            "window_seconds": scenario.detection.window_seconds,
-        },
-        "alerts": [_alert(alert, threshold) for alert in alerts],
+        "detection": _detection(scenario, checks),
+        "alerts": [_alert(alert, thresholds.get(alert.rule_id)) for alert in alerts],
         "incidents": [
             {
                 "id": incident.id,
@@ -109,6 +105,26 @@ def build_report(session: Session, engine: ScenarioEngine, run: ScenarioRun) -> 
         ],
         "post_run_verification": post_run_verification,
         "cleanup": _cleanup(session, run),
+    }
+
+
+def _detection(scenario: Optional[ScenarioDefinition], checks: list[RuleCheck]) -> Optional[dict[str, Any]]:
+    """The rule(s) the run was checked against.
+
+    `rule`, `threshold` and `window_seconds` describe an attack scenario's one
+    rule (null for an observation run); `rules` lists every rule checked.
+    """
+    if scenario is None:
+        return None
+    single = checks[0] if scenario.detection is not None and checks else None
+    return {
+        "rule": single.rule if single else None,
+        "threshold": single.threshold if single else None,
+        "window_seconds": single.window_seconds if single else None,
+        "rules": [
+            {"rule": c.rule, "threshold": c.threshold, "window_seconds": c.window_seconds, "taken_from": c.taken_from}
+            for c in checks
+        ],
     }
 
 

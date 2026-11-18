@@ -299,6 +299,56 @@
       "rate": 1.0
     }
   ],
+  "finish_to_alert": [
+    {
+      "telemetry_source": "docker",
+      "scenario_id": "authentication_abuse",
+      "n": 10,
+      "min": 0.103,
+      "median": 0.115,
+      "max": 0.14
+    },
+    {
+      "telemetry_source": "docker",
+      "scenario_id": "suspicious_container_activity",
+      "n": 10,
+      "min": 2.133,
+      "median": 2.436,
+      "max": 2.603
+    },
+    {
+      "telemetry_source": "docker",
+      "scenario_id": "unauthorized_resource_access",
+      "n": 10,
+      "min": 0.104,
+      "median": 0.117,
+      "max": 0.173
+    },
+    {
+      "telemetry_source": "loki",
+      "scenario_id": "authentication_abuse",
+      "n": 5,
+      "min": 4.128,
+      "median": 4.178,
+      "max": 4.196
+    },
+    {
+      "telemetry_source": "loki",
+      "scenario_id": "suspicious_container_activity",
+      "n": 5,
+      "min": 4.147,
+      "median": 4.44,
+      "max": 6.247
+    },
+    {
+      "telemetry_source": "loki",
+      "scenario_id": "unauthorized_resource_access",
+      "n": 5,
+      "min": 4.119,
+      "median": 4.138,
+      "max": 4.182
+    }
+  ],
   "lab_setup": [
     {
       "telemetry_source": "docker",

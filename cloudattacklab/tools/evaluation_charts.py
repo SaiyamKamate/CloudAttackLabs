@@ -39,26 +39,43 @@ def read(path: Path) -> list[dict]:
     return list(csv.DictReader(path.open())) if path.exists() else []
 
 
+def latency_rows(results: Path) -> list[dict]:
+    """runs.csv rows with both latency measures (computed from runs.json when the CSV predates them)."""
+    runs_json = results / "runs.json"
+    if runs_json.exists():
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        import json
+
+        from evaluate import run_row
+
+        return [run_row(r) for r in json.loads(runs_json.read_text())]
+    return read(results / "runs.csv")
+
+
 def latency_chart(results: Path, out: Path) -> None:
-    rows = [r for r in read(results / "runs.csv") if r["detection_latency_s"]]
+    rows = [r for r in latency_rows(results) if r.get("detection_latency_s") not in (None, "")]
     scenarios = [s for s in SHORT if any(r["scenario_id"] == s for r in rows)]
-    fig, ax = plt.subplots(figsize=(8, 4.2), dpi=150)
-    for i, scenario in enumerate(scenarios):
-        for j, source in enumerate(("docker", "loki")):
-            values = [float(r["detection_latency_s"]) for r in rows
-                      if r["scenario_id"] == scenario and r["telemetry_source"] == source]
-            if not values:
-                continue
-            x = i + (j - 0.5) * 0.3
-            ax.scatter([x] * len(values), values, s=36, color=SOURCE_COLOR[source], alpha=0.75,
-                       edgecolor="white", linewidth=1, zorder=3, label=source if i == 0 else None)
-            median = statistics.median(values)
-            ax.plot([x - 0.1, x + 0.1], [median, median], color=TEXT, linewidth=2, zorder=4)
-    ax.set_xticks(range(len(scenarios)), [SHORT[s] for s in scenarios])
-    ax.set_ylim(bottom=0)
-    ax.grid(axis="y", color=GRID, linewidth=0.8)
-    style(ax, "Detection latency per run (dots) and median (bar)", ylabel="seconds")
-    ax.legend(title="telemetry source", frameon=False)
+    measures = (("detection_latency_s", "From threshold-crossing event to alert"),
+                ("finish_to_alert_s", "From run finish (last event) to alert"))
+    fig, axes = plt.subplots(1, 2, figsize=(11, 4.2), dpi=150, sharey=True)
+    for ax, (field, title) in zip(axes, measures):
+        for i, scenario in enumerate(scenarios):
+            for j, source in enumerate(("docker", "loki")):
+                values = [float(r[field]) for r in rows if r.get(field) not in (None, "")
+                          and r["scenario_id"] == scenario and r["telemetry_source"] == source]
+                if not values:
+                    continue
+                x = i + (j - 0.5) * 0.3
+                ax.scatter([x] * len(values), values, s=30, color=SOURCE_COLOR[source], alpha=0.75,
+                           edgecolor="white", linewidth=1, zorder=3, label=source if i == 0 else None)
+                median = statistics.median(values)
+                ax.plot([x - 0.1, x + 0.1], [median, median], color=TEXT, linewidth=2, zorder=4)
+        ax.set_xticks(range(len(scenarios)), [SHORT[s] for s in scenarios], fontsize=8)
+        ax.set_ylim(bottom=0)
+        ax.grid(axis="y", color=GRID, linewidth=0.8)
+        style(ax, title, ylabel="seconds" if ax is axes[0] else "")
+    axes[0].legend(title="telemetry source", frameon=False)
+    fig.suptitle("Time to alert per run (dots) and median (bar)", x=0.01, ha="left", color=TEXT, fontsize=12)
     fig.tight_layout()
     fig.savefig(out / "detection-latency.png")
     plt.close(fig)

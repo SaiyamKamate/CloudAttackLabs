@@ -1,0 +1,2 @@
+operation,requested_at,ok,error,api_returned_seconds,ready_seconds,phase,telemetry_source,falco,trial
+start,2026-11-17T17:00:43.769031+00:00,True,,10.972,11.105,docker,docker,False,1
