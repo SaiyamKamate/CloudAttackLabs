@@ -2,10 +2,11 @@
 
 Real problems met while building and testing CloudAttackLab, and how to fix them. Each entry says what you see, why it happens and what to do. Entries marked **Seen on 17 November 2026** were reproduced on the test machine while writing this page; the others come from the project's history (the code comments, the README and the [November 2026 audit](audit-2026-11.md)).
 
-Run every command from the `cloudattacklab/` folder, inside WSL if you use Windows.
+Run every command from the repository's root folder, inside WSL if you use Windows. Start with `scripts/status.sh`: it shows which container is down, whether the backend, dashboard and Loki answer, and the lab's own status.
 
 ## Contents
 
+- [The platform does not start, or setup stops with an error](#the-platform-does-not-start-or-setup-stops-with-an-error)
 - [Vite does not notice saved files on a Windows drive](#vite-does-not-notice-saved-files-on-a-windows-drive)
 - [Loki answers "not ready" for its first 15 seconds](#loki-answers-not-ready-for-its-first-15-seconds)
 - [Containers cannot reach each other on 127.0.0.1](#containers-cannot-reach-each-other-on-127001)
@@ -14,6 +15,24 @@ Run every command from the `cloudattacklab/` folder, inside WSL if you use Windo
 - [The lab says "running" after a WSL or Docker restart](#the-lab-says-running-after-a-wsl-or-docker-restart)
 - [A manual login gets 429 after a test](#a-manual-login-gets-429-after-a-test)
 - [Other problems](#other-problems)
+
+## The platform does not start, or setup stops with an error
+
+`scripts/setup.sh` and `scripts/start.sh` stop at the first step that fails and say which one. None of them deletes anything, so after fixing the cause you simply run the same script again.
+
+| The script says | Cause | Fix |
+|---|---|---|
+| "This is a Windows shell" | You ran it in Git Bash or PowerShell | Open Ubuntu (WSL) and run it there |
+| "The Docker daemon is not running" | Docker Engine is not started in WSL | `sudo service docker start` |
+| "Docker refused access" | Your user is not in the `docker` group | `sudo usermod -aG docker $USER`, then close and reopen Ubuntu |
+| "Port 5432 (needed by postgres) is already used by another program" | Another PostgreSQL, or another project, holds the port | Stop it (`sudo service postgresql stop`, or `docker ps` to find the container) |
+| "docker compose could not build or start the platform" | A build or pull error, shown just above the message | Usually the network during the first download: run the script again |
+| "Backend and database did not answer ... within 120s" | The backend crashed at start | `docker compose logs --tail=80 backend`. A `password authentication failed` there means the next entry in this table |
+| `password authentication failed for user "cloudattacklab"` in the backend log | The database volume was created with another `POSTGRES_PASSWORD` than the one in `.env` (PostgreSQL keeps the password it was first created with) | Put the old password back in `.env` (the published default was `change-me-locally`) and run `scripts/start.sh`. Or, if you do not need the data, `scripts/reset.sh` and then `scripts/setup.sh` |
+| "Grafana did not answer" and `docker compose logs grafana` says `GF_SECURITY_ADMIN_PASSWORD is empty` | No Grafana password in `.env` | Set `GF_SECURITY_ADMIN_PASSWORD` in `.env`, then `scripts/start.sh --monitoring` |
+| "The backend could not start lab ..." | ShopCloud's image did not build, or port 8081 is taken | Open the dashboard's Lab page for the reason, or `docker compose -f lab/docker-compose.lab.yml logs shopcloud` |
+
+The Lab page and `scripts/status.sh` show the lab's state as the backend sees it; `docker compose ps -a` and `docker compose logs <service>` show the platform's containers. Persistent data is only in the `cloudattacklab_pgdata` volume, and only `scripts/reset.sh` (after you type `delete`) or `docker compose down -v` removes it.
 
 ## Vite does not notice saved files on a Windows drive
 
@@ -40,7 +59,7 @@ Two more things about the development server:
 
 **Seen on 17 November 2026.**
 
-**What you see.** Right after `docker compose --env-file .env -f monitoring/docker-compose.monitoring.yml up -d`:
+**What you see.** Right after `docker compose --profile monitoring up -d`:
 
 ```bash
 curl -s http://127.0.0.1:3100/ready
@@ -76,25 +95,26 @@ The same goes for ShopCloud: the backend reaches it at `127.0.0.1:8081` (publish
 
 ## Grafana: dashboard empty, "Datasource ... was not found", or the stack will not start
 
-**The stack will not start, or `stop`/`ps`/`down` fails.** **Seen on 17 November 2026.**
+**Grafana will not start.** It exits right after starting, and `docker compose logs grafana` shows (checked on 18 November 2026 with an empty password):
 
 ```
-error while interpolating services.grafana.environment.GF_SECURITY_ADMIN_PASSWORD: required variable GF_SECURITY_ADMIN_PASSWORD is missing a value: Set GF_SECURITY_ADMIN_PASSWORD in .env and start with --env-file .env
+ERROR: GF_SECURITY_ADMIN_PASSWORD is empty. Set it in .env, then: docker compose --profile monitoring up -d grafana
 ```
 
-Grafana has no default password on purpose. Set `GF_SECURITY_ADMIN_PASSWORD` in the project's `.env`, and pass `--env-file .env` on **every** command for the monitoring compose file. Without it Docker Compose looks for `.env` next to the compose file, in `monitoring/`, which does not exist:
+Grafana has no default password on purpose. Set `GF_SECURITY_ADMIN_PASSWORD` in the project's `.env` (`scripts/setup.sh` puts a random one there when it creates `.env`) and start it again:
 
 ```bash
-docker compose --env-file .env -f monitoring/docker-compose.monitoring.yml up -d
-docker compose --env-file .env -f monitoring/docker-compose.monitoring.yml stop
+docker compose --profile monitoring up -d grafana
 ```
+
+Before 18 November 2026 the monitoring stack had its own compose file, `monitoring/docker-compose.monitoring.yml`, and every command for it needed `--env-file .env`. That file is gone: the services are now the `monitoring` profile of `docker-compose.yml`, which reads the root `.env` like every other command. If `scripts/status.sh` reports containers of the old `cloudattacklab-monitoring` project, remove them with `docker compose -p cloudattacklab-monitoring down` (they hold no volumes).
 
 **A panel shows "Datasource fg492mjm656v4b was not found" and "No data".** This is what the November 2026 audit found: the dashboard pointed at a datasource by an id that Grafana had made up when it was first set up by hand, and a fresh Grafana has a different one. Fixed in the repository: the Loki datasource is provisioned from `monitoring/grafana/provisioning/datasources/loki.yml` with a fixed `uid: loki`, and every panel of `monitoring/grafana/dashboards/lab-activity.json` refers to `{"type": "loki", "uid": "loki"}`. If you add a panel, use that uid, not one Grafana generates.
 
 **You changed the dashboard in Grafana and the change is gone, or cannot be saved.** The dashboard is provisioned from a file (`monitoring/grafana/provisioning/dashboards/dashboards.yml`, with `allowUiUpdates: false` and `disableDeletion: true`). Edit `monitoring/grafana/dashboards/lab-activity.json` instead (in Grafana: Share → Export → copy the JSON, then paste it into the file), then restart Grafana:
 
 ```bash
-docker compose --env-file .env -f monitoring/docker-compose.monitoring.yml restart grafana
+docker compose --profile monitoring restart grafana
 ```
 
 (The restart command was not run on the test machine.)

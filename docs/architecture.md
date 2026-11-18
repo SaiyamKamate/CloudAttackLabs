@@ -4,15 +4,14 @@ This page explains how CloudAttackLab is built: its modules, what each one does,
 
 ## The big picture
 
-CloudAttackLab is three Docker Compose projects on one machine:
+CloudAttackLab is two Docker Compose projects on one machine:
 
 | Compose project | File | Containers | Job |
 |---|---|---|---|
-| `cloudattacklab` (the platform) | `docker-compose.yml` | `postgres`, `backend`, `frontend` | Stores results, runs scenarios, detects, responds, serves the dashboard |
-| `cloudattacklab-lab` (the lab) | `lab/docker-compose.lab.yml` | `shopcloud`, `test_container`, `falco` (optional) | The isolated environment that scenarios act on |
-| `cloudattacklab-monitoring` | `monitoring/docker-compose.monitoring.yml` | `loki`, `alloy`, `grafana` | Optional log storage and dashboards |
+| `cloudattacklab` (the platform) | `docker-compose.yml` | Basic mode: `postgres`, `backend`, `frontend`. With the `monitoring` profile also `loki`, `alloy`, `grafana` | Stores results, runs scenarios, detects, responds, serves the dashboard; optionally stores and shows logs |
+| `cloudattacklab-lab` (the lab) | `lab/docker-compose.lab.yml` | `shopcloud`, `test_container`, `falco` (profile `falco`, optional) | The isolated environment that scenarios act on |
 
-The user only starts the platform (and, optionally, the monitoring stack) by hand. The backend starts, stops and resets the lab itself through the Docker socket.
+The user only starts the platform (`scripts/setup.sh`, `scripts/start.sh`, or `docker compose up -d`, with `--profile monitoring` for the monitoring stack) by hand. The backend starts, stops and resets the lab itself through the Docker socket. Until 18 November 2026 the monitoring stack was a third project, `cloudattacklab-monitoring`, with its own compose file; it became a profile so that it needs no separate command set and no `--env-file`.
 
 The backend is one FastAPI application (`backend/app/main.py`) with one Python package per module. Every route is under `/api/v1` (see [the API contract](api-contract.md)). PostgreSQL holds eight tables, created by Alembic migrations in `backend/alembic/`: `labs`, `scenario_runs`, `events`, `alerts` (and the link table `alert_events`), `incidents`, `response_actions`, `audit_log`, and `users`, which exists but is unused because there is no login yet.
 
@@ -37,7 +36,7 @@ flowchart TB
         falco["falco (profile falco)<br/>privileged, reads host /proc"]
     end
 
-    subgraph mon["Project cloudattacklab-monitoring<br/>network cloudattacklab-monitoring_default"]
+    subgraph mon["Project cloudattacklab, profile monitoring<br/>network cloudattacklab_default"]
         loki[("loki<br/>127.0.0.1:3100")]
         alloy["alloy<br/>127.0.0.1:12345"]
         grafana["grafana<br/>127.0.0.1:3000"]
@@ -61,11 +60,25 @@ flowchart TB
 
 Things to notice:
 
-- **The backend and the dashboard use the host's network** (`network_mode: host`). That is how the backend reaches ShopCloud at `127.0.0.1:8081` and Loki at `127.0.0.1:3100`, both published by other Compose projects, without joining their networks. It is also why the platform needs a Linux Docker Engine (native or in WSL 2).
+- **The backend and the dashboard use the host's network** (`network_mode: host`). That is how the backend reaches ShopCloud at `127.0.0.1:8081` (published by the lab project) and Loki at `127.0.0.1:3100` without joining their networks. It is also why the platform needs a Linux Docker Engine (native or in WSL 2).
 - **Inside one Compose project, containers reach each other by service name**: Alloy and Grafana use `http://loki:3100`. From the host network the same Loki is `127.0.0.1:3100`. `127.0.0.1` inside a container on a Compose network means that container itself (see [troubleshooting](troubleshooting.md#containers-cannot-reach-each-other-on-127001)).
 - **Every published port is bound to `127.0.0.1`**, so nothing is reachable from other machines.
 - **The test container has no network at all** (`network_mode: none`), a read-only root, 32 MB of memory and 0.1 CPU. It only runs `sleep`.
 - **Falco** runs only when `FALCO_ENABLED=true` (the backend then adds the Compose profile `falco`). It is privileged; see [safety](safety.md#falco-is-privileged).
+
+### Why the backend still uses host networking
+
+Moving the backend and the dashboard to a bridge network, with service-name URLs, was evaluated for version 1.0 and **not done**. It would make the platform less tied to a Linux Docker Engine, but it touches every path the platform depends on:
+
+| What depends on host networking | What a bridge network would need |
+|---|---|
+| The backend reaches ShopCloud at `127.0.0.1:8081`, and the target check (`SHOPCLOUD_URL` must point into the lab) accepts that | The backend joins the lab's network `cloudattacklab-lab`, which the Lab Manager creates and recreates on start and reset; `SHOPCLOUD_URL` naming a lab container (the target check already accepts that) |
+| The backend reaches Loki at `127.0.0.1:3100` | `LOKI_URL=http://loki:3100` (same project now, so this part is easy) |
+| The backend reaches PostgreSQL at `127.0.0.1:5432` | `POSTGRES_HOST=postgres` |
+| nginx in the dashboard container proxies `/api` to `127.0.0.1:8000` | `frontend/nginx.conf` proxies to `backend:8000`; ports `5173` and `8000` published on `127.0.0.1` |
+| `tools/evaluate.py`, `tools/check_shopcloud.py` and the integration tests call `127.0.0.1` | Unchanged (published ports), but every scenario and response would have to be re-run to validate |
+
+The lab network being created by a different project, after the platform has started, is the hard part: the backend would have to attach itself to it on every lab start and reset. The current setup works and was evaluated on Windows 11 with WSL 2, so it stays the baseline, and Docker Desktop and macOS remain untested (see [known limitations](known-limitations.md)).
 
 ## The modules
 
