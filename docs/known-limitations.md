@@ -15,6 +15,8 @@ These are outside version 1.0, as planned in the project guide (section 2, "Vers
 | Dashboard login and users | Not built (see [No dashboard login](#no-dashboard-login)). A `users` table exists but nothing uses it |
 | `isolate_container` response | Accepted in a scenario file, but requesting it gives 409 `action_not_supported` |
 | PDF export and sharing of reports | Not built. Reports are JSON, shown on a page and downloadable |
+| AI-assisted incident analysis | Not built; planned for version 2. Incidents are explained by the fixed risk-score lines and the evidence timeline only. Nothing in the code calls a language model or any AI service |
+| Attack-chain visualization | Not built; planned for version 2. Each incident has a chronological evidence timeline (run, events, alerts, responses, audit entries), but no graph linking the steps of an attack |
 | Other target applications | Only ShopCloud (and the test container) can be targeted. Adding one needs code (see [adding a scenario](adding-a-scenario.md#what-needs-code)) |
 
 ## Only tested on Windows 11 with WSL 2

@@ -202,7 +202,12 @@ The `backend/tests` and `shopcloud/tests` counts are from 18 November 2026; `pyt
 
 Version 1.0 of the planned workflow is built and was evaluated on 17 November 2026 on one laptop: 54 scenario runs, all `completed`; in the 45 runs measured for detection the expected alert was raised every time; all 30 approved responses were executed, verified and reverted by cleanup. Ten minutes of benign traffic raised one false positive. The [evaluation](docs/evaluation-results.md) explains why these numbers prove less than they seem.
 
-Not part of version 1.0: Kubernetes and cloud (AWS, Azure, GCP) adapters, machine learning, a dashboard login, Prometheus, the `isolate_container` response, PDF export of reports, and AI-assisted analysis. See [known limitations](docs/known-limitations.md).
+### Not in version 1.0
+
+- **Planned for version 2:** AI-assisted incident analysis, and an attack-chain visualization (version 1.0 has a chronological evidence timeline per incident, not a graph of the attack's steps). Neither exists in the code today.
+- **Deferred or out of scope:** Kubernetes and cloud (AWS, Azure, GCP) adapters, machine learning, a dashboard login, Prometheus, the `isolate_container` response, and PDF export of reports.
+
+See [known limitations](docs/known-limitations.md) for each item and why.
 
 ## Safety
 
