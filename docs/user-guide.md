@@ -1,52 +1,64 @@
 # User guide: the dashboard
 
-This guide walks through one full session on the CloudAttackLab dashboard: start the lab, run each of the three scenarios, read an alert and its evidence, open an incident's timeline and risk score, request, approve and verify a response, view and download a report, clean up and reset.
+This guide walks through one full session on the CloudAttackLab dashboard: start the lab, run each of the three attack scenarios, read an alert and its evidence, investigate an incident, request, approve and verify a response, view and download a report, clean up, close an incident and reset the lab.
 
 Before you start, install and start the platform with the [installation guide](install.md). The dashboard is at <http://127.0.0.1:5173>.
 
-**About the screenshots.** They were taken on 17 November 2026 on the test machine. That machine already had runs from earlier testing, so the Alerts and Incidents lists are long, and the lab is called `followup` rather than `default`. On a new installation the lists start empty. The numbers you see (event counts, risk scores, source IP) should match, except the source IP, whose last numbers depend on your Docker network (here `172.22.0.1`).
+**About the screenshots.** They were taken on 19 November 2026 from the running dashboard on the test machine. That machine already had runs from earlier testing, so the lists are long and the lab is called `evaluation` rather than `default`. On a new installation the lists start empty. Event counts and risk scores should match what you see; the source IP (here `172.22.0.1`) depends on your Docker network. Falco was off, so the container scenario shows Docker evidence only.
 
-## The four pages
+## The dashboard at a glance
 
-The buttons at the top switch between four pages:
+The sidebar on the left lists the pages, in four groups:
 
-| Page | What it is for |
-|---|---|
-| **Lab** | The lab's status, its containers, ShopCloud's health, Falco and the telemetry source. Start, Stop, Reset |
-| **Scenarios** | The three scenarios. Run one, watch its status, run its cleanup, open its report |
-| **Alerts** | Every alert, oldest first. Open one to see its evidence and to request a response |
-| **Incidents** | Every incident, newest first, with status and risk score. Open one for its risk explanation, timeline, response and report |
+| Group | Page | What it is for |
+|---|---|---|
+| Operations | **Overview** | Environment health, counts of runs, alerts and incidents, recent activity |
+| | **Labs & Environments** | The lab's status, health and containers. Create a lab; **Start**, **Stop**, **Reset**; **Open ShopCloud** |
+| Simulation | **Attack Scenarios** | The scenario catalogue. Open a scenario to see its definition and checks, run it and follow the run |
+| | **Experiment Runs** | Every run with its status, detection outcome and cleanup. Open a run for its report and **Cleanup** |
+| Detection | **Events & Telemetry** | Every normalized event, with filters. Click a row for the raw record |
+| | **Detection & Alerts** | Every alert, newest first. Click one for its supporting events and response |
+| | **Incidents** | Every incident, newest first. Open one for the investigation workspace |
+| Response | **Response Center** | Every response action by status; approve or reject from here too |
+| | **Reports & Analytics** | Outcomes per scenario, the run history, and each run's report |
 
-The dashboard always works on **the first lab ever created** (the oldest one). The API can create more labs, but the dashboard shows only that one.
+At the bottom of the sidebar are **Settings** (platform information and dashboard preferences) and the backend connection status. The top bar shows:
+
+- **Lab**: the active lab. The dashboard works on one lab at a time; click it to switch if you have more than one. If none is selected, the dashboard picks a running lab, or the first lab.
+- **API**: whether the backend answers.
+- **Notifications** (bell): a run in progress, responses awaiting approval and open incidents.
+
+**What refreshes by itself.** Backend health every 15 seconds, the active lab's status every 20 seconds, the notification counts every 30 seconds, and a run in progress until it finishes. Lists such as alerts and incidents load when you open the page; use **Refresh** to reload them.
 
 ## 1. Start the lab
 
-Open **Lab**. On a new installation the page says "No lab yet."; click **Create lab** (it creates a lab called `default`). Then click **Start**.
+Open **Labs & Environments**. On a new installation the page says "No lab yet": type a name (or leave it empty for `default`) and click **Create lab**. If you used `scripts/setup.sh`, a lab called `default` already exists and is running.
 
-Start runs `docker compose up` for the lab and waits until ShopCloud is healthy, which takes about 9 seconds once the images are built (longer the first time). The page then shows:
+If the lab is not running, click **Start**. The backend starts ShopCloud and the test container and answers once every lab container is healthy. The first start builds ShopCloud's image, so it can take a minute; later starts take seconds.
 
-![The Lab page with a running lab](images/01-lab-running.jpg)
+![The Labs & Environments page with a running lab](images/guide-labs.jpg)
 
-- **Status** `running`. Other values: `stopped`, `degraded` (a lab container is down; the page says which), `starting`, `error`.
-- **Containers**: `shopcloud` (the shop under test) and `test_container` (the target of the container scenario). `falco` appears even when Falco is off, as "exited"; that is normal.
-- **ShopCloud URL**: where the backend sends scenario traffic, and "(inside the lab)" when the safety check accepts it. If it says it is refused, see [safety](safety.md#1-lab-only-targets).
-- **Falco** and **Telemetry source**: the settings from `.env`.
+- **Status** `Running`. Other values: `stopped`, `degraded` (a lab container is down; the page says which), `starting`, `error`.
+- **Health**: Backend API, Lab, ShopCloud (its health check), Containers, Falco, Telemetry source and Target URL. **Target URL** must say **Allowed**; if it is refused, runs are refused too (see [safety](safety.md#1-lab-only-targets)).
+- **Containers**: `shopcloud` (the shop under test) and `test_container` (the target of the container scenario). `falco` appears even when Falco is off, as "exited" with "not used (FALCO_ENABLED=false)"; that is normal.
+- **Open ShopCloud** opens the shop at <http://127.0.0.1:8081>.
 
-**Refresh** reads the status again; the page does not update by itself.
+**Refresh status** reads the lab again. Reading the lab also corrects its stored status, for example after a WSL or Docker restart (see [troubleshooting](troubleshooting.md#the-lab-says-running-after-a-wsl-or-docker-restart)).
 
 ## 2. Run `authentication_abuse` (failed logins)
 
-Open **Scenarios**. It lists the scenarios found in `scenarios/`: the three attack scenarios used below, and *Benign Baseline (observe only)*, which runs no attack and only watches the lab for ten minutes (it is for measuring false positives; see the [evaluation](evaluation-results.md#false-positives)):
+Open **Attack Scenarios**. The catalogue lists the scenarios found in `scenarios/`: the three attack scenarios used below, and *Benign Baseline (observe only)*, which runs no attack and only watches the lab for ten minutes (it is for measuring false positives; see the [evaluation](evaluation-results.md#false-positives)).
 
-![The Scenarios page](images/02-scenarios.jpg)
+![The Attack Scenarios page](images/guide-scenarios.jpg)
 
-Click **Run** next to *Repeated Failed Login Attempts*. The script sends 20 logins for the test account `lab_user` with a deliberately wrong password, one per second. While it runs, the status says `running (updating...)` and every Run button is disabled, because a lab runs one scenario at a time:
+1. Click **Repeated Failed Login Attempts**. A panel opens with the scenario's definition: its script and fixed parameters, the telemetry and detection it expects, its response and its cleanup.
+2. Check **Required environment status**. Every item should have a green tick. The last one, "Test account can log in", is checked by the backend when the run starts.
 
-![A run in progress](images/03-run-running.jpg)
+   ![The scenario panel with its environment checks](images/dashboard-scenario-detail.jpg)
 
-After about 21 seconds the status becomes `completed`, with the script's summary: 20 attempts, 20 answered `401`.
+3. Click **Run scenario**, then **Run scenario** again in the confirmation dialog.
 
-![A completed run](images/04-run-completed.jpg)
+The script sends 20 logins for the test account `lab_user` with a deliberately wrong password, one per second. The **Current execution** panel follows the run through its steps (Pending, Running, then the final status). While it runs, no other run can start, because a lab runs one scenario at a time. After about 21 seconds the status becomes **Completed**, with **Cleanup** and **View report** buttons.
 
 A run can end in four ways:
 
@@ -55,132 +67,156 @@ A run can end in four ways:
 | `completed` | The script finished, the expected evidence was collected (here: at least 10 failed-login events) and no request went unanswered |
 | `incomplete` | The script finished, but some expected evidence is missing or some requests got no answer. The reason is shown. Alerts that were raised are kept |
 | `failed` | The script failed, timed out, or a telemetry source failed. Cleanup runs automatically |
-| `cleaned_up` | Cleanup was run afterwards |
+| `cleaned_up` | Cleanup was run afterwards (shown as **Cleaned Up**) |
 
-## 3. Read the alert and its evidence
+Detection runs once, when the script has finished, over all of the run's events. It is not a real-time stream.
 
-Open **Alerts**. The newest alert is at the **bottom** of the list:
+## 3. Look at the events
 
-![The Alerts list](images/05-alerts-list.jpg)
+Open **Events & Telemetry**. The newest rows are the run's 20 `authentication_failure` events from ShopCloud (source **Application**).
 
-Click **View events** on the newest `repeated_failed_logins` row. Below the list you see:
+![The Events & Telemetry page](images/dashboard-events.jpg)
 
-![An alert with its response panel and evidence](images/06-alert-evidence.jpg)
-
-- The title and the reason it fired: "20 authentication_failure events from source_ip=172.22.0.1 within 20s (threshold 10 in 60s)".
-- A **Response** panel (next section).
-- The **linked events**: every event that counts towards the alert. Each row has its time, source (`application` = ShopCloud's log), type, source IP, and its **evidence**, `raw_event_reference`. For ShopCloud events it is `docker:shopcloud:<request_id>` (or `loki:shopcloud:<request_id>` with Loki): the `request_id` is in ShopCloud's own log line, so you can find the original record with `docker compose -f lab/docker-compose.lab.yml logs shopcloud`.
+- The buttons at the top right choose the time range: 15 min, 1 h, 24 h, 7 d or All.
+- The filters narrow the list by run, event type, source and severity; the search box searches messages, IPs, containers, users and raw records.
+- Click a row to see the event's raw record. The **Raw evidence reference** column links each event to its original record: for ShopCloud events it is `docker:shopcloud:<request_id>` (or `loki:shopcloud:<request_id>` with Loki). The `request_id` is in ShopCloud's own log line, so you can find the original with `docker compose -f lab/docker-compose.lab.yml logs shopcloud`.
 
 Every source IP is the same Docker gateway address. That is a known limitation, explained in [known limitations](known-limitations.md#every-source-ip-is-the-docker-gateway-address).
 
-## 4. Request, approve and verify a response
+## 4. Read the alert and its evidence
 
-In the alert's **Response** panel, click **Request response**. The response comes from the scenario file: for `authentication_abuse` it is `temporary_rate_limit`, at most 5 logins per 60 seconds. Its status is `pending_approval` and nothing has changed in ShopCloud yet:
+Open **Detection & Alerts**. The newest alert is at the top.
 
-![A response waiting for approval](images/07-response-pending.jpg)
+![The Detection & Alerts page](images/guide-alerts-list.jpg)
 
-Click **Approve** (or **Reject**, which leaves ShopCloud untouched). Approving does three things in a row:
+Click the newest **Repeated failed logins from one source** alert. A panel opens with:
 
-1. **Executes** the action: the backend tells ShopCloud to turn the rate limit on.
-2. **Verifies** it: the backend sends 7 logins with a wrong password and expects the ones over the limit to be refused with `429`.
-3. Records the result. Here: "Verified: 2 of 7 follow-up logins were blocked with 429", with every status code ShopCloud answered.
+![An alert with its supporting events](images/dashboard-alert-evidence.jpg)
 
-![A verified response and its audit trail](images/08-response-verified.jpg)
+- The rule and the reason it fired: "20 authentication_failure events from source_ip=172.22.0.1 within 20s (threshold 10 in 60s)".
+- The first and last event, the run and the incident (both are links).
+- **Supporting events**: every event that counts towards the alert, each with its raw evidence reference. Click one for its raw record.
+- Further down, **Related incident and response**, with the same **Response action** panel as on the incident page (next steps), and **Open incident investigation**.
 
-The audit trail under it shows each step, who did it (`anonymous`, because there is no login) and what was sent.
+**Run report** at the top opens the run's report.
 
-While the rate limit is on, **any** login to ShopCloud from this machine may get `429`, including yours with the right password. Cleanup (step 7) or Reset turns it off. See [troubleshooting](troubleshooting.md#a-manual-login-gets-429-after-a-test).
+## 5. Investigate the incident
 
-The same panel appears on the incident page, so you can do this from either place.
+Open **Incidents**. The newest incident is at the top, with its severity, status, risk score and number of alerts. The **All**, **Open** and **Closed** buttons and the severity filter narrow the list.
 
-## 5. Open the incident: risk score and timeline
+![The Incidents page](images/guide-incidents-list.jpg)
 
-Open **Incidents**. The newest incident is at the top:
+Click the newest *Repeated Failed Login Attempts* incident. The investigation page shows:
 
-![The Incidents list](images/09-incidents-list.jpg)
+- At the top, a summary strip: **Execution** (the scenario and its times), **Telemetry** (20 events), **Detection** (1 alert), **Risk** and **Response**.
+- **Attack timeline**: one list, in time order, of the scenario starting, every event behind the alert (the middle ones are folded; click "Show 18 more telemetry events" to unfold them), the alert firing, the incident opening, the scenario finishing, and later every response step and the cleanup. Each line links to its evidence (**open run**, **open event**, **open alert**) and to the API record.
+- The other tabs: **Linked alerts**, **Supporting events** and **Context**.
+- **Risk assessment**: the score with every factor written out.
+- **Response action**: request, approve or reject a response (next step).
 
-Click **View**. The detail opens below the list (scroll down). It starts with the status, the correlation key (what grouped the alerts: the run, the resource and the source IP) and the **risk score** with its explanation:
+The risk score is a simple sum: 40 points for a medium-severity alert, 2 points for each event over the threshold (here 10, so 20 points, the maximum), 5 points for each extra correlated alert, minus 20 while a verified response is still applied. Before any response: 40 + 20 + 0 = 60. It is a rule of thumb for comparing incidents in this lab, not a prediction of loss.
 
-![An incident's risk score and explanation](images/10-incident-risk-score.jpg)
+## 6. Request, approve and verify a response
 
-The score is a simple sum, written out line by line: 40 points for a medium-severity alert, 2 points for each event over the threshold (here 10, so 20 points, the maximum), 5 points for each extra correlated alert, minus 20 while a verified response is still applied. Here: 40 + 20 + 0 − 20 = 40. It is a rule of thumb for comparing incidents in this lab, not a prediction of loss.
+1. In the incident's **Response action** panel, click **Request response**, then **Request response** in the dialog. The response comes from the scenario file: for `authentication_abuse` it is `temporary_rate_limit`, at most 5 login attempts per 60 seconds. Its status is **Pending Approval** and nothing has changed in ShopCloud yet.
 
-Further down are the **linked alerts** and the **timeline**: one list, in time order, of the scenario starting, every event behind the alert, the alert firing, the scenario finishing, every response step and the cleanup. Each line links to its evidence (the run, the event with its `raw_event_reference`, the alert, the response or the audit rows):
+   ![An incident with a response waiting for approval](images/dashboard-incident-pending-approval.jpg)
 
-![The incident timeline](images/11-incident-timeline.jpg)
+2. Click **Approve**, then **Approve and execute** in the dialog. (**Reject** leaves ShopCloud untouched.) Approving does three things in a row:
+   1. **Executes** the action: the backend tells ShopCloud to turn the rate limit on.
+   2. **Verifies** it: the backend sends 7 logins with a wrong password and expects the ones over the limit to be refused with `429`.
+   3. Records the result. Here: "Verified: 2 of 7 follow-up logins were blocked with 429", with every status code ShopCloud answered.
 
-## 6. View and download the report
+   The panel shows **Verified** and **Passed**, the timeline gains the response steps, and the risk score drops from 60 to 40.
 
-Click **View report** on the incident (or on the run, on the Scenarios page). The report shows, for one run: the lab and scenario, the run's times and parameters, what the script reported, the telemetry expected next to what was collected, the alerts with the time from the threshold-crossing event to the alert, the incident and risk score, the response and its verification, and the cleanup status.
+   ![An incident with a verified response](images/dashboard-incident-verified.jpg)
 
-![The run report](images/12-run-report.jpg)
+**Audit trail** at the bottom of the panel shows each step, who did it (`anonymous`, because there is no login) and what was sent.
 
-**Download as JSON** saves the same report as `report-<scenario>-<run id>.json`. The same JSON is available from the API:
+You can do the same from the alert's panel (step 4) or from **Response Center**, which lists every response by status (**Pending approval**, **Approved**, **Executed**, **Verified**, **Failed**, **Rejected**, **Reverted**). Click a row there to open its response panel.
+
+![The Response Center](images/guide-response-center.jpg)
+
+While the rate limit is on, **any** login to ShopCloud from this machine may get `429`, including yours with the right password. Cleanup (step 8) or Reset turns it off. See [troubleshooting](troubleshooting.md#a-manual-login-gets-429-after-a-test).
+
+## 7. View and download the report
+
+Click **View report** on the incident, **Run report** on an alert, or a run on **Experiment Runs** or **Reports & Analytics**. The report shows, for one run: the execution steps and times, the lab and scenario, the run's parameters, what the script reported, the telemetry expected next to what was collected, the alerts with the time from the threshold-crossing event to the alert, the incident and risk score, the response and its verification, and the cleanup status.
+
+![A run report](images/dashboard-run-report.jpg)
+
+**Download JSON** saves the same report as `report-<scenario>-<run id>.json`. The same JSON is available from the API:
 
 ```bash
 curl -s http://127.0.0.1:8000/api/v1/runs/<run id>/report
 ```
 
-(Run on the test machine with the run id from the screenshot; it returned the 3.7 KB report. The **Download as JSON** button itself was not clicked during this check.)
+The **PDF** and **CSV** buttons are disabled: the backend only produces JSON reports. **Back** returns to the page you came from.
 
-**Back** returns to the page you came from.
+## 8. Clean up
 
-## 7. Clean up
+Open the run (from **Experiment Runs**, or from **Current execution** on **Attack Scenarios** while you are still on that page) and click **Cleanup**, then **Run cleanup** in the dialog. For `authentication_abuse` it runs the scenario's two cleanup steps, `disable_rate_limit` and `reset_target_state`: the rate limit goes off and ShopCloud's data and sessions go back to their starting state. The run becomes **Cleaned Up**.
 
-Go back to **Scenarios**. The last run is still shown. Click **Cleanup**. For `authentication_abuse` it runs the scenario's two cleanup steps, `disable_rate_limit` and `reset_target_state`: the rate limit goes off and ShopCloud's data and sessions go back to their starting state. The run becomes `cleaned_up`:
-
-![A cleaned-up run](images/13-cleaned-up.jpg)
-
-The response becomes `reverted`, and the incident's risk score goes back up to 60, because the response no longer protects anything. The explanation says so.
+The response becomes **Reverted**, and the incident's risk score goes back up to 60, because the response no longer protects anything. The risk explanation says so.
 
 Cleanup is refused while any run in the lab is still active.
 
-## 8. Run `unauthorized_resource_access` (denied access)
+**Experiment Runs** lists every run with its status, detection outcome and cleanup:
 
-Click **Run** next to *Unauthorized Resource Access*. The script signs in as `lab_restricted`, a user who may not read orders, and asks for `GET /api/orders` 8 times. All 8 must be refused with `403`. After about 8 seconds the run is `completed`, and because this scenario has no response action, the engine checks once more after the run and reports it in plain words: "Verification passed: access is still denied".
+![The Experiment Runs page](images/guide-runs.jpg)
 
-![The second scenario, completed](images/14-unauthorized-access-completed.jpg)
+## 9. Run `unauthorized_resource_access` (denied access)
 
-On **Alerts**, the new alert is `repeated_access_denied` with 8 events. The incident's risk score is 46: 40 for a medium alert plus 2 × 3 events over the threshold of 5. If any request had been allowed, the run would end `failed` with `"access_control_failed": true`.
+On **Attack Scenarios**, open **Unauthorized Resource Access** and click **Run scenario**, then confirm. The script signs in as `lab_restricted`, a user who may not read orders, and asks for `GET /api/orders` 8 times. All 8 must be refused with `403`.
 
-Click **Cleanup** when you are done (`reset_target_state`).
+After about 8 seconds the run is **Completed**. Because this scenario has no response action, the engine checks once more after the run and reports it in plain words: "Verification passed: access is still denied (GET /api/orders as lab_restricted returned 403)".
 
-## 9. Run `suspicious_container_activity` (a shell in a container)
+![The access scenario's run report](images/guide-access-run-report.jpg)
+
+On **Detection & Alerts**, the new alert is `repeated_access_denied` with 8 events. The incident's risk score is 46: 40 for a medium alert plus 2 × 3 events over the threshold of 5. If any request had been allowed, the run would end `failed` with `"access_control_failed": true`.
+
+Run **Cleanup** when you are done (`reset_target_state`).
+
+## 10. Run `suspicious_container_activity` (a shell in a container)
 
 This scenario runs one fixed, harmless command, `sh -c "id; : cloudattacklab-scenario-marker"`, inside the lab's test container, the way an intruder would start a shell. Docker reports it as an `exec_start` event, and Falco, when it is on, reports it too.
 
-The screenshots below were taken with Falco on (see [install, step 10](install.md#10-turn-falco-on-optional)). Click **Run** next to *Suspicious Container Activity*. It completes in about 3 seconds and shows the command and its output:
+1. On **Attack Scenarios**, open **Suspicious Container Activity**, click **Run scenario** and confirm. It completes in about 3 seconds. The run report's "What the script reported" section shows the command and its output.
+2. On **Detection & Alerts**, open the new **Suspicious process in the test container** alert (rule `suspicious_container_process`, severity **High**). With Falco off, as here, it holds one event, from Docker. With Falco on ([install, step 10](install.md#10-turn-falco-on-optional)) it holds two: one from Docker and one from Falco, whose rule is "CloudAttackLab marker process in test container".
 
-![The container scenario, completed](images/17-container-run-completed.jpg)
+   ![The container alert with its Docker evidence](images/guide-container-alert.jpg)
 
-On **Alerts**, the new `suspicious_container_process` alert (severity `high`) holds **two** events: one from Docker and one from Falco, whose rule is "CloudAttackLab marker process in test container". With Falco off it holds only the Docker event.
+3. Open the incident, click **Request response** and confirm, then **Approve** and **Approve and execute**. The response here is `stop_container`: the backend stops the test container (and refuses any other container), then inspects it to confirm it is no longer running: "Verified: the test container cloudattacklab-lab-test_container-1 is no longer running".
 
-![The container alert with Docker and Falco evidence](images/18-container-alert-falco.jpg)
+   ![stop_container verified](images/guide-stop-container-verified.jpg)
 
-Click **Request response**, then **Approve**. The response here is `stop_container`: the backend stops the test container (and refuses any other container), then inspects it to confirm it is no longer running:
+4. Run **Cleanup** for the run. Its step `recreate_test_container` creates a fresh test container, and the response becomes **Reverted**.
 
-![stop_container verified](images/19-stop-container-verified.jpg)
+The incident's risk score is 60 with Docker evidence only (60 for a high-severity alert) and 62 with Falco on (Falco's extra event adds 2). While `stop_container` is applied it is 20 lower.
 
-Then click **Cleanup** on the Scenarios page. Its step `recreate_test_container` creates a fresh test container, and the response becomes `reverted`.
+## 11. Close incidents
 
-## 10. Close incidents
+On an incident's page, **Close incident** (then **Close incident** in the dialog) marks it **Closed**. A closed incident takes no new response, and closing is refused while one of its responses is still waiting for approval. Closing is recorded in the audit log.
 
-On an incident's detail, **Close incident** marks it `closed`. A closed incident takes no new response, and closing is refused while one of its responses is still waiting for approval. Closing is recorded in the audit log and at the end of the timeline.
+On **Incidents**, use **Open** and **Closed** to see each group.
 
-After the three scenarios and their cleanups, the Incidents page shows one incident per run: 60 for the login one (its response was reverted), 46 for the access one, and 62 for the container one (60 with Docker events only; Falco's extra event adds 2). Here the newest one has just been closed:
+## 12. Reset the lab
 
-![Incidents after the three runs](images/20-incidents-after-cleanup.jpg)
+**Reset** on **Labs & Environments** (then **Reset lab** in the dialog) recreates every lab container and calls ShopCloud's own reset, so the lab is back at its starting point: original data, no sessions, rate limit off, a fresh test container (and Falco, if it is on). It also reverts any response that is still applied. Use it whenever you are not sure what state the lab is in, after changing `FALCO_ENABLED`, or when the lab is `degraded`.
 
-## 11. Reset the lab
+Reset is disabled while a run is active, and takes a few seconds.
 
-**Reset** on the Lab page recreates every lab container and calls ShopCloud's own reset, so the lab is back at its starting point: original data, no sessions, rate limit off, a fresh test container (and Falco, if it is on). It also reverts any response that is still applied. Use it whenever you are not sure what state the lab is in, after changing `FALCO_ENABLED`, or when the page says `degraded`.
+**Stop** stops the lab's containers but keeps them and their logs. Nothing in the database is deleted by Stop, Reset or Cleanup: runs, alerts, incidents, reports and the audit log stay. Only `scripts/reset.sh` deletes the database (see the [README](../README.md#stopping-and-resetting)).
 
-Reset is refused while a run is active (the button is disabled), and takes about 9 seconds.
+## Reports & Analytics
 
-**Stop** stops the lab's containers but keeps them and their logs. Nothing in the database is deleted by Stop, Reset or Cleanup: runs, alerts, incidents and the audit log stay.
+**Reports & Analytics** summarizes every recorded run: how many runs raised an alert, observation-run alerts (false positives), runs cleaned up, outcomes and alerts per scenario, and the full experiment history. Click a run in the history to open its report.
+
+![The Reports & Analytics page](images/guide-reports.jpg)
 
 ## What the dashboard does not do
 
 - There is no login. Anyone who can open `127.0.0.1:5173` on this machine can run scenarios and approve responses. See [known limitations](known-limitations.md#no-dashboard-login).
-- Pages do not refresh by themselves, except the status of a run in progress. Use **Refresh**.
-- Reports are JSON only: no PDF and no sharing.
+- Most lists do not refresh by themselves; use **Refresh**. See "What refreshes by itself" above.
+- Reports are JSON only: no PDF, no CSV and no sharing. **Settings** lists these as not implemented.
+- Backend settings come from `.env` and cannot be changed in the dashboard.
