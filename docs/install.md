@@ -28,7 +28,7 @@ What that fresh-clone check did **not** cover: installing WSL and Docker (§2; D
 | CPU | A modern Intel Core i5 / AMD Ryzen 5 class processor or better |
 | RAM | 16 GB recommended for development and a modest local lab |
 | Disk | At least 30–50 GB free for images, dependencies, the database and logs; more as images and logs grow |
-| Operating system | Linux, macOS, or Windows 11 with WSL 2, with Docker Desktop or Docker Engine |
+| Operating system | The project guide names Linux, macOS and Windows 11 with WSL 2. Version 1.0 supports only Linux Docker Engine inside Ubuntu on WSL 2 (see below) |
 | Network | Internet for the first downloads only. Scenarios only ever talk to the local lab |
 
 ### Supported setup for version 1.0
@@ -43,7 +43,9 @@ What that fresh-clone check did **not** cover: installing WSL and Docker (§2; D
 
 ### What was actually tested
 
-Only one setup has been tested: **Windows 11 with Docker Engine inside WSL 2**. Linux, macOS and Docker Desktop have not been tried. The platform should work on a native Linux Docker Engine for the same reasons it works in WSL 2, but nobody has checked. On macOS and on Docker Desktop, the backend and dashboard use host networking (`network_mode: host`), which Docker Desktop only supports when you turn it on, so expect to do some work there.
+Only one setup has been tested: **Windows 11 with Docker Engine inside WSL 2**. Linux, macOS and Docker Desktop have not been tried. The platform should work on a native Linux Docker Engine for the same reasons it works in WSL 2, but nobody has checked.
+
+**Why only Linux Docker Engine: host networking.** The backend and the dashboard run with `network_mode: host`. The backend reaches ShopCloud at `127.0.0.1:8081` and Loki at `127.0.0.1:3100`, ports that the lab and monitoring projects publish on the Docker host, and the dashboard serves on the host's port 5173. That relies on the containers sharing the network of a Linux Docker host, which is what Docker Engine inside WSL 2 gives you (and WSL 2 forwards those `127.0.0.1` ports to Windows). Docker Desktop on Windows or macOS runs containers in its own VM and supports host networking only as an opt-in setting; that has not been tested, so it is not supported in version 1.0. Moving the backend to a bridge network is planned for a later version; [architecture](architecture.md#why-the-backend-still-uses-host-networking) lists what it would involve.
 
 | Item | The test machine |
 |---|---|

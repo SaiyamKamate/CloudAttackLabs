@@ -71,6 +71,8 @@ The [architecture guide](docs/architecture.md) covers the modules, the networks 
 | Hardware | 16 GB RAM recommended (the platform and lab use about 190 MiB, about 810 MiB with monitoring and Falco); 30–50 GB free disk |
 | Ports (all on `127.0.0.1`) | 5173 dashboard, 8000 API, 5432 PostgreSQL, 8081 ShopCloud; with monitoring 3000 Grafana, 3100 Loki, 12345 Alloy |
 
+**The supported setup is Linux Docker Engine running inside Ubuntu on WSL 2.** The reason is host networking: the backend and the dashboard run with `network_mode: host`, so the backend reaches ShopCloud (`127.0.0.1:8081`) and Loki (`127.0.0.1:3100`) through ports published on the Docker host. This only works as intended where the containers share the network of a Linux Docker host. Docker Desktop (Windows or macOS) runs containers in its own VM and supports host networking only as an opt-in feature, which has not been tested. Moving to a bridge network is planned for after version 1.0; the [architecture guide](docs/architecture.md#why-the-backend-still-uses-host-networking) lists what that change involves.
+
 ## Installation
 
 Run every command **inside Ubuntu (WSL)**, not in PowerShell.
