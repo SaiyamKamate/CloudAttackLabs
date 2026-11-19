@@ -23,6 +23,9 @@ from .target import TargetClient, TargetError, TargetHealth
 from .target_guard import TargetGuard, TargetUrlCheck
 
 ACTIVE = (LabStatus.starting.value, LabStatus.running.value, LabStatus.degraded.value)
+# labs.environment of a registered target's lab (targets/service.py). Its application
+# runs outside CloudAttackLab: the Lab Manager never starts, stops or resets it.
+EXTERNAL = "external"
 # A scenario run that has not finished yet.
 ACTIVE_RUN = (RunStatus.pending.value, RunStatus.running.value)
 
@@ -46,6 +49,16 @@ def refuse_while_run_active(session: Session, lab_id: uuid.UUID, what: str, why:
             f"Run {run.id} ({run.scenario_id}) is {run.status} in this lab. {what} is refused until it "
             f"finishes, because {why}.",
         )
+
+def _refuse_external(lab: Lab, what: str) -> None:
+    if lab.environment == EXTERNAL:
+        raise ApiError(
+            409,
+            "external_lab",
+            f"Lab '{lab.name}' belongs to a registered target that runs outside CloudAttackLab; "
+            f"it cannot be {what} from here. Use Target Management.",
+        )
+
 
 # One start/stop/reset at a time (single backend process).
 _operation_lock = threading.Lock()
@@ -110,6 +123,11 @@ class LabManager:
 
     def details(self, lab_id: uuid.UUID) -> tuple[Lab, list[ContainerStatus], TargetHealth]:
         lab = self.get(lab_id)
+        if lab.environment == EXTERNAL:
+            self.status_detail = "Managed outside CloudAttackLab; see Target Management."
+            return lab, [], TargetHealth(
+                reachable=False, healthy=False, error="external target: check it in Target Management"
+            )
         other = self._other_active_lab(lab)
         if other is not None:
             # The physical lab currently belongs to another lab row; do not report its containers as ours.
@@ -193,6 +211,7 @@ class LabManager:
     # --- start / stop / reset ---------------------------------------------
     def start(self, lab_id: uuid.UUID) -> Lab:
         lab = self.get(lab_id)
+        _refuse_external(lab, "started")
         self._require_target_url(lab)
         with _exclusive():
             other = self._other_active_lab(lab)
@@ -212,6 +231,7 @@ class LabManager:
 
     def stop(self, lab_id: uuid.UUID) -> Lab:
         lab = self.get(lab_id)
+        _refuse_external(lab, "stopped")
         with _exclusive():
             if lab.status in (LabStatus.created.value, LabStatus.stopped.value):
                 raise ApiError(409, "lab_not_running", f"Lab '{lab.name}' is {lab.status}; there is nothing to stop.")
@@ -226,6 +246,7 @@ class LabManager:
 
     def reset(self, lab_id: uuid.UUID) -> Lab:
         lab = self.get(lab_id)
+        _refuse_external(lab, "reset")
         with _exclusive():
             # A degraded lab may be reset: that is how it is brought back.
             if lab.status not in (LabStatus.running.value, LabStatus.degraded.value):
@@ -252,6 +273,8 @@ class LabManager:
 
     # --- the target URL ---------------------------------------------------
     def target_url_check(self, lab: Lab) -> TargetUrlCheck:
+        if lab.environment == EXTERNAL:
+            return TargetUrlCheck(lab.target, "", False, "External target: its URL is checked in Target Management.")
         if self.guard is None:
             return TargetUrlCheck(lab.target, "", True)
         return self.guard.check(lab.target)
@@ -266,7 +289,10 @@ class LabManager:
         return self.target_clients[lab.target]
 
     def _other_active_lab(self, lab: Lab) -> Optional[Lab]:
-        return self.session.scalars(select(Lab).where(Lab.id != lab.id, Lab.status.in_(ACTIVE))).first()
+        # Only the one physical (Docker) lab is shared; external targets run elsewhere.
+        return self.session.scalars(
+            select(Lab).where(Lab.id != lab.id, Lab.status.in_(ACTIVE), Lab.environment != EXTERNAL)
+        ).first()
 
     def _finish(
         self, lab: Lab, action: str, status: LabStatus, previous: str, *, error: Optional[str] = None

@@ -70,7 +70,7 @@ ORDERS = [
 
 
 class Database:
-    def __init__(self, path: str | Path) -> None:
+    def __init__(self, path: str | Path, *, reset_on_start: bool = True) -> None:
         self.path = str(path)
         if self.path != ":memory:":
             Path(self.path).parent.mkdir(parents=True, exist_ok=True)
@@ -79,7 +79,10 @@ class Database:
         self._seed_accounts = [(i, u, hash_password(p), r) for i, u, p, r in ACCOUNTS]
         with self.connect() as conn:
             conn.executescript(SCHEMA)
-        self.reset()
+            empty = conn.execute("SELECT COUNT(*) FROM products").fetchone()[0] == 0
+        # Seed a new database; restore the baseline at start only when asked to (the default).
+        if reset_on_start or empty:
+            self.reset()
 
     @contextmanager
     def connect(self) -> Iterator[sqlite3.Connection]:

@@ -187,6 +187,71 @@ class ResponseAction(Base):
     incident: Mapped[Incident] = relationship(back_populates="responses")
 
 
+class TargetStatus(str, Enum):
+    registered = "registered"   # stored; nothing has been sent to it yet
+    verified = "verified"       # /health answered and the integration handshake proved the key
+    disabled = "disabled"
+
+
+class AuthorizationStatus(str, Enum):
+    active = "active"
+    revoked = "revoked"
+    expired = "expired"         # computed when read: an active row whose expires_at has passed
+
+
+class Target(Base):
+    """An application registered by URL (V1: kind "shopcloud" only), run outside CloudAttackLab.
+
+    Registering one also creates its lab row (environment "external"), which holds
+    its runs, events, alerts and incidents like any other lab.
+    """
+
+    __tablename__ = "targets"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    name: Mapped[str] = mapped_column(String(64), unique=True)
+    kind: Mapped[str] = mapped_column(String(32))
+    base_url: Mapped[str] = mapped_column(String(300))       # normalized, built from the pinned address
+    resolved_ip: Mapped[str] = mapped_column(String(45))     # the address the URL policy approved
+    port: Mapped[int] = mapped_column(Integer)
+    integration_key: Mapped[str] = mapped_column(Text)       # write-only through the API
+    control_token: Mapped[str] = mapped_column(Text)         # write-only through the API
+    status: Mapped[str] = mapped_column(String(20), default=TargetStatus.registered.value)
+    instance_id: Mapped[Optional[str]] = mapped_column(String(64))
+    app_version: Mapped[Optional[str]] = mapped_column(String(32))
+    capabilities: Mapped[Optional[list[str]]] = mapped_column(JSON)
+    verified_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    telemetry_verified_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    lab_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("labs.id"), unique=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+    lab: Mapped[Lab] = relationship()
+    authorizations: Mapped[list["TargetAuthorization"]] = relationship(
+        back_populates="target", order_by="TargetAuthorization.created_at"
+    )
+
+
+class TargetAuthorization(Base):
+    """Explicit, scoped and time-boxed permission to run scenarios against a target."""
+
+    __tablename__ = "target_authorizations"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    target_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("targets.id"))
+    scenario_ids: Mapped[list[str]] = mapped_column(JSON)
+    status: Mapped[str] = mapped_column(String(20), default=AuthorizationStatus.active.value)
+    authorized_by: Mapped[str] = mapped_column(String(64))
+    acknowledgement: Mapped[str] = mapped_column(Text)
+    max_runs: Mapped[int] = mapped_column(Integer, default=3)
+    runs_used: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    revoked_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+
+    target: Mapped[Target] = relationship(back_populates="authorizations")
+
+
 class AuditLog(Base):
     """Scenario runs, approvals, response actions and cleanup (guide section 13)."""
 
@@ -202,3 +267,4 @@ class AuditLog(Base):
 
 
 Index("ix_events_type_time", Event.event_type, Event.timestamp)
+Index("ix_target_authorizations_lookup", TargetAuthorization.target_id, TargetAuthorization.status)

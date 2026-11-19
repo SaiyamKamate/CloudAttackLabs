@@ -59,6 +59,12 @@ class Settings:
     # records stops growing or this timeout passes.
     loki_settle_interval_seconds: float
     loki_settle_timeout_seconds: float
+    # Registered (external) targets: which addresses and ports may be registered,
+    # and how long one authorization may last (targets/url_policy.py, targets/service.py).
+    target_allowed_cidrs: tuple[str, ...] = ("127.0.0.0/8",)
+    target_allowed_ports: tuple[int, ...] = (8090,)
+    target_authorization_max_minutes: int = 60
+    integration_timeout_seconds: float = 5
 
 
 TELEMETRY_SOURCES = ("docker", "loki")
@@ -118,7 +124,15 @@ def get_settings() -> Settings:
         loki_url=os.environ.get("LOKI_URL", "http://127.0.0.1:3100").rstrip("/"),
         loki_settle_interval_seconds=float(os.environ.get("LOKI_SETTLE_INTERVAL_SECONDS", "2")),
         loki_settle_timeout_seconds=float(os.environ.get("LOKI_SETTLE_TIMEOUT_SECONDS", "20")),
+        target_allowed_cidrs=_csv("TARGET_ALLOWED_CIDRS", "127.0.0.0/8"),
+        target_allowed_ports=tuple(int(p) for p in _csv("TARGET_ALLOWED_PORTS", "8090")),
+        target_authorization_max_minutes=int(os.environ.get("TARGET_AUTHORIZATION_MAX_MINUTES", "60")),
+        integration_timeout_seconds=float(os.environ.get("INTEGRATION_TIMEOUT_SECONDS", "5")),
     )
+
+
+def _csv(name: str, default: str) -> tuple[str, ...]:
+    return tuple(part.strip() for part in os.environ.get(name, default).split(",") if part.strip())
 
 
 def _telemetry_source() -> str:

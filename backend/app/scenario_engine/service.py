@@ -122,6 +122,14 @@ class ScenarioService:
         if lab is None:
             raise ApiError(404, "lab_not_found", f"No lab with id {lab_id}.")
         scenario = self.engine.get(scenario_id)  # 404 if not a valid scenario
+        if lab.environment == "external":
+            # Fail closed until runs against registered targets (target resolution,
+            # authorization check, integration telemetry) are wired in.
+            raise ApiError(
+                409,
+                "external_runs_not_enabled",
+                f"Lab '{lab.name}' belongs to a registered target; runs against registered targets are not enabled yet.",
+            )
 
         # Refuse (409) if the lab is not running or the target is not one of the lab's targets.
         is_container = scenario.type == "container"

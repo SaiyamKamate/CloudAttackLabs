@@ -2,3 +2,7 @@ tests
 data
 **/__pycache__
 **/*.pyc
+.env
+.env.example
+docker-compose.yml
+README.md
