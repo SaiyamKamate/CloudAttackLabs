@@ -166,7 +166,7 @@ The [architecture guide](docs/architecture.md) covers the modules, networks, eve
 | Not supported | Docker Desktop (the backend uses host networking), macOS, native Windows |
 | Memory | 16 GB RAM recommended. The platform and lab use about 190 MiB, about 810 MiB with monitoring and Falco |
 | Disk | 30–50 GB free |
-| Tools | `git`, `curl` and `python3` inside Ubuntu (the setup script checks for them) |
+| Tools | `git`, `curl` and `python3` inside Ubuntu (the setup script checks for `curl` and `python3`) |
 
 Ports used (all bound to `127.0.0.1`; they must be free):
 
@@ -204,7 +204,13 @@ Close and reopen Ubuntu, then check that this works **without** `sudo`:
 docker compose version
 ```
 
-**2. Clone the repository.**
+If Docker later reports that the daemon is not running (this happens when your WSL setup does not use systemd), start it with:
+
+```bash
+sudo service docker start
+```
+
+**2. Clone the repository.** By default this clones into your Linux home directory. You can also clone onto a Windows drive, which Ubuntu sees as `/mnt/d/...` (for `D:\`); that works too, with one caveat for frontend development described in [troubleshooting](docs/troubleshooting.md#vite-does-not-notice-saved-files-on-a-windows-drive).
 
 ```bash
 git clone https://github.com/SaiyamKamate/CloudAttackLabs.git
@@ -317,7 +323,7 @@ This walkthrough uses the `authentication_abuse` scenario (repeated failed login
 6. **Investigate the incident.** Open **Incidents** and click the newest incident. The **Attack timeline** tab shows the run from scenario start to incident; **Risk assessment** explains the score.
 7. **Request a response.** In the incident's **Response action** panel, click **Request response** and confirm. The response `temporary_rate_limit` is created with status **Pending Approval**. Nothing has changed in the lab yet.
 8. **Approve and verify.** Click **Approve**, then **Approve and execute**. The backend turns on ShopCloud's login rate limit and verifies it by sending follow-up logins. The panel shows **Verified** and **Passed**, and the risk score drops by 20.
-9. **Clean up.** Open **Experiment Runs**, open the run, and click **Cleanup**, then **Run cleanup**. This turns the rate limit off, resets ShopCloud's state and marks the response as reverted.
+9. **Clean up.** Open **Experiment Runs**, open the run, and click **Cleanup**, then **Run cleanup**. This turns the rate limit off, resets ShopCloud's state and marks the response as reverted. Because the response is no longer applied, the incident's risk score goes back up by 20.
 
 The run report (**Experiment Runs**, or **Reports & Analytics**) can be downloaded as JSON with **Download JSON**. The [user guide](docs/user-guide.md) covers the other scenarios, closing incidents and resetting the lab.
 
@@ -327,10 +333,12 @@ CloudAttackLab has two modes. The core workflow (scenarios, telemetry, detection
 
 | | Basic mode (default) | Full monitoring mode |
 |---|---|---|
-| Start | `scripts/start.sh` or `docker compose up -d` | `scripts/start.sh --monitoring` or `docker compose --profile monitoring up -d` |
+| Start | `scripts/start.sh --lab` | `scripts/start.sh --monitoring --lab` |
 | Services | PostgreSQL, backend, dashboard; the lab (ShopCloud, test container) | The same, plus Loki, Alloy and Grafana |
 | Where telemetry comes from | Docker (`TELEMETRY_SOURCE=docker`) | Docker, or Loki with `TELEMETRY_SOURCE=loki` |
 | Needs | Nothing beyond `.env` | `GF_SECURITY_ADMIN_PASSWORD` in `.env` |
+
+Without the scripts, `docker compose up -d` (basic) or `docker compose --profile monitoring up -d` (full) start the platform only; start the lab from the **Labs & Environments** page.
 
 The roles of the monitoring services:
 
@@ -362,7 +370,7 @@ There are three different operations. Only the last one deletes data.
 scripts/stop.sh
 ```
 
-Stops the lab, the monitoring stack and the platform. Containers are stopped, not removed; the database, your `.env` and the built images stay. Start again with `scripts/start.sh`.
+Stops the lab, the monitoring stack and the platform. Containers are stopped, not removed; the database, your `.env` and the built images stay. Start again with `scripts/start.sh --lab` (add `--monitoring` if you use it).
 
 **Reset the lab** (keeps history): the **Reset** button on the **Labs & Environments** page recreates the lab's containers, resets ShopCloud's state and reverts applied responses. Incidents and reports are kept.
 
