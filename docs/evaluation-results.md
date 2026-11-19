@@ -253,7 +253,7 @@ CPU % is Docker's figure, where 100% is one full CPU. Per sample, the containers
 
 `tools/evaluate.py` measures the platform through its API only (project guide section 14: run success, detection rate, false positives, detection latency, correlation, response and verification, lab setup time, resource use).
 
-From the `cloudattacklab/` folder, where the `docker` CLI works (here: inside WSL), with the platform images built and nothing else using the lab:
+From the repository root (the `cloudattacklab/` folder at the time of this evaluation), where the `docker` CLI works (here: inside WSL), with the platform images built and nothing else using the lab:
 
 ```bash
 python3 tools/evaluate.py                    # full plan, about 35 minutes

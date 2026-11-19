@@ -1,0 +1,162 @@
+# CloudAttackLab: one Compose project, two modes.
+#
+#   Basic mode (the default): PostgreSQL, the backend and the dashboard.
+#     docker compose up -d --build                         # then open http://127.0.0.1:5173
+#   Full monitoring mode: the same, plus Loki, Alloy and Grafana.
+#     docker compose --profile monitoring up -d --build    # Grafana on http://127.0.0.1:3000
+#   (or set COMPOSE_PROFILES=monitoring in .env to make it the default.)
+#
+# The lab itself (ShopCloud, the test container and, with FALCO_ENABLED=true,
+# Falco) is a separate project, lab/docker-compose.lab.yml, which the backend's
+# Lab Manager starts, stops and resets through the Docker socket. You do not
+# start it by hand.
+#
+# Settings come from .env (scripts/setup.sh creates it, or copy .env.example).
+# The defaults below are published in this repository and are for a local lab on
+# 127.0.0.1 only; the backend logs a warning at startup while the default lab
+# token or database password is in use.
+name: cloudattacklab
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-cloudattacklab}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-locally}
+      POSTGRES_DB: ${POSTGRES_DB:-cloudattacklab}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    mem_limit: 512m
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build: ./backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # Host networking: the lab publishes ShopCloud on the host's 127.0.0.1 only,
+    # and this is how the backend reaches it without joining the lab network.
+    # The API listens on 127.0.0.1:8000 (this machine only).
+    network_mode: host
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-cloudattacklab}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-locally}
+      POSTGRES_DB: ${POSTGRES_DB:-cloudattacklab}
+      POSTGRES_HOST: 127.0.0.1
+      POSTGRES_PORT: 5432
+      LAB_CONTROL_TOKEN: ${LAB_CONTROL_TOKEN:-lab-dev-token}
+      LAB_COMPOSE_FILE: /workspace/lab/docker-compose.lab.yml
+      SHOPCLOUD_URL: ${SHOPCLOUD_URL:-http://127.0.0.1:8081}
+      # The Scenario Engine loads these and runs the scenario scripts in-process.
+      SCENARIOS_DIR: /workspace/scenarios
+      SCENARIO_SCRIPTS_DIR: /workspace/scenarios/scripts
+      # Detection rules.
+      RULES_DIR: /workspace/rules
+      # Telemetry: docker (default) or loki. Loki runs with the `monitoring`
+      # profile and publishes 127.0.0.1:3100 on the host; with host networking
+      # the backend reaches it there, like ShopCloud on 8081.
+      TELEMETRY_SOURCE: ${TELEMETRY_SOURCE:-docker}
+      LOKI_URL: ${LOKI_URL:-http://127.0.0.1:3100}
+      # Run Falco in the lab (privileged; see README). Off by default.
+      FALCO_ENABLED: ${FALCO_ENABLED:-false}
+      BACKEND_HOST: 127.0.0.1
+      BACKEND_PORT: ${BACKEND_PORT:-8000}
+    volumes:
+      # The Lab Manager's Docker adapter drives the host's Docker through this socket.
+      - /var/run/docker.sock:/var/run/docker.sock
+      # The lab definition and its build context, read-only.
+      - ./lab:/workspace/lab:ro
+      - ./shopcloud:/workspace/shopcloud:ro
+      - ./mock_shopcloud:/workspace/mock_shopcloud:ro
+      # Scenario definitions and their scripts, read-only.
+      - ./scenarios:/workspace/scenarios:ro
+      # Detection rules, read-only.
+      - ./rules:/workspace/rules:ro
+    mem_limit: 512m
+    healthcheck:
+      test: ["CMD", "python", "-c", "import os, urllib.request; urllib.request.urlopen('http://127.0.0.1:' + os.environ['BACKEND_PORT'] + '/api/v1/health', timeout=2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  frontend:
+    build: ./frontend
+    depends_on:
+      backend:
+        condition: service_healthy
+    # Host networking so nginx reaches the backend on 127.0.0.1:8000 and serves
+    # the dashboard on 127.0.0.1:5173 (this machine only).
+    network_mode: host
+    mem_limit: 256m
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:5173/"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # --- Optional monitoring stack (profile: monitoring) -----------------------
+  # Not needed to run scenarios, detect or respond: with TELEMETRY_SOURCE=docker
+  # (the default) the backend reads ShopCloud's logs straight from Docker.
+  # Containers here reach each other by service name (http://loki:3100); the
+  # backend, on the host network, uses the published 127.0.0.1:3100.
+  # These services keep no volumes: their data lasts as long as the container.
+  loki:
+    image: grafana/loki:3.7.8
+    profiles: ["monitoring"]
+    command: -config.file=/etc/loki/local-config.yaml
+    ports:
+      - "127.0.0.1:3100:3100"
+    mem_limit: 512m
+
+  alloy:
+    image: grafana/alloy:v1.20.0
+    profiles: ["monitoring"]
+    depends_on: [loki]
+    # Ships every container's logs to Loki, labelled with the Compose service name.
+    command: run --server.http.listen-addr=0.0.0.0:12345 /etc/alloy/config.alloy
+    volumes:
+      - ./monitoring/config.alloy:/etc/alloy/config.alloy:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    ports:
+      - "127.0.0.1:12345:12345"
+    mem_limit: 256m
+
+  grafana:
+    image: grafana/grafana:13.2.2
+    profiles: ["monitoring"]
+    depends_on: [loki]
+    # The admin password is required: there is no admin/admin default. It is
+    # checked here, when Grafana starts, and not with ${VAR:?}, because Compose
+    # interpolates every service, so ${VAR:?} would make basic mode need it too.
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        if [ -z "$${GF_SECURITY_ADMIN_PASSWORD}" ]; then
+          echo "ERROR: GF_SECURITY_ADMIN_PASSWORD is empty. Set it in .env, then: docker compose --profile monitoring up -d grafana" >&2
+          exit 1
+        fi
+        exec /run.sh "$$@"
+      - grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GF_SECURITY_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GF_SECURITY_ADMIN_PASSWORD:-}
+      # Open the lab dashboard after login.
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/lab-activity.json
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "127.0.0.1:3000:3000"
+    mem_limit: 512m
+
+volumes:
+  # Every lab, run, event, alert, incident, response and audit row. Only
+  # `docker compose down -v` (or scripts/reset.sh, after you confirm) deletes it.
+  pgdata:

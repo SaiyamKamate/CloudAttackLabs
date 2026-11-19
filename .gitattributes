@@ -1,0 +1,4 @@
+# Shell scripts run inside Linux/WSL: keep LF line endings even on a Windows checkout.
+*.sh text eol=lf
+# .env is created from this file and read by Docker Compose and the scripts in Linux.
+.env.example text eol=lf

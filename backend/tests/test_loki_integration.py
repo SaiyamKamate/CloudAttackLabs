@@ -3,7 +3,7 @@ authentication_abuse against the real lab and check the events came from Loki.
 
 Opt-in. Needs Docker, port 8081 and the monitoring stack:
 
-    docker compose --env-file .env -f monitoring/docker-compose.monitoring.yml up -d
+    docker compose --profile monitoring up -d
     pytest -m integration backend/tests/test_loki_integration.py
 """
 import sys
