@@ -23,7 +23,11 @@ export default function HealthStatusPanel({ lab, detail, backend }) {
   const healthyContainers = containers.filter((c) => containerTone(c) === 'ok').length
   const target = targetHealthState(detail?.target_health)
   const falco = falcoState(detail?.falco)
-  const telemetry = telemetryState(detail?.telemetry)
+  const external = lab?.environment === 'external'
+  // A registered target's telemetry is its signed event feed, whatever TELEMETRY_SOURCE says.
+  const telemetry = external
+    ? { tone: 'ok', label: 'integration feed', detail: 'The target\u2019s signed security-event feed (checked in Target Management)' }
+    : telemetryState(detail?.telemetry)
   const status = detail?.status ?? lab?.status
 
   return (

@@ -18,6 +18,17 @@ import time
 import urllib.error
 import urllib.request
 
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """Never follow a redirect: the 3xx comes back as an HTTPError with its own
+    status, so no request can leave the target the platform passed in."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+OPENER = urllib.request.build_opener(_NoRedirect)
+
 # Deliberately invalid. Not any lab account's real password.
 WRONG_PASSWORD = "wrong-password-not-real-cloudattacklab"
 
@@ -29,7 +40,7 @@ def send_login(base_url, username):
         base_url + "/api/login", data=data, method="POST", headers={"Content-Type": "application/json"}
     )
     try:
-        with urllib.request.urlopen(request, timeout=5) as response:
+        with OPENER.open(request, timeout=5) as response:
             return response.status
     except urllib.error.HTTPError as error:
         return error.code

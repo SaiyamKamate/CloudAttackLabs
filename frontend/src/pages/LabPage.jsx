@@ -1,10 +1,11 @@
 import { useState } from 'react'
-import { Boxes, ExternalLink, Play, Plus, RefreshCw, RotateCcw, Server, Square } from 'lucide-react'
+import { Boxes, ExternalLink, Play, Plus, RefreshCw, RotateCcw, Server, Square, Target } from 'lucide-react'
 import { api } from '../api.js'
 import { usePlatform, useUI } from '../lib/context.js'
 import { useAction } from '../lib/useAction.js'
 import { containerTone, isUnusedFalco, labStatusTone } from '../lib/describe.js'
 import { fmt, humanize, shortId } from '../lib/format.js'
+import { navigate } from '../lib/router.js'
 import { Callout, KeyValue, PageHeader, Panel } from '../components/ui/Layout.jsx'
 import { StatusBadge, StatusIndicator } from '../components/ui/Badges.jsx'
 import { EmptyState, ErrorState, LoadingState } from '../components/ui/States.jsx'
@@ -102,6 +103,9 @@ export default function LabPage() {
   const activeRun = detail?.active_run ?? null
   const targetAllowed = detail?.target_url?.allowed
   const containers = detail?.containers ?? []
+  // A registered target's lab: the application runs outside CloudAttackLab, so
+  // there is nothing to start, stop or reset here, and no containers.
+  const external = activeLab.environment === 'external'
 
   return (
     <>
@@ -121,7 +125,13 @@ export default function LabPage() {
       <div className="stack">
         {creating && <Panel title="Create a lab">{createForm}</Panel>}
 
-        {detail?.target_url && !targetAllowed && (
+        {external && (
+          <Callout tone="info" title="Registered target" action={<button className="btn btn-sm" onClick={() => navigate('targets')}><Target size={13} /> Target Management</button>}>
+            This lab belongs to an application that runs on its own, outside CloudAttackLab. It is never started, stopped or reset from here.
+            Verify it and authorize experiments in Target Management.
+          </Callout>
+        )}
+        {!external && detail?.target_url && !targetAllowed && (
           <Callout tone="crit" title="Target URL refused">
             {detail.target_url.error} Runs, start and reset are refused until SHOPCLOUD_URL in .env points at the lab
             (for example http://127.0.0.1:8081) and the backend is restarted.
@@ -133,7 +143,11 @@ export default function LabPage() {
           title={activeLab.name}
           icon={Server}
           meta={<StatusBadge tone={labStatusTone(status)}>{status}</StatusBadge>}
-          actions={
+          actions={external ? (
+            targetAllowed && detail?.target_url?.url
+              ? <a className="btn" href={detail.target_url.url} target="_blank" rel="noreferrer"><ExternalLink size={14} /> Open ShopCloud</a>
+              : null
+          ) : (
             <>
               <button className="btn btn-primary" onClick={() => operate('Start', () => api.startLab(activeLab.id))} disabled={Boolean(busy)}>
                 <Play size={14} /> Start
@@ -151,7 +165,7 @@ export default function LabPage() {
                 <a className="btn" href={detail.target_url.url} target="_blank" rel="noreferrer"><ExternalLink size={14} /> Open ShopCloud</a>
               )}
             </>
-          }
+          )}
         >
           {busy && (
             <div className="stack-sm" style={{ marginBottom: 14 }}>
@@ -195,7 +209,7 @@ export default function LabPage() {
           <HealthStatusPanel lab={activeLab} detail={detail} backend={backend} />
         </Panel>
 
-        <Panel title="Containers" icon={Boxes} flush meta={`${containers.length}`}>
+        {!external && <Panel title="Containers" icon={Boxes} flush meta={`${containers.length}`}>
           <DataTable
             rowKey={(c) => c.service}
             rows={containers}
@@ -215,7 +229,7 @@ export default function LabPage() {
               },
             ]}
           />
-        </Panel>
+        </Panel>}
 
         <Panel title="All labs" flush meta={`${labs.length}`}>
           <DataTable

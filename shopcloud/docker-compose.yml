@@ -1,0 +1,38 @@
+# ShopCloud, standalone: its own Compose project, network, volume and URL.
+# It runs whether or not CloudAttackLab is running. From this folder (shopcloud/):
+#
+#   cp .env.example .env        # then set the two secrets (see .env.example)
+#   docker compose up -d --build
+#   open http://127.0.0.1:8090
+#
+# This is separate from the bundled lab (lab/docker-compose.lab.yml, port 8081),
+# which CloudAttackLab's Lab Manager starts itself. Both build from this same
+# folder and can run at the same time.
+name: shopcloud
+
+services:
+  # Not called `shopcloud`: the optional monitoring stack labels logs by Compose
+  # service name, and this keeps them apart from the bundled lab's ShopCloud.
+  shopcloud-standalone:
+    build: .
+    environment:
+      LAB_CONTROL_TOKEN: ${LAB_CONTROL_TOKEN:?Set LAB_CONTROL_TOKEN in shopcloud/.env (see .env.example)}
+      INTEGRATION_KEY: ${INTEGRATION_KEY:?Set INTEGRATION_KEY in shopcloud/.env (see .env.example)}
+      INTEGRATION_INSTANCE_ID: ${INTEGRATION_INSTANCE_ID:-shopcloud-standalone}
+      # Keep orders, accounts and sessions across restarts; POST /lab/reset restores the baseline.
+      SHOP_RESET_ON_START: "false"
+    ports:
+      - "127.0.0.1:8090:8000" # reachable from this machine only
+    volumes:
+      - shop-data:/app/data
+    mem_limit: 256m
+    cpus: 0.5
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  shop-data:

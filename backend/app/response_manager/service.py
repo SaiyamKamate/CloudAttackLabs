@@ -65,6 +65,8 @@ class ResponseManager:
         adapter: Optional[LabAdapter] = None,
         container_targets: Optional[dict[str, str]] = None,
         actor: str = audit.ANONYMOUS_ACTOR,
+        settings=None,          # needed only for registered targets (labs with environment "external")
+        client_factory=None,
     ) -> None:
         self.session = session
         self.engine = engine
@@ -72,6 +74,8 @@ class ResponseManager:
         self.adapter = adapter  # for stop_container
         self.container_targets = container_targets or {}
         self.actor = actor
+        self.settings = settings
+        self.client_factory = client_factory
 
     # --- read -------------------------------------------------------------
     def get(self, response_id: uuid.UUID) -> ResponseAction:
@@ -329,6 +333,8 @@ class ResponseManager:
         lab: Optional[Lab] = self.session.get(Lab, incident.lab_id) if incident.lab_id else None
         if lab is None:
             raise ApiError(409, "no_lab", f"Incident {incident.id} is not linked to a lab.")
+        if lab.environment == "external":
+            return self._external_target(lab, scenario)
         if scenario.target != lab.target or lab.target not in self.target_clients:
             raise ApiError(
                 409, "unknown_target", f"'{scenario.target}' is not the configured target of lab '{lab.name}'."
@@ -336,6 +342,33 @@ class ResponseManager:
         if lab.status != LabStatus.running.value:
             raise ApiError(409, "lab_not_running", f"Lab '{lab.name}' is {lab.status}; start it before approving.")
         return self.target_clients[lab.target]
+
+    def _external_target(self, lab: Lab, scenario: ScenarioDefinition) -> TargetClient:
+        """A registered target: its guarded client, only while an authorization covers the scenario.
+
+        A response sends traffic too (the rate-limit change and the verification
+        logins), so it needs the same explicit permission as a run. It does not
+        spend a run from the budget.
+        """
+        from ..targets.resolve import authorization_for, resolve_external
+        from ..targets.service import default_client_factory
+
+        if self.settings is None:
+            raise ApiError(409, "unknown_target", f"Lab '{lab.name}' belongs to a registered target; no settings to reach it.")
+        resolved = resolve_external(self.session, lab, self.settings, self.client_factory or default_client_factory)
+        if scenario.target != resolved.kind:
+            raise ApiError(409, "unknown_target", f"'{scenario.target}' is not the kind of target '{resolved.target.name}'.")
+        if not resolved.url_check.allowed:
+            raise ApiError(409, "target_url_refused", resolved.url_check.error)
+        if authorization_for(resolved.target, scenario.id) is None:
+            raise ApiError(
+                409, "not_authorized",
+                f"Target '{resolved.target.name}' has no active authorization for '{scenario.id}'; "
+                "authorize it again in Target Management before approving a response.",
+            )
+        if lab.status != LabStatus.running.value:
+            raise ApiError(409, "lab_not_running", f"Target '{resolved.target.name}' is not verified; verify it first.")
+        return resolved.client
 
     @staticmethod
     def _username(scenario: ScenarioDefinition) -> str:

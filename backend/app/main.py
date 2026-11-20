@@ -22,6 +22,7 @@ from .observability.router import router as observability_router
 from .reports.router import router as reports_router
 from .response_manager.router import router as responses_router
 from .scenario_engine.router import router as scenarios_router
+from .targets.router import router as targets_router
 
 API_PREFIX = "/api/v1"
 
@@ -56,6 +57,7 @@ def create_app() -> FastAPI:
     app.include_router(incidents_router, prefix=API_PREFIX)
     app.include_router(responses_router, prefix=API_PREFIX)
     app.include_router(reports_router, prefix=API_PREFIX)
+    app.include_router(targets_router, prefix=API_PREFIX)
     return app
 
 

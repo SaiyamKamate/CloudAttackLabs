@@ -31,6 +31,8 @@ export default function ScenariosPage({ selectedId }) {
   )
   const baseAvailability = computeReadiness({ definition: null, labDetail, activeLab, runActive }).availability
 
+  const external = activeLab?.environment === 'external'
+
   // Another run (not the one shown here) is still active in the lab.
   const activeRun = labDetail?.active_run ?? null
   const otherActive = activeRun && (!run || activeRun.id !== run.id) ? activeRun : null
@@ -96,10 +98,22 @@ export default function ScenariosPage({ selectedId }) {
 
       <div className="grid grid-main-side">
         <div className="stack">
-          {(!activeLab || (labDetail?.status ?? activeLab.status) !== 'running') && (
-            <Callout tone="info" title="The active lab is not running">
-              Start it on the <a href="#/labs">Labs & Environments</a> page before running a scenario.
+          {external && (
+            <Callout tone="info" title={`Target: ${activeLab.target} (registered, runs outside CloudAttackLab)`}>
+              Runs go to {labDetail?.target_url?.url ?? 'its registered URL'} and need an active authorization that names the scenario.
+              The backend re-checks the URL and the handshake before every run. Manage it in <a href="#/targets">Target Management</a>.
             </Callout>
+          )}
+          {(!activeLab || (labDetail?.status ?? activeLab.status) !== 'running') && (
+            external ? (
+              <Callout tone="info" title="The target is not verified">
+                Verify it in <a href="#/targets">Target Management</a> before running a scenario.
+              </Callout>
+            ) : (
+              <Callout tone="info" title="The active lab is not running">
+                Start it on the <a href="#/labs">Labs & Environments</a> page before running a scenario.
+              </Callout>
+            )
           )}
           <Panel title="Scenario catalogue" icon={Crosshair} meta={scenarios.data ? `${scenarios.data.length}` : undefined}>
             {scenarios.loading && <LoadingState compact />}

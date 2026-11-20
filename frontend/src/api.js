@@ -86,6 +86,17 @@ export const api = {
 
   // Audit
   listAudit: (params = {}) => request('/audit' + query(params)),
+
+  // Target Management: applications registered by URL that run outside the
+  // platform (V1: ShopCloud). The secrets are sent once and never returned.
+  listTargets: () => request('/targets'),
+  getTarget: (targetId) => request(`/targets/${targetId}`),
+  registerTarget: (body) => request('/targets', { method: 'POST', body }),
+  verifyTarget: (targetId) => request(`/targets/${targetId}/verify`, { method: 'POST' }),
+  verifyTargetTelemetry: (targetId) => request(`/targets/${targetId}/verify-telemetry`, { method: 'POST' }),
+  authorizeTarget: (targetId, body) => request(`/targets/${targetId}/authorizations`, { method: 'POST', body }),
+  revokeAuthorization: (targetId, authorizationId) =>
+    request(`/targets/${targetId}/authorizations/${authorizationId}/revoke`, { method: 'POST' }),
 }
 
 function query(params) {

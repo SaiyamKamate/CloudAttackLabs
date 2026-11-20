@@ -432,7 +432,9 @@ These results come from one machine and from scenarios that were designed togeth
 | [Known limitations](docs/known-limitations.md) | What the lab does not do, or does only simply, and why |
 | [Safety controls](docs/safety.md) | Each safety control and where the code enforces it |
 | [API contract](docs/api-contract.md) | Every backend endpoint, its body, results and errors |
-| [ShopCloud interface](docs/shopcloud-interface.md) | What a lab target must provide: endpoints, test accounts, log format |
+| [ShopCloud interface](docs/shopcloud-interface.md) | What a lab target must provide: endpoints, test accounts, log format, and the signed integration API |
+| [ShopCloud](shopcloud/README.md) | Running ShopCloud on its own (port 8090) and connecting it through Target Management |
+| [Presentation integration plan](docs/architecture/PRESENTATION_INTEGRATION_PLAN.md) | The design for connecting an independent ShopCloud: registration, authorization, signed telemetry, security controls |
 | [Evaluation results](docs/evaluation-results.md) | Measurements of 17 November 2026, with threats to validity and how to repeat them |
 | [Audit, November 2026](docs/audit-2026-11.md) | The independent audit of 16 November 2026 (a record of that day) |
 | [Frontend](frontend/README.md) | The dashboard's pages, structure and data sources |

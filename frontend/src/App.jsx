@@ -16,10 +16,12 @@ import IncidentsPage from './pages/IncidentsPage.jsx'
 import ResponseCenterPage from './pages/ResponseCenterPage.jsx'
 import ReportsPage from './pages/ReportsPage.jsx'
 import SettingsPage from './pages/SettingsPage.jsx'
+import TargetsPage from './pages/TargetsPage.jsx'
 
 const PAGES = {
   overview: OverviewPage,
   labs: LabPage,
+  targets: TargetsPage,
   scenarios: ScenariosPage,
   runs: RunsPage,
   events: EventsPage,

@@ -24,6 +24,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from .db import Database
+from .integration import EventBuffer, build_router
 from .security import (
     DUMMY_HASH,
     RateLimit,
@@ -59,14 +60,39 @@ def note(request: Request, event: str, level: str, message: str, username: Optio
     request.state.log = {"event": event, "level": level, "message": message, "username": username}
 
 
-def create_app(db_path: Optional[str] = None, lab_token: Optional[str] = None, clock=time.monotonic) -> FastAPI:
-    db = Database(db_path or os.environ.get("SHOP_DB_PATH", "/app/data/shop.db"))
+def _env_flag(name: str, default: bool) -> bool:
+    value = os.environ.get(name)
+    if value is None or not value.strip():
+        return default
+    return value.strip().lower() in ("1", "true", "yes", "on")
+
+
+def create_app(
+    db_path: Optional[str] = None,
+    lab_token: Optional[str] = None,
+    clock=time.monotonic,
+    *,
+    integration_key: Optional[str] = None,
+    instance_id: Optional[str] = None,
+    reset_on_start: Optional[bool] = None,
+    wall_clock=time.time,
+) -> FastAPI:
+    if reset_on_start is None:
+        # The bundled lab restores the baseline at every start (the default); the
+        # standalone deployment keeps its data in a volume (SHOP_RESET_ON_START=false).
+        reset_on_start = _env_flag("SHOP_RESET_ON_START", True)
+    db = Database(db_path or os.environ.get("SHOP_DB_PATH", "/app/data/shop.db"), reset_on_start=reset_on_start)
     lab_control_token = lab_token or os.environ.get("LAB_CONTROL_TOKEN", "lab-dev-token")
     rate_limit = RateLimit(clock=clock)
+    # CloudAttackLab integration (shop/integration.py): off unless a key is set.
+    integration_key = integration_key if integration_key is not None else os.environ.get("INTEGRATION_KEY", "")
+    instance_id = instance_id or os.environ.get("INTEGRATION_INSTANCE_ID") or f"shopcloud-{secrets.token_hex(4)}"
+    events = EventBuffer(instance_id)
 
     app = FastAPI(title="ShopCloud", docs_url=None, redoc_url=None, openapi_url=None)
     app.state.db = db
     app.state.rate_limit = rate_limit
+    app.state.events = events
 
     # --- logging and security headers --------------------------------------
 
@@ -90,21 +116,21 @@ def create_app(db_path: Optional[str] = None, lab_token: Optional[str] = None, c
                 else "Request failed",
                 "username": None,
             }
-            write_log(
-                {
-                    "timestamp": _now(),
-                    "service": SERVICE,
-                    "level": described["level"],
-                    "event": described["event"],
-                    "request_id": str(uuid.uuid4()),
-                    "source_ip": request.client.host if request.client else None,
-                    "method": request.method,
-                    "path": path,
-                    "status": response.status_code,
-                    "username": described["username"],
-                    "message": described["message"],
-                }
-            )
+            record = {
+                "timestamp": _now(),
+                "service": SERVICE,
+                "level": described["level"],
+                "event": described["event"],
+                "request_id": str(uuid.uuid4()),
+                "source_ip": request.client.host if request.client else None,
+                "method": request.method,
+                "path": path,
+                "status": response.status_code,
+                "username": described["username"],
+                "message": described["message"],
+            }
+            write_log(record)
+            events.append(record)  # the same record, for the integration feed
         return response
 
     async def read_json(request: Request) -> object:
@@ -272,6 +298,13 @@ def create_app(db_path: Optional[str] = None, lab_token: Optional[str] = None, c
     @app.get("/favicon.ico", include_in_schema=False)
     def favicon():
         return Response(status_code=204)
+
+    if integration_key:
+        if len(integration_key) < 32:
+            raise ValueError("INTEGRATION_KEY must be at least 32 characters")
+        app.include_router(
+            build_router(key=integration_key, buffer=events, write_log=write_log, now=_now, wall_clock=wall_clock)
+        )
 
     app.mount("/static", StaticFiles(directory=STATIC), name="static")
     return app

@@ -1,6 +1,6 @@
 # User guide: the dashboard
 
-This guide walks through one full session on the CloudAttackLab dashboard: start the lab, run each of the three attack scenarios, read an alert and its evidence, investigate an incident, request, approve and verify a response, view and download a report, clean up, close an incident and reset the lab.
+This guide walks through one full session on the CloudAttackLab dashboard: start the lab, run each of the three attack scenarios, read an alert and its evidence, investigate an incident, request, approve and verify a response, view and download a report, clean up, close an incident and reset the lab. Section 13 connects a ShopCloud that runs on its own, outside CloudAttackLab, and runs an authorized experiment against it.
 
 Before you start, install and start the platform with the [installation guide](install.md). The dashboard is at <http://127.0.0.1:5173>.
 
@@ -14,6 +14,7 @@ The sidebar on the left lists the pages, in four groups:
 |---|---|---|
 | Operations | **Overview** | Environment health, counts of runs, alerts and incidents, recent activity |
 | | **Labs & Environments** | The lab's status, health and containers. Create a lab; **Start**, **Stop**, **Reset**; **Open ShopCloud** |
+| | **Target Management** | Register an independently running ShopCloud by URL, verify it, and authorize experiments against it ([section 13](#13-connect-an-independent-shopcloud-target-management)) |
 | Simulation | **Attack Scenarios** | The scenario catalogue. Open a scenario to see its definition and checks, run it and follow the run |
 | | **Experiment Runs** | Every run with its status, detection outcome and cleanup. Open a run for its report and **Cleanup** |
 | Detection | **Events & Telemetry** | Every normalized event, with filters. Click a row for the raw record |
@@ -207,6 +208,98 @@ On **Incidents**, use **Open** and **Closed** to see each group.
 Reset is disabled while a run is active, and takes a few seconds.
 
 **Stop** stops the lab's containers but keeps them and their logs. Nothing in the database is deleted by Stop, Reset or Cleanup: runs, alerts, incidents, reports and the audit log stay. Only `scripts/reset.sh` deletes the database (see the [README](../README.md#stopping-and-resetting)).
+
+## 13. Connect an independent ShopCloud (Target Management)
+
+Sections 1 to 12 use the **bundled** lab, which CloudAttackLab starts itself. This section connects a ShopCloud that runs **on its own**, with its own Compose project, URL (<http://127.0.0.1:8090>) and data. It keeps running when CloudAttackLab is stopped. CloudAttackLab never starts, stops or looks inside it; it only talks to it over HTTP.
+
+Registering a target, verifying it and authorizing an experiment are separate steps. Registration alone never allows attack traffic.
+
+**Before you start**, start the standalone ShopCloud as described in [its README](../shopcloud/README.md#run-it-standalone), and keep its `shopcloud/.env` open: you need `INTEGRATION_KEY` and `LAB_CONTROL_TOKEN`.
+
+### Register
+
+Open **Target Management** (under Operations) and click **Register target**. Fill in:
+
+| Field | Value |
+|---|---|
+| Name | For example `shopcloud-demo`. Lower-case letters, digits and dashes. `shopcloud` is reserved for the bundled lab |
+| Application URL | `http://127.0.0.1:8090` |
+| Integration key | `INTEGRATION_KEY` from `shopcloud/.env` |
+| Control token | `LAB_CONTROL_TOKEN` from `shopcloud/.env` |
+
+Click **Register**. The backend checks the URL against the lab address policy and **sends nothing** to it. The two secrets are stored and never shown again, in the dashboard, the API or the audit log.
+
+Registration creates a lab called `<name> (external)`, which holds the target's runs, events, alerts and incidents. You can see it on **Labs & Environments**.
+
+**Which URLs are accepted.** Only an IP address or `localhost` (host names are refused, so DNS can never redirect the target), inside `127.0.0.0/8`, on port `8090`, with no path. Cloud metadata addresses such as `169.254.169.254`, link-local, multicast and unspecified addresses, and CloudAttackLab's own ports (8000, 5173, 5432, 3000, 3100, 12345) are always refused. A refused URL is shown with the reason and recorded in the audit log as `target.register_refused`.
+
+### Verify the connection and the telemetry
+
+Each target is shown as a card with four steps:
+
+1. **Registered.**
+2. **Connection verified.** Click **Verify connection**. The backend sends `GET /health` and a signed handshake. ShopCloud must prove that it holds the integration key. The card then shows its instance (`shopcloud-standalone`), version and capabilities.
+3. **Telemetry verified.** Click **Verify telemetry**. ShopCloud writes one test security event, and the backend reads it back through ShopCloud's signed event feed. This proves that the evidence path works before any attack traffic is sent.
+4. **Authorized for a controlled experiment**: see the next step.
+
+If verification fails, the step stays open and a message says why, for example "the target refused the integration key (HTTP 401)" or "the target has no integration API (HTTP 404); is INTEGRATION_KEY set on it?".
+
+### Authorize an experiment
+
+Click **Authorize** and choose:
+
+| Field | Choices |
+|---|---|
+| Scenarios | The application scenarios (`authentication_abuse`, `unauthorized_resource_access`) |
+| Valid for | 15, 30 or 60 minutes (60 is the maximum) |
+| Maximum runs | 1, 2, 3 or 5 |
+| Authorized by | Your name. There is no login, so this is recorded as you type it |
+
+Tick the box confirming that the URL is a lab system you control, then click **Authorize experiment**. The button stays disabled until the box is ticked. The card shows **Authorized**, the runs used, and when the authorization expires.
+
+A target has one active authorization at a time. It ends when it expires, when its runs are used up, or when you click **Revoke**.
+
+### Run a scenario
+
+Click **Use for a run**. This selects the target's lab and opens **Attack Scenarios**, which now shows "Target: … (registered, runs outside CloudAttackLab)". Open **Repeated Failed Login Attempts** and click **Run scenario**, as in [section 2](#2-run-authentication_abuse-failed-logins).
+
+Before every run, the backend:
+
+1. checks the stored URL against the address policy again;
+2. repeats the handshake (the same application must still hold the key);
+3. checks that an active authorization names this scenario and has a run left, and counts this run against it.
+
+The script sends its 20 failed logins to `http://127.0.0.1:8090`. During the run, the backend collects ShopCloud's security events through the signed feed, not from Docker. Detection, alerts, incidents and reports then work exactly as in sections 3 to 7.
+
+In **Events & Telemetry**, these events have references that start with `integration:shopcloud:`. The **run.start** entry in the audit log records the authorization, the URL and the ShopCloud instance.
+
+If a run is refused, the message says why:
+
+| Code | Meaning | What to do |
+|---|---|---|
+| `not_authorized` | No active authorization names this scenario: none, revoked, expired, or its runs are used up | Authorize again |
+| `handshake_failed` | The application at the URL did not prove the key. The target's lab is set to `error` | Check ShopCloud and its `.env`, then **Verify connection** |
+| `not_verified` | The telemetry has not been verified (for example after ShopCloud's instance changed) | **Verify telemetry** |
+| `target_url_refused` | The stored URL no longer passes the address policy | Register a URL the policy accepts |
+| `scenario_not_supported` | Container and observation scenarios cannot run against a registered target | Use the bundled lab for them |
+
+### Respond, clean up and revoke
+
+A response to the incident (for example **temporary_rate_limit**) is sent to the registered ShopCloud with its own control token. Approving it needs an active authorization for the scenario, because it sends traffic too, but it does not use up a run. **Cleanup** is always allowed: it turns the rate limit off and resets ShopCloud's data through `/lab/reset`.
+
+**Revoke** stops any new run or response. A run in progress finishes.
+
+### The target's lab
+
+On **Labs & Environments**, the target's lab shows "Registered target" and has no **Start**, **Stop** or **Reset**: CloudAttackLab does not run that application. The lab's status is **Running** after a successful verification and **Error** after a failed one. Its health tiles show ShopCloud's own `/health` and the telemetry source "integration feed". There are no containers.
+
+### Limits of this version
+
+- Only ShopCloud can be registered, and only on approved local addresses. The address and port policy uses the backend's defaults (`TARGET_ALLOWED_CIDRS=127.0.0.0/8`, `TARGET_ALLOWED_PORTS=8090`, `TARGET_AUTHORIZATION_MAX_MINUTES=60`). These are not passed through `docker-compose.yml`, so setting them in `.env` has no effect unless you also add them to the backend's `environment`.
+- A registered target cannot be deleted or renamed from the dashboard yet. Registering the same name again is refused, so pick a new name.
+- The secrets are stored in plain text in PostgreSQL, with the same trust as `.env` on this machine.
+- CloudAttackLab collects telemetry by reading ShopCloud's feed (pull). ShopCloud does not push events to CloudAttackLab in this version.
 
 ## Reports & Analytics
 
