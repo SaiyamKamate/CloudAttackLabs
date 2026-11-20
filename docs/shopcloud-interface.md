@@ -82,6 +82,46 @@ One JSON object per line on stdout, for every request to `/api/*` and `/lab/*`.
 | `rate_limit_changed` | Rate limit settings changed | `config_changed` |
 | `lab_reset` | Baseline restored | `config_changed` |
 
-## 6. Changes
+## 6. Integration API (v1)
+
+Only for a ShopCloud that runs on its own and is registered in CloudAttackLab's **Target Management** (`shopcloud/docker-compose.yml`, port 8090). It is off unless `INTEGRATION_KEY` (at least 32 characters) is set. When it is off, every `/integration` path answers 404, so the bundled lab is unchanged. Requests to `/integration/*` are never written to the security log.
+
+### Signing
+
+Every request carries three headers:
+
+| Header | Value |
+|---|---|
+| `X-CAL-Timestamp` | Unix time in seconds. Refused if more than 60 s from ShopCloud's clock |
+| `X-CAL-Nonce` | 16–64 letters or digits, new for every request. A nonce seen in the last 120 s is refused |
+| `X-CAL-Signature` | `hex(HMAC-SHA256(key, METHOD \n PATH[?QUERY] \n timestamp \n nonce \n hex(SHA-256(body))))` |
+
+`PATH[?QUERY]` is the path and the query string exactly as sent. A missing, stale, replayed or wrong signature gets `401 {"error": "unauthorized"}`, with no detail.
+
+Every answer to a correctly signed request, including a 422, carries `X-CAL-Response-Signature: hex(HMAC-SHA256(key, "response" \n nonce \n hex(SHA-256(body))))`, using the request's nonce. CloudAttackLab rejects an answer without a valid response signature. So an application that does not hold the key cannot pass the handshake or feed telemetry.
+
+### Endpoints
+
+| Endpoint | Body | Answer |
+|---|---|---|
+| `POST /integration/v1/handshake` | `{"challenge": "<16–128 chars>", "target_id": "<1–64 chars>"}` | `{"app": "shopcloud", "kind": "shopcloud", "instance_id", "app_version", "interface_version": "1.0", "telemetry_schema": "shopcloud.security_event/1", "capabilities": [...], "proof"}`, where `proof = hex(HMAC-SHA256(key, "handshake|" + challenge + "|" + target_id + "|" + instance_id))` |
+| `POST /integration/v1/telemetry/test` | `{"nonce": "<16–64 chars>"}` | Writes one `integration_test` event whose `test_nonce` is that nonce. Answers `{"status": "emitted", "seq", "request_id"}` |
+| `GET /integration/v1/events` | Query: `since` (ISO 8601, optional), `after_seq` (default 0), `limit` (1–1000, default 500) | `{"events": [...], "next_seq", "truncated", "latest_seq"}`, oldest first |
+
+CloudAttackLab requires the capabilities `login_endpoint`, `rate_limit_control` and `telemetry_feed_v1`.
+
+### Event records (`shopcloud.security_event/1`)
+
+Each event is the log record of section 5 plus three fields:
+
+| Field | Meaning |
+|---|---|
+| `schema` | Always `shopcloud.security_event/1`. CloudAttackLab skips other schemas |
+| `seq` | Increases by one per event. Used as the paging cursor |
+| `instance_id` | `INTEGRATION_INSTANCE_ID`. It must match the instance that passed the handshake, or CloudAttackLab fails the run |
+
+The feed keeps the last 10,000 events. `truncated: true` means events after `after_seq` were dropped because the buffer wrapped. CloudAttackLab then fails the run, because its evidence would be incomplete.
+
+## 7. Changes
 
 If either side needs to change something here, change this file first and tell the other person. Both the fake ShopCloud and `tools/check_shopcloud.py` are then updated to match.
