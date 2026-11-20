@@ -249,18 +249,18 @@ def test_an_expired_authorization_is_not_active(api, db):
 
 
 # --- the external lab is never driven through Docker -------------------------------------
-def test_external_lab_cannot_be_started_or_run_yet(api, adapter):
+def test_external_lab_is_never_driven_through_docker(api, adapter):
     target = ready_target(api)
-    authorize(api, target["id"])
     lab_id = target["lab_id"]
     assert api.post(f"{API}/labs/{lab_id}/start").json()["error"] == "external_lab"
+    assert api.post(f"{API}/labs/{lab_id}/stop").json()["error"] == "external_lab"
     assert api.post(f"{API}/labs/{lab_id}/reset").json()["error"] == "external_lab"
     detail = api.get(f"{API}/labs/{lab_id}").json()
+    assert detail["status"] == "running"  # verified
     assert detail["containers"] == []
-    run = api.post(f"{API}/labs/{lab_id}/runs", json={"scenario_id": "authentication_abuse"})
-    assert run.status_code == 409
-    assert run.json()["error"] == "external_runs_not_enabled"
-    assert "start" not in adapter.calls and "reset" not in adapter.calls
+    assert detail["target_health"]["healthy"] is True  # ShopCloud's own /health
+    assert detail["target_url"] == {"url": URL, "allowed": True, "error": None}
+    assert not {"start", "stop", "reset"} & set(adapter.calls)
 
 
 def test_external_lab_does_not_block_the_docker_lab(api):

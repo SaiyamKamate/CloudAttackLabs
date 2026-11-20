@@ -17,6 +17,8 @@ from .docker_adapter import DockerComposeAdapter
 from .service import LabManager, active_run_in_lab
 from .target import HttpTargetClient, TargetClient
 from .target_guard import GuardedTargetClient, TargetGuard
+from ..targets.resolve import get_client_factory, resolve_external
+from ..targets.service import ClientFactory
 
 router = APIRouter(prefix="/labs", tags=["labs"])
 
@@ -57,13 +59,18 @@ def get_manager(
     target_clients: dict[str, TargetClient] = Depends(get_target_clients),
     guard: TargetGuard = Depends(get_target_guard),
     settings: Settings = Depends(get_settings),
+    client_factory: ClientFactory = Depends(get_client_factory),
 ) -> LabManager:
+    def external_resolver(lab):  # a registered target's lab: its pinned URL and guarded client
+        return resolve_external(session, lab, settings, client_factory)
+
     container_services = tuple(settings.container_targets.values())
     # Lab target names are also their Compose service names (shopcloud).
     expected = tuple(settings.lab_targets) + container_services + ((FALCO_SERVICE,) if settings.falco_enabled else ())
     return LabManager(
         session, adapter, target_clients, guard=guard,
         expected_services=expected, container_services=container_services,
+        external_resolver=external_resolver,
     )
 
 

@@ -18,6 +18,8 @@ from ..scenario_engine.engine import ScenarioEngine
 from ..scenario_engine.router import get_scenario_engine
 from .api_schemas import AuditOut, ResponseOut
 from .service import ResponseManager
+from ..targets.resolve import get_client_factory
+from ..targets.service import ClientFactory
 
 router = APIRouter(tags=["responses"])
 
@@ -28,9 +30,11 @@ def get_response_manager(
     target_clients: dict[str, TargetClient] = Depends(get_target_clients),
     adapter: LabAdapter = Depends(get_adapter),
     settings: Settings = Depends(get_settings),
+    client_factory: ClientFactory = Depends(get_client_factory),
 ) -> ResponseManager:
     return ResponseManager(
-        session, engine, target_clients, adapter=adapter, container_targets=settings.container_targets
+        session, engine, target_clients, adapter=adapter, container_targets=settings.container_targets,
+        settings=settings, client_factory=client_factory,
     )
 
 

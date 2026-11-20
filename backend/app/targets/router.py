@@ -12,15 +12,11 @@ from ..models import Target, TargetAuthorization
 from ..scenario_engine.engine import ScenarioEngine
 from ..scenario_engine.router import get_scenario_engine
 from .api_schemas import AuthorizationCreate, AuthorizationOut, TargetCreate, TargetDetail, TargetOut
-from .service import ClientFactory, TargetService, default_client_factory, effective_status
+from .resolve import get_client_factory
+from .service import ClientFactory, TargetService, effective_status
 from .url_policy import UrlRefused, check_pinned
 
 router = APIRouter(prefix="/targets", tags=["targets"])
-
-
-def get_client_factory() -> ClientFactory:
-    """How the backend talks to a target's integration API (replaced by a fake in tests)."""
-    return default_client_factory
 
 
 def get_target_service(

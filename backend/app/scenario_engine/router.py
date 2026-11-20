@@ -17,6 +17,8 @@ from ..schemas.scenario import ScenarioDefinition
 from .api_schemas import RunCreate, RunOut, ScenarioSummary
 from .engine import ScenarioEngine
 from .service import ScenarioService
+from ..targets.resolve import get_client_factory
+from ..targets.service import ClientFactory
 
 router = APIRouter(tags=["scenarios"])
 
@@ -43,8 +45,9 @@ def get_service(
     settings: Settings = Depends(get_settings),
     adapter: LabAdapter = Depends(get_adapter),
     detection: DetectionEngine = Depends(get_detection_engine),
+    client_factory: ClientFactory = Depends(get_client_factory),
 ) -> ScenarioService:
-    return ScenarioService(session, engine, target_clients, settings, adapter, detection)
+    return ScenarioService(session, engine, target_clients, settings, adapter, detection, client_factory=client_factory)
 
 
 @router.get("/scenarios", response_model=list[ScenarioSummary])

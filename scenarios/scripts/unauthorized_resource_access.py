@@ -26,6 +26,17 @@ import time
 import urllib.error
 import urllib.request
 
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """Never follow a redirect: the 3xx comes back as an HTTPError with its own
+    status, so no request can leave the target the platform passed in."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+OPENER = urllib.request.build_opener(_NoRedirect)
+
 RESOURCE = "/api/orders"
 
 # Documented synthetic test accounts this script may use.
@@ -51,7 +62,7 @@ def login(base_url, username, password):
         base_url + "/api/login", data=data, method="POST", headers={"Content-Type": "application/json"}
     )
     try:
-        with urllib.request.urlopen(request, timeout=5) as response:
+        with OPENER.open(request, timeout=5) as response:
             body = json.loads(response.read().decode() or "{}")
             token = body.get("token") if isinstance(body, dict) else None
             return response.status, token if isinstance(token, str) else None
@@ -67,7 +78,7 @@ def request_resource(base_url, token):
         base_url + RESOURCE, method="GET", headers={"Authorization": "Bearer " + token}
     )
     try:
-        with urllib.request.urlopen(request, timeout=5) as response:
+        with OPENER.open(request, timeout=5) as response:
             return response.status
     except urllib.error.HTTPError as error:
         return error.code

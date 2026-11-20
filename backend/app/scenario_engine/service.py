@@ -48,6 +48,9 @@ from . import runner
 from .engine import ScenarioEngine
 from .preflight import run_preflight
 from .verification import run_verification
+from ..targets.resolve import ResolvedTarget, is_external, require_authorization, resolve_lab_target
+from ..targets.service import ClientFactory, TargetService, default_client_factory
+from ..telemetry.integration import IntegrationFeedSource
 
 log = logging.getLogger("cloudattacklab.scenarios")
 
@@ -90,6 +93,7 @@ class ScenarioService:
         detection: DetectionEngine,
         *,
         actor: str = audit.ANONYMOUS_ACTOR,
+        client_factory: ClientFactory = default_client_factory,
     ) -> None:
         self.session = session
         self.engine = engine
@@ -98,6 +102,7 @@ class ScenarioService:
         self.adapter = adapter
         self.detection = detection
         self.actor = actor
+        self.client_factory = client_factory  # registered targets' integration API
         # Checks, before every run, that the target URL points into the lab.
         self.guard = TargetGuard(settings.lab_targets, settings.lab_compose_file, adapter)
         # Background threads open their own session on the same database.
@@ -122,22 +127,41 @@ class ScenarioService:
         if lab is None:
             raise ApiError(404, "lab_not_found", f"No lab with id {lab_id}.")
         scenario = self.engine.get(scenario_id)  # 404 if not a valid scenario
-        if lab.environment == "external":
-            # Fail closed until runs against registered targets (target resolution,
-            # authorization check, integration telemetry) are wired in.
-            raise ApiError(
-                409,
-                "external_runs_not_enabled",
-                f"Lab '{lab.name}' belongs to a registered target; runs against registered targets are not enabled yet.",
-            )
 
         # Refuse (409) if the lab is not running or the target is not one of the lab's targets.
         is_container = scenario.type == "container"
         is_observation = scenario.type == OBSERVATION
+        external = is_external(lab)
+        resolved: Optional[ResolvedTarget] = None
+        authorization = None
+        if external and scenario.type != "application":
+            raise ApiError(
+                409, "scenario_not_supported",
+                f"Only application scenarios can run against a registered target; '{scenario.id}' is {scenario.type}.",
+            )
         if is_container:
             # Every Docker lab has the configured container targets (the test container).
             if scenario.target not in self.settings.container_targets:
                 raise ApiError(409, "unknown_target", f"'{scenario.target}' is not a configured container target.")
+        elif external:
+            resolved = self._resolve(lab)
+            target_row = resolved.target
+            if scenario.target != target_row.kind:
+                raise ApiError(
+                    409, "target_mismatch",
+                    f"scenario targets '{scenario.target}' but '{target_row.name}' is a '{target_row.kind}' target.",
+                )
+            # Nothing is sent unless the pinned URL still passes the URL policy.
+            if not resolved.url_check.allowed:
+                raise ApiError(409, "target_url_refused", resolved.url_check.error)
+            # Prove, now, that the same application still answers with the key.
+            TargetService(self.session, self.settings, client_factory=self.client_factory, actor=self.actor).verify(
+                target_row.id
+            )
+            if target_row.telemetry_verified_at is None:
+                raise ApiError(409, "not_verified", f"Verify the telemetry integration of '{target_row.name}' first.")
+            # Registration is not permission: an explicit, active authorization must name this scenario.
+            authorization = require_authorization(target_row, scenario.id)
         else:
             if scenario.target != lab.target:
                 raise ApiError(
@@ -151,11 +175,13 @@ class ScenarioService:
             url_check = self.guard.check(lab.target)
             if not url_check.allowed:
                 raise ApiError(409, "target_url_refused", url_check.error)
+            if not is_observation:
+                resolved = self._resolve(lab)
         if lab.status != LabStatus.running.value:
             raise ApiError(409, "lab_not_running", f"Lab '{lab.name}' is {lab.status}; start it before a run.")
 
-        target = None if is_container else self.target_clients[lab.target]
-        base_url = None if is_container else self.settings.lab_targets[lab.target]
+        target = resolved.client if resolved is not None else (None if is_container else self.target_clients[lab.target])
+        base_url = resolved.base_url if resolved is not None else (None if is_container else self.settings.lab_targets[lab.target])
         # Confirm the script exists before accepting the run (an observation has none).
         script_path = (
             None
@@ -190,13 +216,27 @@ class ScenarioService:
             )
             self.session.add(run)
             self.session.flush()
+            detail = {"scenario_id": scenario.id, "lab_id": str(lab.id), "parameters": dict(run.parameters)}
+            if authorization is not None:
+                # Spend one run of the authorization in the same commit as the run.
+                authorization.runs_used += 1
+                detail.update(
+                    authorization_id=str(authorization.id),
+                    authorization_runs_used=authorization.runs_used,
+                    authorization_max_runs=authorization.max_runs,
+                    target_id=str(resolved.target.id),
+                    target_name=resolved.target.name,
+                    base_url=resolved.base_url,
+                    resolved_ip=resolved.target.resolved_ip,
+                    instance_id=resolved.target.instance_id,
+                )
             audit.record(
                 self.session,
                 actor=self.actor,
                 action="run.start",
                 object_type="scenario_run",
                 object_id=str(run.id),
-                detail={"scenario_id": scenario.id, "lab_id": str(lab.id), "parameters": dict(run.parameters)},
+                detail=detail,
             )
             self.session.commit()
             run_id = run.id
@@ -206,7 +246,7 @@ class ScenarioService:
 
         thread = threading.Thread(
             target=self._run_in_background,
-            args=(run_id, lab_id, scenario, base_url, str(script_path) if script_path else None, scenario.target),
+            args=(run_id, lab_id, scenario, base_url, str(script_path) if script_path else None, scenario.target, resolved),
             name=f"run-{run_id}",
             daemon=True,
         )
@@ -225,7 +265,12 @@ class ScenarioService:
             "cleanup resets the lab's target and would break that run",
         )
         scenario = self.engine.get(run.scenario_id)
-        target = self.target_clients.get(scenario.target)
+        lab = self.session.get(Lab, run.lab_id)
+        if lab is not None and is_external(lab):
+            # Cleanup restores the target's baseline, so it needs no authorization.
+            target = self._resolve(lab).client
+        else:
+            target = self.target_clients.get(scenario.target)
         if target is None and scenario.target not in self.settings.container_targets:
             raise ApiError(409, "unknown_target", f"'{scenario.target}' is not a configured lab target.")
         self._run_cleanup(self.session, scenario, target, run, trigger="manual")
@@ -242,8 +287,13 @@ class ScenarioService:
         base_url: Optional[str],
         script_path: Optional[str],
         target_name: str,
+        resolved: Optional[ResolvedTarget] = None,
     ) -> None:
         from pathlib import Path
+
+        # The HTTP target for verification and cleanup: the resolved one (for a
+        # registered target, its guarded client), else the configured lab target.
+        http_target = resolved.client if resolved is not None else self.target_clients.get(target_name)
 
         try:
             with Session(self._bind, expire_on_commit=False) as session:
@@ -254,7 +304,7 @@ class ScenarioService:
                 started_at = run.started_at
 
             # Collect the run's telemetry while it is active (and once more at the end).
-            feeds = self._telemetry_feeds(scenario)
+            feeds = self._telemetry_feeds(scenario, resolved)
             for feed in feeds:
                 try:
                     feed.source.check()
@@ -272,7 +322,8 @@ class ScenarioService:
                 lab_id=lab_id,
                 scenario_id=scenario.id,
                 started_at=started_at,
-                container_id=self._container_id(service),
+                # A registered target is not one of the lab's containers.
+                container_id=None if (resolved is not None and resolved.external) else self._container_id(service),
             )
             stop = threading.Event()
             telemetry_errors: list[tuple[str, str]] = []
@@ -331,9 +382,7 @@ class ScenarioService:
                 # keep the result with the run. Done after collection stops, so
                 # this request is not counted as part of the run's evidence.
                 summary = result.summary
-                verification = run_verification(
-                    scenario, self.target_clients.get(target_name), self.settings.lab_test_accounts
-                )
+                verification = run_verification(scenario, http_target, self.settings.lab_test_accounts)
                 if verification is not None:
                     summary = {**(summary or {}), "verification": verification}
 
@@ -377,9 +426,8 @@ class ScenarioService:
                     )
                     session.commit()
                     # Cleanup also runs if a run fails or times out.
-                    target = self.target_clients.get(target_name)
-                    if target is not None or target_name in self.settings.container_targets:
-                        self._run_cleanup(session, scenario, target, run, trigger="auto")
+                    if http_target is not None or target_name in self.settings.container_targets:
+                        self._run_cleanup(session, scenario, http_target, run, trigger="auto")
                         session.commit()
         except Exception:  # never let a background thread die silently
             log.exception("run %s crashed", run_id)
@@ -388,14 +436,26 @@ class ScenarioService:
             self._release(lab_id)
 
     # --- telemetry collection --------------------------------------------
-    def _telemetry_feeds(self, scenario: ScenarioDefinition) -> list[Feed]:
+    def _telemetry_feeds(self, scenario: ScenarioDefinition, resolved: Optional[ResolvedTarget] = None) -> list[Feed]:
         """What to collect for this scenario.
+
+        A registered target: its signed security-event feed, and nothing else
+        (CloudAttackLab has no access to its containers).
 
         Application scenarios: the target's logs from TELEMETRY_SOURCE.
         Container scenarios: the test container's Docker events (base telemetry)
         and, with FALCO_ENABLED, Falco's alerts read from TELEMETRY_SOURCE (extra
         evidence: Falco having nothing to report is not an error).
         """
+        if resolved is not None and resolved.external:
+            return [
+                Feed(
+                    IntegrationFeedSource(resolved.integration, resolved.target.instance_id),
+                    what=f"{resolved.target.name} security events",
+                    settle=True,
+                    hint="Check the target in Target Management (Verify telemetry).",
+                )
+            ]
         if scenario.type == OBSERVATION:
             # Everything an attack run of any type would collect.
             source = make_source(self.settings, self.adapter)
@@ -642,6 +702,14 @@ class ScenarioService:
             self.adapter.recreate_service(service)
         else:
             log.warning("unknown cleanup step '%s'; skipping", step)
+
+    def _resolve(self, lab: Lab) -> ResolvedTarget:
+        resolved = resolve_lab_target(
+            self.session, lab, self.settings, self.target_clients, self.guard, self.client_factory
+        )
+        if resolved is None:
+            raise ApiError(409, "unknown_target", f"'{lab.target}' is not a configured lab target.")
+        return resolved
 
     # --- one active run per lab ------------------------------------------
     def _acquire(self, lab_id: uuid.UUID) -> None:

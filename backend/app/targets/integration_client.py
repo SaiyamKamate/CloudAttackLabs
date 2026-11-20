@@ -84,6 +84,11 @@ class IntegrationClient:
     def base_url(self) -> str:
         return self.pinned.base_url
 
+    @property
+    def http(self) -> Optional[httpx.Client]:
+        """The injected HTTP client, if any (tests route every target request through it)."""
+        return self._http
+
     # --- the calls ------------------------------------------------------------
     def health(self) -> TargetHealth:
         """GET /health, unsigned (the application's public health check)."""

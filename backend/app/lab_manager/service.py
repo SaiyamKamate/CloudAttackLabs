@@ -85,6 +85,7 @@ class LabManager:
         expected_services: tuple[str, ...] = (),
         container_services: tuple[str, ...] = (),
         actor: str = audit.ANONYMOUS_ACTOR,
+        external_resolver=None,  # lab -> ResolvedTarget, for registered targets' labs
     ) -> None:
         self.session = session
         self.adapter = adapter
@@ -96,6 +97,7 @@ class LabManager:
         self.container_services = container_services  # the test container(s)
         self.status_detail: Optional[str] = None  # set by details()
         self.actor = actor
+        self.external_resolver = external_resolver
 
     # --- create / read ----------------------------------------------------
     def create(self, name: str, target: str) -> Lab:
@@ -124,10 +126,10 @@ class LabManager:
     def details(self, lab_id: uuid.UUID) -> tuple[Lab, list[ContainerStatus], TargetHealth]:
         lab = self.get(lab_id)
         if lab.environment == EXTERNAL:
-            self.status_detail = "Managed outside CloudAttackLab; see Target Management."
-            return lab, [], TargetHealth(
-                reachable=False, healthy=False, error="external target: check it in Target Management"
-            )
+            self.status_detail = "Runs outside CloudAttackLab; verify and authorize it in Target Management."
+            if self.external_resolver is None:
+                return lab, [], TargetHealth(reachable=False, healthy=False, error="external target: see Target Management")
+            return lab, [], self.external_resolver(lab).client.health()
         other = self._other_active_lab(lab)
         if other is not None:
             # The physical lab currently belongs to another lab row; do not report its containers as ours.
@@ -274,7 +276,9 @@ class LabManager:
     # --- the target URL ---------------------------------------------------
     def target_url_check(self, lab: Lab) -> TargetUrlCheck:
         if lab.environment == EXTERNAL:
-            return TargetUrlCheck(lab.target, "", False, "External target: its URL is checked in Target Management.")
+            if self.external_resolver is None:
+                return TargetUrlCheck(lab.target, "", False, "External target: its URL is checked in Target Management.")
+            return self.external_resolver(lab).url_check
         if self.guard is None:
             return TargetUrlCheck(lab.target, "", True)
         return self.guard.check(lab.target)

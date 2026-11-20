@@ -186,6 +186,7 @@ class TargetService:
         except IntegrationError as exc:
             target.status = TargetStatus.registered.value
             target.telemetry_verified_at = None
+            target.lab.status = LabStatus.error.value  # no run can start until it verifies again
             self._audit(target, "target.verify_failed", {"error": str(exc)})
             self.session.commit()
             raise ApiError(502, "handshake_failed", f"Connection check failed: {exc}") from None
@@ -198,6 +199,8 @@ class TargetService:
         target.app_version = identity["app_version"]
         target.capabilities = identity["capabilities"]
         target.verified_at = utcnow()
+        # The lab row shows the target as running while it answers and proves its identity.
+        target.lab.status = LabStatus.running.value
         self._audit(target, "target.verified", {
             "instance_id": target.instance_id, "app_version": target.app_version,
             "capabilities": target.capabilities, "interface_version": identity["interface_version"],

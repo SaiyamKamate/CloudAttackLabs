@@ -1,6 +1,6 @@
 import {
   Activity, BarChart3, Crosshair, FlaskConical, LayoutDashboard,
-  Server, ShieldAlert, ShieldCheck, Siren,
+  Server, ShieldAlert, ShieldCheck, Siren, Target,
 } from 'lucide-react'
 
 // The navigation, in sidebar order. Page keys are the hash routes.
@@ -8,6 +8,7 @@ export const NAV = [
   { section: 'Operations' },
   { key: 'overview', label: 'Overview', icon: LayoutDashboard },
   { key: 'labs', label: 'Labs & Environments', icon: Server },
+  { key: 'targets', label: 'Target Management', icon: Target },
   { section: 'Simulation' },
   { key: 'scenarios', label: 'Attack Scenarios', icon: Crosshair },
   { key: 'runs', label: 'Experiment Runs', icon: FlaskConical },

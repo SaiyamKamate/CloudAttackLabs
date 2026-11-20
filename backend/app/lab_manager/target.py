@@ -53,14 +53,26 @@ class TargetClient(Protocol):
 
 
 class HttpTargetClient:
-    def __init__(self, base_url: str, lab_control_token: str, *, timeout_seconds: float = 5) -> None:
+    """Redirects are never followed (httpx's default, passed explicitly): a 3xx
+    answer is just a non-200 status, so no request can leave the target."""
+
+    def __init__(
+        self, base_url: str, lab_control_token: str, *, timeout_seconds: float = 5, http: Optional[httpx.Client] = None
+    ) -> None:
         self.base_url = base_url.rstrip("/")
         self._token = lab_control_token
         self._timeout = timeout_seconds
+        self._http = http  # an httpx.Client (tests); None: one-off requests
+
+    def _get(self, url: str, **kwargs):
+        return (self._http or httpx).get(url, follow_redirects=False, **kwargs)
+
+    def _post(self, url: str, **kwargs):
+        return (self._http or httpx).post(url, follow_redirects=False, **kwargs)
 
     def health(self) -> TargetHealth:
         try:
-            response = httpx.get(f"{self.base_url}/health", timeout=self._timeout)
+            response = self._get(f"{self.base_url}/health", timeout=self._timeout)
         except httpx.HTTPError as exc:
             return TargetHealth(reachable=False, healthy=False, error=f"{type(exc).__name__}: {exc}")
         try:
@@ -86,7 +98,7 @@ class HttpTargetClient:
 
     def reset(self) -> None:
         try:
-            response = httpx.post(
+            response = self._post(
                 f"{self.base_url}/lab/reset", headers={"X-Lab-Token": self._token}, timeout=self._timeout
             )
         except httpx.HTTPError as exc:
@@ -97,7 +109,7 @@ class HttpTargetClient:
     def login(self, username: str, password: str) -> LoginResult:
         """POST /api/login. Used by the test_account pre-flight check."""
         try:
-            response = httpx.post(
+            response = self._post(
                 f"{self.base_url}/api/login",
                 json={"username": username, "password": password},
                 timeout=self._timeout,
@@ -112,7 +124,7 @@ class HttpTargetClient:
         Used by the access_remains_denied verification.
         """
         try:
-            login = httpx.post(
+            login = self._post(
                 f"{self.base_url}/api/login",
                 json={"username": username, "password": password},
                 timeout=self._timeout,
@@ -122,7 +134,7 @@ class HttpTargetClient:
             token = login.json().get("token")
             if not isinstance(token, str) or not token:
                 return AccessResult(login_status=200, error="login returned no token")
-            response = httpx.get(
+            response = self._get(
                 f"{self.base_url}/api/orders",
                 headers={"Authorization": f"Bearer {token}"},
                 timeout=self._timeout,
@@ -144,7 +156,7 @@ class HttpTargetClient:
         if window_seconds is not None:
             body["window_seconds"] = window_seconds
         try:
-            response = httpx.post(
+            response = self._post(
                 f"{self.base_url}/lab/rate-limit",
                 json=body,
                 headers={"X-Lab-Token": self._token},
